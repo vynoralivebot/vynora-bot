@@ -78,7 +78,7 @@ def handle_screenshot(message):
         btn5 = types.InlineKeyboardButton("90 Min (Rs.1000)", callback_data=f"app_{user_id}_90")
         btn_rej = types.InlineKeyboardButton("Reject", callback_data=f"rej_{user_id}")
         markup.add(btn1, btn2, btn3, btn4, btn5, btn_rej)
-        
+
         admin_msg = f"📸 *New Payment Screenshot*\n\nUser ID: `{user_id}`\nTxn ID: `{txn_id}`"
         bot.send_photo(ADMIN_GROUP_ID, photo_id, caption=admin_msg, reply_markup=markup)
         bot.send_message(user_id, "⏳ Aapka screenshot verification ke liye admin ko bhej diya gaya hai.")
@@ -90,15 +90,17 @@ def callback_query(call):
         parts = data.split("_")
         user_id = int(parts[1])
         mins = int(parts[2])
-        
+
         user_balances[user_id] = user_balances.get(user_id, 0) + mins
-        
-        bot.send_message(user_id, f"✅ *Payment Approved!*\nAapke account mein *{mins} Minutes* add kar diye gaye hain.\nTotal Balance: {user_balances[user_id]} Minutes.")
+
+        bot.send_message(user_id, f"✅ *Payment Approved!*\nAapke account mein *{mins} Minutes* add kar diye gaye hain.")
         bot.answer_callback_query(call.id, "Approved!")
         bot.edit_message_caption(f"✅ APPROVED: {mins} Mins credited to User ID `{user_id}`", ADMIN_GROUP_ID, call.message.message_id)
+        
     elif data.startswith("rej_"):
         parts = data.split("_")
         user_id = int(parts[1])
+        
         bot.send_message(user_id, "❌ Aapka payment screenshot reject ho gaya hai. Admin se sampark karein.")
         bot.answer_callback_query(call.id, "Rejected!")
         bot.edit_message_caption(f"❌ REJECTED for User ID `{user_id}`", ADMIN_GROUP_ID, call.message.message_id)
@@ -109,9 +111,12 @@ def show_balance(message):
     bal = user_balances.get(user_id, 0)
     bot.send_message(message.chat.id, f"💰 *Aapka Account Balance*\n\nRemaining Balance: *{bal} Minutes*")
 
+# Main execution loop
 if __name__ == '__main__':
     print("Vynora Bot Active & Running...")
-    bot.remove_webhook(drop_pending_updates=True)
+    try:
+        bot.remove_webhook(drop_pending_updates=True)
+    except Exception as e:
+        print(f"Webhook cleanup note: {e}")
+        
     bot.infinity_polling(skip_pending=True)
-
-
