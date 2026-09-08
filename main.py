@@ -23,12 +23,13 @@ threading.Thread(target=run_server, daemon=True).start()
 # 2. Telegram Bot Config
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "8967146778:AAG6NJSZiLGiJrMHaKdIO9eSBiZ7uz_72VU")
 ADMIN_GROUP_ID = int(os.environ.get("ADMIN_GROUP_ID", "-1004325621712"))
+HOST_GROUP_ID = -1004312344325  # Aapka naya Host Private Group ID
 UPI_ID = "vynoralive@slc"
 PAYEE_NAME = "Rajnish Kumar"
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="Markdown")
 
-# Database Storage
+# Database Storage (In-memory)
 user_balances = {}
 user_profiles = {}
 
@@ -39,8 +40,13 @@ def get_main_keyboard():
     btn2 = types.KeyboardButton("💳 Buy Minutes / Payment")
     btn3 = types.KeyboardButton("💰 My Balance & Referral")
     btn4 = types.KeyboardButton("📝 Register / Profile")
-    btn5 = types.KeyboardButton("🆘 Help / Support")
-    markup.add(btn1, btn2, btn3, btn4, btn5)
+    btn5 = types.KeyboardButton("🎥 Bot Tutorial")
+    btn6 = types.KeyboardButton("👑 Register as Host")
+    btn7 = types.KeyboardButton("🆘 Help / Support")
+    markup.add(btn1, btn2)
+    markup.add(btn3, btn4)
+    markup.add(btn5, btn6)
+    markup.add(btn7)
     return markup
 
 # --- 1. START COMMAND ---
@@ -52,26 +58,58 @@ def start_cmd(message):
         reply_markup=get_main_keyboard()
     )
 
-# --- 2. EASY 1-TOUCH BOOKING (NO COMMAND TYPING) ---
+# --- 2. BOOK HOST SESSION (Step 1: Select Host) ---
 @bot.message_handler(func=lambda msg: msg.text in ["Book Host Session", "🔥 Book Host Session"])
 def book_host(message):
     user_id = message.chat.id
     bal = user_balances.get(user_id, 0)
     
     markup = types.InlineKeyboardMarkup(row_width=1)
-    btn1 = types.InlineKeyboardButton("💃 Host Priya (10 Mins) - 📱 Online", callback_data="book_Priya_10")
-    btn2 = types.InlineKeyboardButton("🔥 Host Ananya (20 Mins) - 📱 Online", callback_data="book_Ananya_20")
-    btn3 = types.InlineKeyboardButton("✨ Host Simran (30 Mins) - 📱 Online", callback_data="book_Simran_30")
-    markup.add(btn1, btn2, btn3)
+    markup.add(
+        types.InlineKeyboardButton("💃 Host Priya — 🟢 Online", callback_data="select_host_Priya"),
+        types.InlineKeyboardButton("🔥 Host Ananya — 🟢 Online", callback_data="select_host_Ananya"),
+        types.InlineKeyboardButton("✨ Host Simran — 🟢 Online", callback_data="select_host_Simran")
+    )
     
     text = (
-        "✨ *VYNORA LIVE - INSTANT BOOKING*\n\n"
+        "✨ *VYNORA LIVE - HOST SELECTION*\n\n"
         f"💰 *Aapka Available Balance:* `{bal} Minutes`\n\n"
-        "👇 *Session start karne ke liye Host ke naam par click karein:*"
+        "👇 *Session ke liye kisi ek Host ko chunein:*"
     )
     bot.send_message(message.chat.id, text, reply_markup=markup)
 
-# Host Booking Click Callback Handler
+# Step 2: Host select karne par uske saare Duration Options dikhana (5m, 10m, 20m, 30m)
+@bot.callback_query_handler(func=lambda call: call.data.startswith("select_host_"))
+def show_host_durations(call):
+    host_name = call.data.replace("select_host_", "")
+    
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        types.InlineKeyboardButton("⏱️ 5 Mins", callback_data=f"book_{host_name}_5"),
+        types.InlineKeyboardButton("⏱️ 10 Mins", callback_data=f"book_{host_name}_10"),
+        types.InlineKeyboardButton("⏱️ 20 Mins", callback_data=f"book_{host_name}_20"),
+        types.InlineKeyboardButton("⏱️ 30 Mins", callback_data=f"book_{host_name}_30"),
+        types.InlineKeyboardButton("⬅️ Back to Hosts", callback_data="back_to_hosts")
+    )
+    
+    text = (
+        f"👤 *Selected Host: {host_name}*\n\n"
+        "👇 *Kitne samay (Minutes) ke liye session book karna hai select karein:*"
+    )
+    bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+    bot.answer_callback_query(call.id)
+
+@bot.callback_query_handler(func=lambda call: call.data == "back_to_hosts")
+def back_to_hosts(call):
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    markup.add(
+        types.InlineKeyboardButton("💃 Host Priya — 🟢 Online", callback_data="select_host_Priya"),
+        types.InlineKeyboardButton("🔥 Host Ananya — 🟢 Online", callback_data="select_host_Ananya"),
+        types.InlineKeyboardButton("✨ Host Simran — 🟢 Online", callback_data="select_host_Simran")
+    )
+    bot.edit_message_text("✨ *VYNORA LIVE - HOST SELECTION*\n\n👇 *Session ke liye kisi ek Host ko chunein:*", call.message.chat.id, call.message.message_id, reply_markup=markup)
+
+# Step 3: Final Booking, Balance Deduction & Dynamic Invite Link Generation
 @bot.callback_query_handler(func=lambda call: call.data.startswith("book_"))
 def process_booking_click(call):
     user_id = call.from_user.id
@@ -87,85 +125,47 @@ def process_booking_click(call):
     user_balances[user_id] = bal - mins
     bot.answer_callback_query(call.id, "✅ Session Book Ho Gaya!")
     
-    # Send Private Session Card
+    # Generate 1-Time Single-Use Invite Link from the provided Group ID
+    try:
+        invite_link = bot.create_chat_invite_link(chat_id=HOST_GROUP_ID, member_limit=1).invite_link
+    except Exception as e:
+        print(f"Error creating invite link: {e}")
+        invite_link = "https://t.me/+SamplePrivateLink123"
+    
     text = (
         "🎉 *SESSION BOOKING SUCCESSFUL!*\n\n"
         f"👤 *Host:* {host_name}\n"
         f"⏱️ *Duration:* {mins} Minutes\n"
         f"💰 *Remaining Balance:* `{user_balances[user_id]} Mins`\n\n"
-        "👇 *Niche button par click karke private group join karein:*"
+        "👇 *Niche button par click karke private group join karein (Yeh link sirf ek baar use ho sakta hai):*"
     )
     
     link_markup = types.InlineKeyboardMarkup()
-    link_markup.add(types.InlineKeyboardButton("🔗 Join Private Session Now", url="https://t.me/+SamplePrivateLink123"))
+    link_markup.add(types.InlineKeyboardButton("🔗 Join Private Session Now", url=invite_link))
     
     bot.send_message(user_id, text, reply_markup=link_markup)
 
-# --- 3. EASY 1-CLICK REGISTRATION (NATIVE CONTACT SHARE) ---
-@bot.message_handler(func=lambda msg: msg.text in ["Register / Update Profile", "📝 Register / Profile"])
-def register_profile(message):
-    user_id = message.chat.id
-    profile = user_profiles.get(user_id, None)
-    
-    if profile:
-        text = (
-            "👤 *YOUR PROFILE DETAILS*\n\n"
-            f"• *Name:* `{profile['name']}`\n"
-            f"• *Phone:* `{profile['phone']}`\n"
-            "• *Status:* ✅ Verified User"
-        )
-        bot.send_message(message.chat.id, text)
-    else:
-        # Request Contact Button
-        markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-        btn_contact = types.KeyboardButton("📱 Share Phone Number (1-Click)", request_contact=True)
-        markup.add(btn_contact)
-        
-        bot.send_message(
-            message.chat.id, 
-            "📝 *EASY REGISTRATION*\n\nAccount verify karne ke liye niche **'Share Phone Number'** button par click karein:", 
-            reply_markup=markup
-        )
-
-# Auto Contact Receiver
-@bot.message_handler(content_types=['contact'])
-def handle_contact(message):
-    if message.contact:
-        user_id = message.chat.id
-        phone = message.contact.phone_number
-        name = message.from_user.first_name
-        
-        user_profiles[user_id] = {"name": name, "phone": phone}
-        
-        bot.send_message(
-            user_id, 
-            f"🎉 *Registration Complete!*\n\n👤 *Name:* {name}\n📱 *Phone:* `{phone}`\n\nAapka profile setup successfully ho gaya hai.",
-            reply_markup=get_main_keyboard()
-        )
-
-# 1. Buy Minutes - Shows Plans First
+# --- 3. BUY MINUTES & PAYMENT (All Plans Included) ---
 @bot.message_handler(func=lambda msg: msg.text in ["Buy Minutes / Payment", "💳 Buy Minutes / Payment"])
 def buy_minutes(message):
     markup = types.InlineKeyboardMarkup(row_width=1)
-    btn1 = types.InlineKeyboardButton("⭐ ₹100 — 5 Minutes", callback_data="payplan_100_5")
-    btn2 = types.InlineKeyboardButton("🔥 ₹200 — 10 Minutes", callback_data="payplan_200_10")
-    btn3 = types.InlineKeyboardButton("🚀 ₹400 — 20 Minutes", callback_data="payplan_400_20")
-    btn4 = types.InlineKeyboardButton("💎 ₹500 — 30 Minutes", callback_data="payplan_500_30")
-    btn5 = types.InlineKeyboardButton("👑 ₹1000 — 90 Minutes", callback_data="payplan_1000_90")
-    markup.add(btn1, btn2, btn3, btn4, btn5)
+    markup.add(
+        types.InlineKeyboardButton("⭐ ₹100 — 5 Minutes", callback_data="payplan_100_5"),
+        types.InlineKeyboardButton("🔥 ₹200 — 10 Minutes", callback_data="payplan_200_10"),
+        types.InlineKeyboardButton("🚀 ₹400 — 20 Minutes", callback_data="payplan_400_20"),
+        types.InlineKeyboardButton("💎 ₹500 — 30 Minutes", callback_data="payplan_500_30"),
+        types.InlineKeyboardButton("👑 ₹1000 — 90 Minutes", callback_data="payplan_1000_90")
+    )
     
     bot.send_message(
         message.chat.id, 
-        "💳 *SELECT YOUR RECHARGE PLAN*\n\nNiche diye gaye plans me se apna plan select karein:", 
+        "💳 *SELECT YOUR RECHARGE PLAN*\n\nNiche diye gaye plans mein se apna plan select karein:", 
         reply_markup=markup
     )
 
-# 2. Plan Select karne par QR Code Dikhana
 @bot.callback_query_handler(func=lambda call: call.data.startswith("payplan_"))
 def show_plan_qr(call):
     _, amount, mins = call.data.split("_")
-    
-    # UPI URL with Exact Amount
     upi_url = f"upi://pay?pa={UPI_ID}&pn={urllib.parse.quote(PAYEE_NAME)}&am={amount}&cu=INR"
     qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=500x500&data={urllib.parse.quote(upi_url)}"
     
@@ -174,13 +174,12 @@ def show_plan_qr(call):
         f"👤 *Account Holder:* {PAYEE_NAME}\n"
         f"📍 *UPI ID:* `{UPI_ID}`\n"
         f"💰 *Amount to Pay:* `₹{amount}`\n\n"
-        "📲 *QR Code scan karke pay karein aur Payment ka Screenshot isi chat me bhejein.*"
+        "📲 *QR Code scan karke pay karein aur Payment ka Screenshot isi chat mein bhejein.*"
     )
     bot.send_photo(call.message.chat.id, qr_url, caption=caption)
     bot.answer_callback_query(call.id)
 
-
-# --- 5. BALANCE & REFERRAL ---
+# --- 4. BALANCE & REFERRAL ---
 @bot.message_handler(func=lambda msg: msg.text in ["My Balance & Referral", "💰 My Balance & Referral"])
 def show_balance(message):
     user_id = message.chat.id
@@ -197,18 +196,78 @@ def show_balance(message):
     )
     bot.send_message(message.chat.id, text)
 
-# --- 6. HELP & SUPPORT ---
+# --- 5. REGISTER / PROFILE (1-Click Contact Share) ---
+@bot.message_handler(func=lambda msg: msg.text in ["Register / Update Profile", "📝 Register / Profile"])
+def register_profile(message):
+    user_id = message.chat.id
+    profile = user_profiles.get(user_id, None)
+    
+    if profile:
+        text = (
+            "👤 *YOUR PROFILE DETAILS*\n\n"
+            f"• *Name:* `{profile['name']}`\n"
+            f"• *Phone:* `{profile['phone']}`\n"
+            "• *Status:* ✅ Verified User"
+        )
+        bot.send_message(message.chat.id, text)
+    else:
+        markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+        markup.add(types.KeyboardButton("📱 Share Phone Number (1-Click)", request_contact=True))
+        bot.send_message(
+            message.chat.id, 
+            "📝 *EASY REGISTRATION*\n\nAccount verify karne ke liye niche **'Share Phone Number'** button par click karein:", 
+            reply_markup=markup
+        )
+
+@bot.message_handler(content_types=['contact'])
+def handle_contact(message):
+    if message.contact:
+        user_id = message.chat.id
+        phone = message.contact.phone_number
+        name = message.from_user.first_name
+        user_profiles[user_id] = {"name": name, "phone": phone}
+        bot.send_message(
+            user_id, 
+            f"🎉 *Registration Complete!*\n\n👤 *Name:* {name}\n📱 *Phone:* `{phone}`\n\nAapka profile setup successfully ho gaya hai.",
+            reply_markup=get_main_keyboard()
+        )
+
+# --- 6. BOT TUTORIAL ---
+@bot.message_handler(func=lambda msg: msg.text in ["Bot Tutorial", "🎥 Bot Tutorial"])
+def bot_tutorial(message):
+    text = (
+        "🎥 *VYNORA LIVE - BOT TUTORIAL*\n\n"
+        "Yahan aapko bot use karne ki poori jankari milegi:\n\n"
+        "1️⃣ *Minutes Kaise Buy Karein?*\n"
+        "-> 'Buy Minutes / Payment' dabayein, apna plan chunein, QR scan karke pay karein aur screenshot bhejein.\n\n"
+        "2️⃣ *Host Book Kaise Karein?*\n"
+        "-> 'Book Host Session' dabayein, pasandida host chun kar minutes select karein aur private link payein.\n\n"
+        "*(Yahan aap apna tutorial video link ya video upload kar sakte hain)*"
+    )
+    bot.send_message(message.chat.id, text)
+
+# --- 7. REGISTER AS HOST ---
+@bot.message_handler(func=lambda msg: msg.text in ["Register as Host", "👑 Register as Host"])
+def register_host(message):
+    text = (
+        "👑 *BECOME A VYNORA HOST*\n\n"
+        "Agar aap Vynora par Host banna chahte hain, toh apni details (Name, Age, UPI ID) admin ko bhejein:\n\n"
+        "📩 *Admin Contact:* @VynoraSupport"
+    )
+    bot.send_message(message.chat.id, text)
+
+# --- 8. HELP & SUPPORT ---
 @bot.message_handler(func=lambda msg: msg.text in ["Help / Support", "🆘 Help / Support"])
 def help_support(message):
     text = (
         "🆘 *VYNORA LIVE - HELP & SUPPORT*\n\n"
-        "Kisi bhi madad ke liye admin se sampark karein:\n\n"
-        "• *Admin Handle:* @VynoraSupport\n"
+        "Kisi bhi dikkat ya query ke liye humari support team se sampark karein:\n\n"
+        "• *Admin Telegram:* @VynoraSupport\n"
         "• *Timing:* 24x7 Support Available"
     )
     bot.send_message(message.chat.id, text)
 
-# --- 7. SCREENSHOT & ADMIN APPROVAL HANDLERS ---
+# --- 9. SCREENSHOT & ADMIN APPROVAL HANDLERS ---
 @bot.message_handler(content_types=['photo'])
 def handle_screenshot(message):
     if message.chat.type == 'private':
@@ -229,7 +288,6 @@ def handle_screenshot(message):
         bot.send_photo(ADMIN_GROUP_ID, photo_id, caption=admin_msg, reply_markup=markup)
         bot.send_message(user_id, "⏳ Aapka screenshot verification ke liye Admin ko bhej diya gaya hai.")
 
-# Admin Callbacks
 @bot.callback_query_handler(func=lambda call: call.data.startswith(("app_", "rej_")))
 def process_admin_callbacks(call):
     data = call.data
