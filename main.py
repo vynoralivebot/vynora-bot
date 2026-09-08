@@ -1,12 +1,12 @@
+import os
+import time
+import urllib.parse
+import threading
 import telebot
 from telebot import types
-import urllib.parse
-import time
-import os
-import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
-# Web Service Port Handler (Render Free Tier Ke Liye)
+# 1. Web Service Port Binding (Render Free Tier Ke Liye)
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -20,17 +20,21 @@ def run_server():
 
 threading.Thread(target=run_server, daemon=True).start()
 
-# Telegram Bot Config
-BOT_TOKEN = "8967146778:AAG6NJSZiLGiJrMHaKdIO9eSBiZ7uz_72VU"
-ADMIN_GROUP_ID = -1004325621712
+# 2. Telegram Bot Config
+# Token ko Environment Variable se fetch karein (Security for GitHub)
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "8967146778:AAG6NJSZiLGiJrMHaKdIO9eSBiZ7uz_72VU")
+ADMIN_GROUP_ID = int(os.environ.get("ADMIN_GROUP_ID", "-1004325621712"))
 UPI_ID = "vynoralive@slc"
 PAYEE_NAME = "Rajnish Kumar"
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="Markdown")
-user_balances = {}
 
-@bot.message_handler(commands=['start'])
-def start_cmd(message):
+# In-memory storage (Data save ke liye)
+user_balances = {}
+user_profiles = {}
+
+# 3. Main Keyboard Generator
+def get_main_keyboard():
     markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
     btn1 = types.KeyboardButton("Book Host Session")
     btn2 = types.KeyboardButton("Buy Minutes / Payment")
@@ -38,13 +42,35 @@ def start_cmd(message):
     btn4 = types.KeyboardButton("Register / Update Profile")
     btn5 = types.KeyboardButton("Help / Support")
     markup.add(btn1, btn2, btn3, btn4, btn5)
-    
+    return markup
+
+# --- COMMAND HANDLERS ---
+
+@bot.message_handler(commands=['start'])
+def start_cmd(message):
     bot.send_message(
         message.chat.id, 
-        f"Namaste {message.from_user.first_name}! Vynora Live Bot mein aapka swagat hai.", 
-        reply_markup=markup
+        f"Namaste *{message.from_user.first_name}*! Vynora Live Bot mein aapka swagat hai.", 
+        reply_markup=get_main_keyboard()
     )
 
+# --- BUTTON 1: Book Host Session ---
+@bot.message_handler(func=lambda msg: msg.text == "Book Host Session")
+def book_host(message):
+    user_id = message.chat.id
+    bal = user_balances.get(user_id, 0)
+    
+    text = (
+        "🎙 *BOOK HOST SESSION*\n\n"
+        f"💰 *Aapka Current Balance:* `{bal} Minutes`\n\n"
+        "Session book karne ke liye niche diye gaye formats mein se choose karein:\n"
+        "• `/book_H1_10` (Host 1 - 10 Mins)\n"
+        "• `/book_H2_20` (Host 2 - 20 Mins)\n\n"
+        "_Note: Booking ke waqt aapka balance auto-deduct ho jayega aur private link generate hoga._"
+    )
+    bot.send_message(message.chat.id, text)
+
+# --- BUTTON 2: Buy Minutes / Payment ---
 @bot.message_handler(func=lambda msg: msg.text == "Buy Minutes / Payment")
 def buy_minutes(message):
     upi_url = f"upi://pay?pa={UPI_ID}&pn={urllib.parse.quote(PAYEE_NAME)}&cu=INR"
@@ -63,6 +89,65 @@ def buy_minutes(message):
     )
     bot.send_photo(message.chat.id, qr_url, caption=caption)
 
+# --- BUTTON 3: My Balance & Referral ---
+@bot.message_handler(func=lambda msg: msg.text == "My Balance & Referral")
+def show_balance(message):
+    user_id = message.chat.id
+    bal = user_balances.get(user_id, 0)
+    bot_username = bot.get_me().username
+    ref_link = f"https://t.me/{bot_username}?start={user_id}"
+    
+    text = (
+        "💰 *Aapka Account Balance*\n\n"
+        f"• Remaining Balance: *{bal} Minutes*\n\n"
+        "🔗 *Aapka Referral Link:*\n"
+        f"`{ref_link}`\n\n"
+        "🎁 *Referral Reward:* Har naye friend ko join karane par +1 Minute free credit hoga!"
+    )
+    bot.send_message(message.chat.id, text)
+
+# --- BUTTON 4: Register / Update Profile ---
+@bot.message_handler(func=lambda msg: msg.text == "Register / Update Profile")
+def register_profile(message):
+    user_id = message.chat.id
+    profile = user_profiles.get(user_id, {"name": message.from_user.first_name, "phone": "Not Set"})
+    
+    text = (
+        "📝 *USER PROFILE DETAILS*\n\n"
+        f"• Name: `{profile['name']}`\n"
+        f"• Phone / Details: `{profile['phone']}`\n\n"
+        "Profile update karne ke liye apna naam aur phone number `/setprofile Your Name, 9876543210` format mein likh kar bhejein."
+    )
+    bot.send_message(message.chat.id, text)
+
+# Profile update helper command
+@bot.message_handler(commands=['setprofile'])
+def set_profile_cmd(message):
+    user_id = message.chat.id
+    try:
+        data = message.text.replace("/setprofile", "").strip()
+        if not data:
+            bot.reply_to(message, "❌ Format galat hai. Use karein: `/setprofile Naam, Phone`")
+            return
+        
+        user_profiles[user_id] = {"name": data, "phone": "Verified"}
+        bot.reply_to(message, "✅ Profile successfully update ho gayi hai!")
+    except Exception as e:
+        bot.reply_to(message, f"Error: {e}")
+
+# --- BUTTON 5: Help / Support ---
+@bot.message_handler(func=lambda msg: msg.text == "Help / Support")
+def help_support(message):
+    text = (
+        "🆘 *VYNORA LIVE - HELP & SUPPORT*\n\n"
+        "Kisi bhi dikkat ya query ke liye humari support team se sampark karein:\n\n"
+        "• *Admin Telegram:* @VynoraSupport\n"
+        "• *Payment Issue:* Payment screenshot ke saath Admin ko DM karein.\n"
+        "• *Working Hours:* 24x7 Available"
+    )
+    bot.send_message(message.chat.id, text)
+
+# --- PAYMENT SCREENSHOT HANDLER ---
 @bot.message_handler(content_types=['photo'])
 def handle_screenshot(message):
     if message.chat.type == 'private':
@@ -83,6 +168,7 @@ def handle_screenshot(message):
         bot.send_photo(ADMIN_GROUP_ID, photo_id, caption=admin_msg, reply_markup=markup)
         bot.send_message(user_id, "⏳ Aapka screenshot verification ke liye admin ko bhej diya gaya hai.")
 
+# --- ADMIN APPROVAL CALLBACKS ---
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
     data = call.data
@@ -105,13 +191,7 @@ def callback_query(call):
         bot.answer_callback_query(call.id, "Rejected!")
         bot.edit_message_caption(f"❌ REJECTED for User ID `{user_id}`", ADMIN_GROUP_ID, call.message.message_id)
 
-@bot.message_handler(func=lambda msg: msg.text == "My Balance & Referral")
-def show_balance(message):
-    user_id = message.chat.id
-    bal = user_balances.get(user_id, 0)
-    bot.send_message(message.chat.id, f"💰 *Aapka Account Balance*\n\nRemaining Balance: *{bal} Minutes*")
-
-# Main execution loop
+# 4. Main Execution Loop
 if __name__ == '__main__':
     print("Vynora Bot Active & Running...")
     try:
