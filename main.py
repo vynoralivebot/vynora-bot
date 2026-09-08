@@ -113,4 +113,3 @@ if __name__ == '__main__':
     print("Vynora Bot Active & Running...")
     bot.remove_webhook()
     bot.infinity_polling(skip_pending_updates=True)
-
