@@ -112,5 +112,6 @@ def show_balance(message):
 if __name__ == '__main__':
     print("Vynora Bot Active & Running...")
     bot.remove_webhook(drop_pending_updates=True)
-    bot.infinity_polling()
+    bot.infinity_polling(skip_pending=True)
+
 
