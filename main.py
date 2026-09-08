@@ -143,24 +143,42 @@ def handle_contact(message):
             reply_markup=get_main_keyboard()
         )
 
-# --- 4. BUY MINUTES & PAYMENT ---
+# 1. Buy Minutes - Shows Plans First
 @bot.message_handler(func=lambda msg: msg.text in ["Buy Minutes / Payment", "💳 Buy Minutes / Payment"])
 def buy_minutes(message):
-    upi_url = f"upi://pay?pa={UPI_ID}&pn={urllib.parse.quote(PAYEE_NAME)}&cu=INR"
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    btn1 = types.InlineKeyboardButton("⭐ ₹100 — 5 Minutes", callback_data="payplan_100_5")
+    btn2 = types.InlineKeyboardButton("🔥 ₹200 — 10 Minutes", callback_data="payplan_200_10")
+    btn3 = types.InlineKeyboardButton("🚀 ₹400 — 20 Minutes", callback_data="payplan_400_20")
+    btn4 = types.InlineKeyboardButton("💎 ₹500 — 30 Minutes", callback_data="payplan_500_30")
+    btn5 = types.InlineKeyboardButton("👑 ₹1000 — 90 Minutes", callback_data="payplan_1000_90")
+    markup.add(btn1, btn2, btn3, btn4, btn5)
+    
+    bot.send_message(
+        message.chat.id, 
+        "💳 *SELECT YOUR RECHARGE PLAN*\n\nNiche diye gaye plans me se apna plan select karein:", 
+        reply_markup=markup
+    )
+
+# 2. Plan Select karne par QR Code Dikhana
+@bot.callback_query_handler(func=lambda call: call.data.startswith("payplan_"))
+def show_plan_qr(call):
+    _, amount, mins = call.data.split("_")
+    
+    # UPI URL with Exact Amount
+    upi_url = f"upi://pay?pa={UPI_ID}&pn={urllib.parse.quote(PAYEE_NAME)}&am={amount}&cu=INR"
     qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=500x500&data={urllib.parse.quote(upi_url)}"
     
     caption = (
-        "💳 *VYNORA LIVE - PAYMENT DETAILS*\n\n"
-        "• Rs.100 = 5 Minutes\n"
-        "• Rs.200 = 10 Minutes\n"
-        "• Rs.400 = 20 Minutes\n"
-        "• Rs.500 = 30 Minutes\n"
-        "• Rs.1000 = 90 Minutes\n\n"
+        f"🎯 *SELECTED PLAN: ₹{amount} ({mins} Minutes)*\n\n"
         f"👤 *Account Holder:* {PAYEE_NAME}\n"
-        f"📍 *UPI ID:* `{UPI_ID}`\n\n"
-        "📸 *Note:* Payment karke screenshot isi chat mein bhejein."
+        f"📍 *UPI ID:* `{UPI_ID}`\n"
+        f"💰 *Amount to Pay:* `₹{amount}`\n\n"
+        "📲 *QR Code scan karke pay karein aur Payment ka Screenshot isi chat me bhejein.*"
     )
-    bot.send_photo(message.chat.id, qr_url, caption=caption)
+    bot.send_photo(call.message.chat.id, qr_url, caption=caption)
+    bot.answer_callback_query(call.id)
+
 
 # --- 5. BALANCE & REFERRAL ---
 @bot.message_handler(func=lambda msg: msg.text in ["My Balance & Referral", "💰 My Balance & Referral"])
