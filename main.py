@@ -2,14 +2,31 @@ import telebot
 from telebot import types
 import urllib.parse
 import time
+import os
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
+# Web Service Port Handler (Render Free Tier Ke Liye)
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Vynora Bot is Live!")
+
+def run_server():
+    port = int(os.environ.get("PORT", 8080))
+    server = HTTPServer(('0.0.0.0', port), HealthCheckHandler)
+    server.serve_forever()
+
+threading.Thread(target=run_server, daemon=True).start()
+
+# Telegram Bot Config
 BOT_TOKEN = "8967146778:AAFAGfl7jaejeRfpWA8Mykl0FxK8zax_rkc"
 ADMIN_GROUP_ID = -1004325621712
 UPI_ID = "vynoralive@slc"
 PAYEE_NAME = "Rajnish Kumar"
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="Markdown")
-
 user_balances = {}
 
 @bot.message_handler(commands=['start'])
