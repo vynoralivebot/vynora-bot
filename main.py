@@ -21,7 +21,7 @@ def run_server():
 threading.Thread(target=run_server, daemon=True).start()
 
 # Telegram Bot Config
-BOT_TOKEN = "8967146778:AAF_ONKjO-RCgRIc9aCkMic2lO2tgh25PYY"
+BOT_TOKEN = "8967146778:AAHvyth0rTF4SMrccvqjbKEkNpyUqx1fxIg"
 ADMIN_GROUP_ID = -1004325621712
 UPI_ID = "vynoralive@slc"
 PAYEE_NAME = "Rajnish Kumar"
