@@ -143,8 +143,9 @@ def assign_host_slot(user_id, slot_name):
 
 init_db()
 
-# Pending UTR Storage
+# Pending UTR & Selected Plan Storage
 pending_txns = {}
+user_selected_plan = {}
 
 # --- 3. BOT CONFIGURATION & EXACT HOST GROUPS MAPPING ---
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
@@ -162,7 +163,7 @@ HOST_GROUPS = {
     "Host Sneha 08": int(os.environ.get("GROUP_SNEHA_08", "-1004459506132"))
 }
 
-# 6 ONLINE HOSTS LIST (Inhe 🟢 Online dikhaya jayega, baaki 2 ko 🔴 Offline)
+# 6 ONLINE HOSTS LIST (6 Online & 2 Offline)
 ONLINE_HOSTS = [
     "Host Priya 01",
     "Host Ananya 02",
@@ -187,16 +188,31 @@ def auto_kick_timer(chat_id, user_id, mins):
     except Exception as e:
         print(f"Auto-kick error: {e}")
 
-def get_main_keyboard():
+# --- DYNAMIC KEYBOARD BASED ON USER STATE ---
+def get_main_keyboard(user_id=None):
     markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
     btn1 = types.KeyboardButton("🔥 Book Host Session")
-    btn2 = types.KeyboardButton("💳 Buy Minutes / Payment")
+    
+    pay_btn_text = "💳 Recharge Minutes"
+    profile_btn_text = "📝 Register / Profile"
+    
+    if user_id:
+        u_data = get_user_data(user_id)
+        # Profile check
+        if u_data['phone']:
+            profile_btn_text = "👤 Profile"
+        # Recharge status check
+        if u_data['balance'] > 0:
+            pay_btn_text = "💼 Wallet / Balance"
+            
+    btn2 = types.KeyboardButton(pay_btn_text)
     btn3 = types.KeyboardButton("💰 My Balance & Referral")
-    btn4 = types.KeyboardButton("📝 Register / Profile")
+    btn4 = types.KeyboardButton(profile_btn_text)
     btn5 = types.KeyboardButton("🎥 Bot Tutorial")
     btn6 = types.KeyboardButton("👑 Register as Host")
     btn7 = types.KeyboardButton("💸 Withdraw Earnings")
     btn8 = types.KeyboardButton("🆘 Help / Support")
+    
     markup.add(btn1, btn2)
     markup.add(btn3, btn4)
     markup.add(btn5, btn6)
@@ -209,7 +225,7 @@ def start_cmd(message):
     bot.send_message(
         message.chat.id, 
         f"✨ *Welcome to Vynora Live Official Bot!*\n\nNamaste *{message.from_user.first_name}*, niche diye gaye menu se service chunein:", 
-        reply_markup=get_main_keyboard()
+        reply_markup=get_main_keyboard(message.chat.id)
     )
 
 # --- 5. TUTORIAL SYSTEM ---
@@ -224,7 +240,7 @@ def bot_tutorial(message):
         "1️⃣ **📝 Profile Registration:**\n"
         "   • Main menu par `'📝 Register / Profile'` par click karke apna phone share karein.\n\n"
         "2️⃣ **💳 Minute Recharge:**\n"
-        "   • `'💳 Buy Minutes / Payment'` select karke apna plan chunein.\n"
+        "   • `'💳 Recharge Minutes'` select karke apna plan chunein.\n"
         "   • QR Code scan karke UPI payment karein, Screenshot + UTR Number bhejein.\n\n"
         "3️⃣ **🔥 Private Host Booking:**\n"
         "   • `'🔥 Book Host Session'` par click karke apni favorite Host aur Duration select karein.\n\n"
@@ -236,7 +252,7 @@ def bot_tutorial(message):
     )
     bot.send_message(message.chat.id, tutorial_text)
 
-# --- 6. ADMIN PROBLEM SOLVER COMMANDS (/user, /search, /addbal, /hosts) ---
+# --- 6. ADMIN COMMANDS (/user, /search, /addbal, /hosts) ---
 @bot.message_handler(commands=['user'])
 def inspect_user(message):
     args = message.text.split()
@@ -424,7 +440,7 @@ def admin_payout_complete(call):
     bot.send_message(int(user_id), f"🔔 *PAYMENT SUCCESSFUL!*\nAapka `{amount} Mins` ka payout transfer ho gaya hai.")
     bot.answer_callback_query(call.id, "Marked as Paid!")
 
-# --- 9. HOST REGISTRATION WITH VACANT SLOT AUTO-CHECK ---
+# --- 9. HOST REGISTRATION ---
 @bot.message_handler(func=lambda msg: msg.text in ["Register as Host", "👑 Register as Host"])
 def start_host_registration(message):
     user_id = message.chat.id
@@ -512,7 +528,7 @@ def handle_host_approval(call):
         bot.edit_message_text(f"❌ *HOST REJECTED*\nUser ID `{applicant_id}` rejected.", ADMIN_GROUP_ID, call.message.message_id)
         bot.answer_callback_query(call.id, "Rejected!")
 
-# --- 10. BOOK HOST SESSION (6 ONLINE & 2 OFFLINE) ---
+# --- 10. BOOK HOST SESSION ---
 @bot.message_handler(func=lambda msg: msg.text in ["Book Host Session", "🔥 Book Host Session"])
 def book_host(message):
     user_id = message.chat.id
@@ -601,8 +617,8 @@ def process_booking_click(call):
     )
     bot.send_message(ADMIN_GROUP_ID, admin_private_log)
 
-# --- 11. RECHARGE PLAN & SCREENSHOT + UTR HANDLER ---
-@bot.message_handler(func=lambda msg: msg.text in ["Buy Minutes / Payment", "💳 Buy Minutes / Payment"])
+# --- 11. RECHARGE PLAN & SCREENSHOT HANDLER ---
+@bot.message_handler(func=lambda msg: msg.text in ["Buy Minutes / Payment", "💳 Buy Minutes / Payment", "💳 Recharge Minutes", "Recharge Minutes"])
 def buy_minutes(message):
     markup = types.InlineKeyboardMarkup(row_width=1)
     markup.add(
@@ -617,6 +633,9 @@ def buy_minutes(message):
 @bot.callback_query_handler(func=lambda call: call.data.startswith("payplan_"))
 def show_plan_qr(call):
     _, amount, mins = call.data.split("_")
+    # Store selected plan details for admin alert
+    user_selected_plan[call.message.chat.id] = f"₹{amount} ({mins} Mins)"
+    
     upi_url = f"upi://pay?pa={UPI_ID}&pn={urllib.parse.quote(PAYEE_NAME)}&am={amount}&cu=INR"
     qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=500x500&data={urllib.parse.quote(upi_url)}"
     
@@ -637,6 +656,7 @@ def handle_screenshot(message):
 def process_utr_submission(message, photo_id, txn_id):
     user_id = message.chat.id
     utr_number = message.text.strip() if message.text else "N/A"
+    selected_plan = user_selected_plan.get(user_id, "Custom / Not Selected")
     
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
@@ -647,11 +667,18 @@ def process_utr_submission(message, photo_id, txn_id):
         types.InlineKeyboardButton("90 Min (Rs.1000)", callback_data=f"app_{user_id}_90_{txn_id}"),
         types.InlineKeyboardButton("❌ Reject", callback_data=f"rej_{user_id}_{txn_id}")
     )
-    caption = f"📸 *NEW RECHARGE SCREENSHOT*\n\n👤 *User ID:* `{user_id}`\n👤 *Name:* {message.from_user.first_name}\n🔢 *UTR:* `{utr_number}`\n🔖 *TXN ID:* `{txn_id}`"
+    caption = (
+        f"📸 *NEW RECHARGE SCREENSHOT*\n\n"
+        f"👤 *User ID:* `{user_id}`\n"
+        f"👤 *Name:* {message.from_user.first_name}\n"
+        f"🎯 *Selected Plan:* `{selected_plan}`\n"
+        f"🔢 *UTR:* `{utr_number}`\n"
+        f"🔖 *TXN ID:* `{txn_id}`"
+    )
     sent_msg = bot.send_photo(ADMIN_GROUP_ID, photo_id, caption=caption, reply_markup=markup)
     
     pending_txns[txn_id] = {"user_id": user_id, "utr": utr_number, "msg_id": sent_msg.message_id}
-    bot.send_message(user_id, f"⏳ *Verification Under Process!*\n• *UTR:* `{utr_number}`\nVerification ke baad balance credit kar diya jayega.")
+    bot.send_message(user_id, f"⏳ *Verification Under Process!*\n• *Plan:* `{selected_plan}`\n• *UTR:* `{utr_number}`\nVerification ke baad balance credit kar diya jayega.")
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith(("app_", "rej_")))
 def process_admin_recharge_approval(call):
@@ -675,7 +702,12 @@ def process_admin_recharge_approval(call):
             ADMIN_GROUP_ID, 
             f"✅ *PAYMENT APPROVED & CREDITED*\n\n👤 *User ID:* `{user_id}`\n🔢 *UTR Number:* `{utr}`\n💰 *Credited:* `{mins} Mins`"
         )
-        bot.send_message(user_id, f"✅ *Payment Approved!*\nAapke account mein *{mins} Minutes* add kar diye gaye hain.")
+        # Updates menu keyboard automatically to Wallet button
+        bot.send_message(
+            user_id, 
+            f"✅ *Payment Approved!*\nAapke account mein *{mins} Minutes* add kar diye gaye hain.", 
+            reply_markup=get_main_keyboard(user_id)
+        )
         bot.answer_callback_query(call.id, "Approved!")
         
     elif action == "rej":
@@ -694,15 +726,15 @@ def process_admin_recharge_approval(call):
         bot.answer_callback_query(call.id, "Rejected!")
 
 # --- 12. BALANCE & PROFILES ---
-@bot.message_handler(func=lambda msg: msg.text in ["My Balance & Referral", "💰 My Balance & Referral"])
+@bot.message_handler(func=lambda msg: msg.text in ["My Balance & Referral", "💰 My Balance & Referral", "💼 Wallet / Balance", "Wallet / Balance"])
 def show_balance(message):
     user_id = message.chat.id
     user_info = get_user_data(user_id)
     bot_username = bot.get_me().username
     ref_link = f"https://t.me/{bot_username}?start={user_id}"
-    bot.send_message(message.chat.id, f"💰 *Account Balance*\n\n• Available: *{user_info['balance']} Minutes*\n\n🔗 *Referral Link:*\n`{ref_link}`")
+    bot.send_message(message.chat.id, f"💼 *Account Wallet & Balance*\n\n• Available: *{user_info['balance']} Minutes*\n\n🔗 *Referral Link:*\n`{ref_link}`", reply_markup=get_main_keyboard(user_id))
 
-@bot.message_handler(func=lambda msg: msg.text in ["Register / Profile", "📝 Register / Profile"])
+@bot.message_handler(func=lambda msg: msg.text in ["Register / Profile", "📝 Register / Profile", "👤 Profile", "Profile"])
 def register_profile(message):
     user_id = message.chat.id
     user_info = get_user_data(user_id)
@@ -717,7 +749,7 @@ def register_profile(message):
             "─────────────────────────\n"
             "✅ *Account Status:* Verified Active Member"
         )
-        bot.send_message(message.chat.id, profile_card)
+        bot.send_message(message.chat.id, profile_card, reply_markup=get_main_keyboard(user_id))
     else:
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
         markup.add(types.KeyboardButton("📱 Share Phone Number (1-Click)", request_contact=True))
@@ -728,7 +760,7 @@ def handle_contact(message):
     if message.contact:
         user_id = message.chat.id
         save_user_profile(user_id, message.from_user.first_name, message.contact.phone_number)
-        bot.send_message(user_id, "🎉 *Registration Complete!*", reply_markup=get_main_keyboard())
+        bot.send_message(user_id, "🎉 *Registration Complete!*", reply_markup=get_main_keyboard(user_id))
 
 @bot.message_handler(commands=['stats'])
 def check_stats(message):
@@ -737,7 +769,7 @@ def check_stats(message):
 
 # --- MAIN RUNNER ---
 if __name__ == '__main__':
-    print("Vynora Bot Live with Updated Host Groups...")
+    print("Vynora Bot Live with Dynamic Menu & Plan Details...")
     try:
         bot.remove_webhook()
     except Exception:
