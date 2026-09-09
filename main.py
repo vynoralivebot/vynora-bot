@@ -36,7 +36,7 @@ def init_db():
             balance INTEGER DEFAULT 0
         )
     ''')
-    # Sessions History Table (For /data command)
+    # Sessions History Table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS sessions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -119,12 +119,12 @@ init_db()
 # Pending UTR Storage
 pending_txns = {}
 
-# --- 3. BOT CONFIGURATION ---
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "8967146778:AAG6NJSZiLGiJrMHaKdIO9eSBiZ7uz_72VU")
+# --- 3. BOT CONFIGURATION (SAFE ENV FETCHING) ---
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
 ADMIN_GROUP_ID = int(os.environ.get("ADMIN_GROUP_ID", "-1004325621712"))
-HOST_GROUP_ID = -1004312344325
-UPI_ID = "vynoralive@slc"
-PAYEE_NAME = "Rajnish Kumar"
+HOST_GROUP_ID = int(os.environ.get("HOST_GROUP_ID", "-1004312344325"))
+UPI_ID = os.environ.get("UPI_ID", "vynoralive@slc")
+PAYEE_NAME = os.environ.get("PAYEE_NAME", "Rajnish Kumar")
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="Markdown")
 
@@ -239,7 +239,7 @@ def process_help_options(call):
     bot.edit_message_text(ans, call.message.chat.id, call.message.message_id, reply_markup=markup)
     bot.answer_callback_query(call.id)
 
-# --- 8. HOST POLICY & VALIDATED WITHDRAWAL SYSTEM ---
+# --- 8. HOST POLICY & WITHDRAWAL SYSTEM ---
 @bot.message_handler(commands=['hostpolicy', 'host_policy'])
 @bot.message_handler(func=lambda msg: msg.text in ["Host Policy", "📜 Host Policy"])
 def show_host_policy(message):
@@ -334,7 +334,7 @@ def admin_payout_complete(call):
     bot.send_message(int(user_id), f"🔔 *PAYMENT SUCCESSFUL!*\nAapka `{amount} Mins` ka payout transfer ho gaya hai.")
     bot.answer_callback_query(call.id, "Marked as Paid!")
 
-# --- 9. NEW HOST REGISTRATION WITH APPLICATION FORM & AUTO-LINK ---
+# --- 9. HOST REGISTRATION ---
 @bot.message_handler(func=lambda msg: msg.text in ["Register as Host", "👑 Register as Host"])
 def start_host_registration(message):
     user_id = message.chat.id
@@ -376,7 +376,7 @@ def process_host_tg(message, name_age, phone, whatsapp):
     )
     admin_card = (
         "👑 *NEW HOST APPLICATION RECEIVED*\n\n"
-        f"👤 *Applicant ID:* `{user_id}`\nf"👤 *Name & Age:* `{name_age}`\n"
+        f"👤 *Applicant ID:* `{user_id}`\n👤 *Name & Age:* `{name_age}`\n"
         f"📞 *Calling Phone:* `{phone}`\n💬 *WhatsApp No:* `{whatsapp}`\n"
         f"📲 *Telegram Username:* `{tg_id}`"
     )
@@ -408,7 +408,7 @@ def handle_host_approval(call):
         bot.edit_message_text(f"❌ *HOST REJECTED*\nUser ID `{applicant_id}` reject ho gayi hai.", ADMIN_GROUP_ID, call.message.message_id)
         bot.answer_callback_query(call.id, "Host Rejected!")
 
-# --- 10. BOOK HOST SESSION (8 HOSTS SELECTION) ---
+# --- 10. BOOK HOST SESSION ---
 @bot.message_handler(func=lambda msg: msg.text in ["Book Host Session", "🔥 Book Host Session"])
 def book_host(message):
     user_id = message.chat.id
@@ -541,14 +541,12 @@ def process_admin_recharge_approval(call):
         
         add_user_balance(user_id, mins)
         
-        # Delete Photo from Admin Group for Privacy
         if photo_msg_id:
             try:
                 bot.delete_message(ADMIN_GROUP_ID, photo_msg_id)
             except Exception:
                 pass
                 
-        # Keep Text Record in Admin Group
         bot.send_message(
             ADMIN_GROUP_ID, 
             f"✅ *PAYMENT APPROVED & ADDED*\n\n👤 *User ID:* `{user_id}`\n🔢 *UTR Number:* `{utr}`\n💰 *Credited:* `{mins} Mins`"
