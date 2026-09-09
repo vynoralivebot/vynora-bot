@@ -7,7 +7,7 @@ import telebot
 from telebot import types
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
-# --- 1. WEB SERVICE PORT BINDING (Render Free Tier) ---
+# --- 1. WEB SERVICE PORT BINDING (Render Tier) ---
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -21,7 +21,7 @@ def run_server():
 
 threading.Thread(target=run_server, daemon=True).start()
 
-# --- 2. PERMANENT SQLITE DATABASE SETUP ---
+# --- 2. PERMANENT DATABASE SETUP ---
 DB_NAME = "vynora.db"
 
 def init_db():
@@ -36,12 +36,12 @@ def init_db():
             balance INTEGER DEFAULT 0
         )
     ''')
-    # Hosts Slot Table
+    # Host Slots & Status Table (ONLINE/OFFLINE)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS host_assignments (
             user_id INTEGER PRIMARY KEY,
             slot_name TEXT UNIQUE,
-            status TEXT DEFAULT 'APPROVED'
+            status TEXT DEFAULT 'ONLINE'
         )
     ''')
     # Sessions History Table
@@ -108,19 +108,6 @@ def log_session(user_id, host_name, duration):
     conn.commit()
     conn.close()
 
-def get_today_sessions(user_id):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute('''
-        SELECT host_name, duration, strftime('%H:%M', created_at, 'localtime') 
-        FROM sessions 
-        WHERE user_id = ? AND date(created_at, 'localtime') = date('now', 'localtime')
-        ORDER BY id DESC
-    ''', (user_id,))
-    rows = cursor.fetchall()
-    conn.close()
-    return rows
-
 def get_all_db_users():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -129,35 +116,43 @@ def get_all_db_users():
     conn.close()
     return rows
 
-def get_assigned_hosts():
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-    cursor.execute("SELECT user_id, slot_name FROM host_assignments WHERE status = 'APPROVED'")
-    rows = cursor.fetchall()
-    conn.close()
-    return {row[1]: row[0] for row in rows}
-
 def assign_host_slot(user_id, slot_name):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
     cursor.execute('''
-        INSERT INTO host_assignments (user_id, slot_name, status) VALUES (?, ?, 'APPROVED')
-        ON CONFLICT(user_id) DO UPDATE SET slot_name = ?, status = 'APPROVED'
+        INSERT INTO host_assignments (user_id, slot_name, status) VALUES (?, ?, 'ONLINE')
+        ON CONFLICT(user_id) DO UPDATE SET slot_name = ?, status = 'ONLINE'
     ''', (user_id, slot_name, slot_name))
     conn.commit()
     conn.close()
 
+def update_host_status(user_id, status):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("UPDATE host_assignments SET status = ? WHERE user_id = ?", (status, user_id))
+    affected = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return affected > 0
+
+def get_hosts_status_map():
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("SELECT slot_name, status FROM host_assignments")
+    rows = cursor.fetchall()
+    conn.close()
+    return {row[0]: row[1] for row in rows}
+
 init_db()
 
-# Pending Transaction & Selected Plan Cache
+# Caches
 pending_txns = {}
 user_selected_plan = {}
 
-# --- 3. BOT CONFIGURATION & ENVIRONMENT VARIABLES ---
+# --- 3. BOT CONFIGURATION ---
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 ADMIN_GROUP_ID = int(os.environ.get("ADMIN_GROUP_ID", "-1004325621712"))
 
-# TOTAL 8 HOST GROUPS
 HOST_GROUPS = {
     "Host Priya 01": int(os.environ.get("GROUP_PRIYA_01", "-1004312344325")),
     "Host Ananya 02": int(os.environ.get("GROUP_ANANYA_02", "-1004330981781")),
@@ -169,22 +164,21 @@ HOST_GROUPS = {
     "Host Sneha 08": int(os.environ.get("GROUP_SNEHA_08", "-1004459506132"))
 }
 
-# 6 ONLINE HOSTS LIST (6 Online & 2 Offline)
-ONLINE_HOSTS = [
-    "Host Priya 01",
-    "Host Ananya 02",
-    "Host Simran 03",
-    "Host Neha 04",
-    "Host Pooja 05",
-    "Host Riya 06"
-]
-
 UPI_ID = os.environ.get("UPI_ID", "vynoralive@slc")
 PAYEE_NAME = os.environ.get("PAYEE_NAME", "Rajnish Kumar")
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="Markdown")
 
-# --- AUTO-KICK TIMER FUNCTION ---
+# --- SAFE INVITE & KICK FUNCTIONS ---
+def generate_safe_invite_link(group_id, user_id):
+    try:
+        link_obj = bot.create_chat_invite_link(chat_id=group_id, member_limit=1)
+        return link_obj.invite_link
+    except Exception as e:
+        print(f"Invite Link Error: {e}")
+        bot.send_message(ADMIN_GROUP_ID, f"🚨 *INVITE LINK ERROR!*\nGroup `{group_id}` me Bot Permissions check karein.")
+        return None
+
 def auto_kick_timer(chat_id, user_id, mins):
     time.sleep(mins * 60)
     try:
@@ -192,9 +186,10 @@ def auto_kick_timer(chat_id, user_id, mins):
         bot.unban_chat_member(chat_id, user_id)
         bot.send_message(user_id, f"⏰ *SESSION TIME EXPIRED!*\nAapka `{mins} Mins` ka session khatam ho gaya hai.")
     except Exception as e:
-        print(f"Auto-kick error: {e}")
+        print(f"Kick Error: {e}")
+        bot.send_message(ADMIN_GROUP_ID, f"🚨 *AUTO-KICK ERROR!*\nUser `{user_id}` ko Group `{chat_id}` se remove nahi kiya ja saka.")
 
-# --- CLEAN 4-BUTTON DYNAMIC KEYBOARD ---
+# --- CLEAN 4-BUTTON MENU ---
 def get_main_keyboard(user_id=None):
     markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
     btn1 = types.KeyboardButton("🔥 Book Host Session")
@@ -213,37 +208,53 @@ def get_main_keyboard(user_id=None):
     markup.add(btn3, btn4)
     return markup
 
-# --- 4. START COMMAND (Auto-Registration) ---
+# --- 4. START COMMAND ---
 @bot.message_handler(commands=['start'])
 def start_cmd(message):
     user_id = message.chat.id
     name = message.from_user.first_name
-    
-    # Automatic registration in DB
     auto_register_user(user_id, name)
-    
     bot.send_message(
         user_id, 
         f"✨ *Welcome to Vynora Live Official Bot!*\n\nNamaste *{name}*, niche diye gaye menu se service chunein:", 
         reply_markup=get_main_keyboard(user_id)
     )
 
-# --- 5. BOOK HOST SESSION (With Mandatory Phone Verification) ---
+# --- 5. HOST ONLINE / OFFLINE COMMANDS (For Registered Hosts) ---
+@bot.message_handler(commands=['online'])
+def host_go_online(message):
+    user_id = message.chat.id
+    if update_host_status(user_id, 'ONLINE'):
+        bot.send_message(user_id, "🟢 *Status Updated:* Aap ab **ONLINE** hain. Users aapka session book kar sakte hain!")
+    else:
+        bot.send_message(user_id, "⚠️ Aap registered Host nahi hain ya aapka slot active nahi hai.")
+
+@bot.message_handler(commands=['offline'])
+def host_go_offline(message):
+    user_id = message.chat.id
+    if update_host_status(user_id, 'OFFLINE'):
+        bot.send_message(user_id, "🔴 *Status Updated:* Aap ab **OFFLINE** hain. Menu me aapka slot offline dikhai dega.")
+    else:
+        bot.send_message(user_id, "⚠️ Aap registered Host nahi hain ya aapka slot active nahi hai.")
+
+# --- 6. BOOK HOST SESSION ---
 @bot.message_handler(func=lambda msg: msg.text in ["Book Host Session", "🔥 Book Host Session"])
 def book_host(message):
     user_id = message.chat.id
     user_info = get_user_data(user_id)
     
-    # Check Phone Registration
     if not user_info['phone']:
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
         markup.add(types.KeyboardButton("📱 Share Phone Number (1-Click)", request_contact=True))
-        bot.send_message(user_id, "⚠️ *Phone Registration Required!*\n\nSession book karne ke liye kripya niche button par click karke pehle apna contact share karein:", reply_markup=markup)
+        bot.send_message(user_id, "⚠️ *Phone Registration Required!*\n\nSession book karne ke liye kripya contact share karein:", reply_markup=markup)
         return
         
+    status_map = get_hosts_status_map()
     markup = types.InlineKeyboardMarkup(row_width=1)
+    
     for slot_name in HOST_GROUPS.keys():
-        if slot_name in ONLINE_HOSTS:
+        current_status = status_map.get(slot_name, 'ONLINE')
+        if current_status == 'ONLINE':
             markup.add(types.InlineKeyboardButton(f"🟢 {slot_name} (Online)", callback_data=f"select_host_{slot_name}"))
         else:
             markup.add(types.InlineKeyboardButton(f"🔴 {slot_name} (Offline)", callback_data="host_offline"))
@@ -291,17 +302,16 @@ def process_booking_click(call):
         bot.answer_callback_query(call.id, f"❌ Balance Kam Hai! {mins} Mins chahiye.", show_alert=True)
         return
         
+    target_group_id = HOST_GROUPS.get(host_name)
+    invite_link = generate_safe_invite_link(target_group_id, user_id)
+    
+    if not invite_link:
+        bot.send_message(user_id, "⚠️ Technical Issue ke karan link generate nahi ho paya. Admin ko report bhej di gayi hai.")
+        return
+
     deduct_user_balance(user_id, mins)
     log_session(user_id, host_name, mins)
     new_bal = user_info['balance'] - mins
-    
-    target_group_id = HOST_GROUPS.get(host_name)
-    
-    try:
-        invite_link = bot.create_chat_invite_link(chat_id=target_group_id, member_limit=1).invite_link
-    except Exception as e:
-        invite_link = "https://t.me/+SamplePrivateLink123"
-        print(f"Error creating invite link: {e}")
     
     threading.Thread(target=auto_kick_timer, args=(target_group_id, user_id, mins), daemon=True).start()
     
@@ -310,7 +320,7 @@ def process_booking_click(call):
         f"👤 *Selected Host:* `{host_name}`\n"
         f"⏱️ *Duration:* `{mins} Minutes`\n"
         f"💰 *Remaining Balance:* `{new_bal} Mins`\n\n"
-        "🔒 *Note:* Invite link 1-time single use hai. Time khatam hote hi bot aapko auto-kick kar dega.\n\n"
+        "🔒 *Note:* Invite link single-use hai. Time over hone par bot auto-kick kar dega.\n\n"
         "👇 *Private Room Join Karein:*"
     )
     link_markup = types.InlineKeyboardMarkup()
@@ -320,14 +330,13 @@ def process_booking_click(call):
     admin_private_log = (
         "📊 *NEW PRIVATE SESSION BOOKED*\n─────────────────────────\n"
         f"👤 *User ID:* `{user_id}`\n"
-        f"👤 *User Name:* {call.from_user.first_name}\n"
         f"💃 *Booked Host:* `{host_name}`\n"
         f"⏱️ *Duration:* `{mins} Minutes`\n"
-        f"💰 *User Left Balance:* `{new_bal} Mins`"
+        f"💰 *User Balance Left:* `{new_bal} Mins`"
     )
     bot.send_message(ADMIN_GROUP_ID, admin_private_log)
 
-# --- 6. RECHARGE & PLAN DETAILS IN ADMIN ALERT ---
+# --- 7. RECHARGE & PLAN SELECTION ---
 @bot.message_handler(func=lambda msg: msg.text in ["💳 Recharge Minutes", "Recharge Minutes", "💼 Wallet / Balance", "Wallet / Balance"])
 def buy_minutes(message):
     markup = types.InlineKeyboardMarkup(row_width=1)
@@ -399,12 +408,9 @@ def process_admin_recharge_approval(call):
         photo_msg_id = pending_txns.get(txn_id, {}).get("msg_id")
         
         add_user_balance(user_id, mins)
-        
         if photo_msg_id:
-            try:
-                bot.delete_message(ADMIN_GROUP_ID, photo_msg_id)
-            except Exception:
-                pass
+            try: bot.delete_message(ADMIN_GROUP_ID, photo_msg_id)
+            except Exception: pass
                 
         bot.send_message(ADMIN_GROUP_ID, f"✅ *PAYMENT APPROVED*\n👤 User ID: `{user_id}`\n🔢 UTR: `{utr}`\n💰 Credited: `{mins} Mins`")
         bot.send_message(user_id, f"✅ *Payment Approved!*\nAapke account mein *{mins} Minutes* add kar diye gaye hain.", reply_markup=get_main_keyboard(user_id))
@@ -413,19 +419,15 @@ def process_admin_recharge_approval(call):
     elif action == "rej":
         txn_id = data[2]
         photo_msg_id = pending_txns.get(txn_id, {}).get("msg_id")
-        utr = pending_txns.get(txn_id, {}).get("utr", "N/A")
-        
         if photo_msg_id:
-            try:
-                bot.delete_message(ADMIN_GROUP_ID, photo_msg_id)
-            except Exception:
-                pass
+            try: bot.delete_message(ADMIN_GROUP_ID, photo_msg_id)
+            except Exception: pass
                 
-        bot.send_message(ADMIN_GROUP_ID, f"❌ *PAYMENT REJECTED*\n👤 User ID: `{user_id}`\n🔢 UTR: `{utr}`")
+        bot.send_message(ADMIN_GROUP_ID, f"❌ *PAYMENT REJECTED*\n👤 User ID: `{user_id}`")
         bot.send_message(user_id, "❌ Aapka payment verification reject ho gaya hai.")
         bot.answer_callback_query(call.id, "Rejected!")
 
-# --- 7. PROFILE, REFERRAL & HOST OPTIONS ---
+# --- 8. PROFILE, REFERRAL & HELP ---
 @bot.message_handler(func=lambda msg: msg.text in ["Profile & Referral", "👤 Profile & Referral"])
 def profile_and_ref(message):
     user_id = message.chat.id
@@ -442,7 +444,6 @@ def profile_and_ref(message):
         f"🔗 *Your Referral Link:*\n`{ref_link}`\n"
         "─────────────────────────"
     )
-    
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
         types.InlineKeyboardButton("👑 Register as Host", callback_data="action_reghost"),
@@ -450,7 +451,6 @@ def profile_and_ref(message):
     )
     bot.send_message(user_id, profile_card, reply_markup=markup)
 
-# --- 8. HELP & TUTORIAL ---
 @bot.message_handler(func=lambda msg: msg.text in ["Help & Tutorial", "🆘 Help & Tutorial"])
 def help_and_tutorial(message):
     markup = types.InlineKeyboardMarkup(row_width=2)
@@ -464,64 +464,40 @@ def help_and_tutorial(message):
 @bot.callback_query_handler(func=lambda call: call.data in ["show_tutorial", "show_policy", "action_reghost", "action_withdraw"])
 def handle_profile_help_actions(call):
     user_id = call.message.chat.id
-    
     if call.data == "show_tutorial":
-        tutorial_text = (
-            "🎬 *VYNORA LIVE TUTORIAL*\n\n"
-            "1️⃣ *Recharge Minutes:* Plan select karke QR code scan karein aur UTR number bhejein.\n"
-            "2️⃣ *Book Session:* Online host aur Duration chunein.\n"
-            "3️⃣ *Private Call:* Bot dwara mile Single-User link se group join karein."
-        )
-        bot.send_message(user_id, tutorial_text)
-        
+        bot.send_message(user_id, "🎬 *TUTORIAL*\n1. Recharge Mins -> QR Pay & send UTR\n2. Book Session -> Select host\n3. Click private link to join.")
     elif call.data == "show_policy":
-        policy_text = (
-            "📜 *HOST WORKING POLICY*\n\n"
-            "• **Earning Split:** 70% Host Wallet / 30% Platform Fee.\n"
-            "• **Limits:** Daily Min 500 Mins & Max 5000 Mins withdrawal.\n"
-            "• **Payout Time:** 12 to 24 Hours."
-        )
-        bot.send_message(user_id, policy_text)
-        
+        bot.send_message(user_id, "📜 *HOST POLICY*\n• 70% Host Wallet / 30% Platform Fee\n• Min: 500 Mins | Max: 5000 Mins daily withdrawal\n• Status commands: `/online` & `/offline`")
     elif call.data == "action_reghost":
-        msg = bot.send_message(user_id, "👑 *BECOME A HOST*\n\nStep 1/4: Apna **Full Name & Age** type karke bhejein:")
+        msg = bot.send_message(user_id, "👑 *BECOME A HOST*\nStep 1/4: Apna Name & Age type karein:")
         bot.register_next_step_handler(msg, process_host_name)
-        
     elif call.data == "action_withdraw":
         start_withdrawal(call.message)
-        
     bot.answer_callback_query(call.id)
 
-# --- 9. HOST REGISTRATION & WITHDRAWALS ---
+# --- 9. HOST REGISTRATION & WITHDRAWALS WITH REFUND LOGIC ---
 def process_host_name(message):
-    user_id = message.chat.id
-    name_age = message.text.strip() if message.text else "N/A"
-    msg = bot.send_message(user_id, f"✅ *Name Recorded:* `{name_age}`\n\nStep 2/4: Apna **Calling Phone Number** enter karein:")
-    bot.register_next_step_handler(msg, process_host_phone, name_age)
+    msg = bot.send_message(message.chat.id, "Step 2/4: Calling Phone Number enter karein:")
+    bot.register_next_step_handler(msg, process_host_phone, message.text)
 
 def process_host_phone(message, name_age):
-    user_id = message.chat.id
-    phone = message.text.strip() if message.text else "N/A"
-    msg = bot.send_message(user_id, f"✅ *Phone Recorded:* `{phone}`\n\nStep 3/4: Apna **WhatsApp Number** enter karein:")
-    bot.register_next_step_handler(msg, process_host_whatsapp, name_age, phone)
+    msg = bot.send_message(message.chat.id, "Step 3/4: WhatsApp Number enter karein:")
+    bot.register_next_step_handler(msg, process_host_whatsapp, name_age, message.text)
 
 def process_host_whatsapp(message, name_age, phone):
-    user_id = message.chat.id
-    whatsapp = message.text.strip() if message.text else "N/A"
-    msg = bot.send_message(user_id, f"✅ *WhatsApp Recorded:* `{whatsapp}`\n\nStep 4/4: Apna **Telegram Username** enter karein:")
-    bot.register_next_step_handler(msg, process_host_tg, name_age, phone, whatsapp)
+    msg = bot.send_message(message.chat.id, "Step 4/4: Telegram Username enter karein:")
+    bot.register_next_step_handler(msg, process_host_tg, name_age, phone, message.text)
 
 def process_host_tg(message, name_age, phone, whatsapp):
     user_id = message.chat.id
-    tg_id = message.text.strip() if message.text else "N/A"
-    bot.send_message(user_id, "🎉 *HOST APPLICATION SUBMITTED!* Verification ke baad aapko notification mil jayega.")
+    bot.send_message(user_id, "🎉 *APPLICATION SUBMITTED!* Admin verification ka wait karein.")
     
     admin_markup = types.InlineKeyboardMarkup(row_width=2)
     admin_markup.add(
         types.InlineKeyboardButton("✅ Approve Host", callback_data=f"hostapp_{user_id}"),
         types.InlineKeyboardButton("❌ Reject Host", callback_data=f"hostrej_{user_id}")
     )
-    admin_card = f"👑 *NEW HOST APPLICATION*\n\n👤 *ID:* `{user_id}`\n👤 *Name:* `{name_age}`\n📞 *Phone:* `{phone}`\n💬 *WhatsApp:* `{whatsapp}`\n📲 *TG:* `{tg_id}`"
+    admin_card = f"👑 *NEW HOST APPLICATION*\n🆔 User ID: `{user_id}`\n👤 Name: `{name_age}`\n📞 Phone: `{phone}`\n💬 WhatsApp: `{whatsapp}`"
     bot.send_message(ADMIN_GROUP_ID, admin_card, reply_markup=admin_markup)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith(("hostapp_", "hostrej_")))
@@ -530,28 +506,25 @@ def handle_host_approval(call):
     action, applicant_id = data[0], int(data[1])
     
     if action == "hostapp":
-        assigned = get_assigned_hosts()
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute("SELECT slot_name FROM host_assignments")
+        assigned = [r[0] for r in cursor.fetchall()]
+        conn.close()
+        
         vacant_slots = [s for s in HOST_GROUPS.keys() if s not in assigned]
         if not vacant_slots:
-            bot.answer_callback_query(call.id, "❌ Koi Host Slot khaali nahi hai!", show_alert=True)
+            bot.answer_callback_query(call.id, "❌ No Vacant Slots!", show_alert=True)
             return
             
         assigned_slot = vacant_slots[0]
         assign_host_slot(applicant_id, assigned_slot)
-        group_id = HOST_GROUPS[assigned_slot]
-        
-        try:
-            host_invite_link = bot.create_chat_invite_link(chat_id=group_id, member_limit=1).invite_link
-        except Exception:
-            host_invite_link = "https://t.me/+SampleHostGroupLink"
-
-        bot.send_message(applicant_id, f"🎉 *APPLICATION APPROVED!*\n👑 *Slot:* `{assigned_slot}`\n🔗 *Join Group:* {host_invite_link}")
+        bot.send_message(applicant_id, f"🎉 *HOST APPROVED!*\n👑 Slot: `{assigned_slot}`\n\n📌 *Note:* Offline/Online hone ke liye bot me `/offline` aur `/online` command use karein.")
         bot.edit_message_text(f"✅ *HOST APPROVED*\nUser `{applicant_id}` -> Slot *{assigned_slot}*", ADMIN_GROUP_ID, call.message.message_id)
-        bot.answer_callback_query(call.id, "Approved!")
     elif action == "hostrej":
         bot.send_message(applicant_id, "❌ *APPLICATION REJECTED*")
-        bot.edit_message_text(f"❌ *HOST REJECTED*\nUser ID `{applicant_id}`", ADMIN_GROUP_ID, call.message.message_id)
-        bot.answer_callback_query(call.id, "Rejected!")
+        bot.edit_message_text(f"❌ *HOST REJECTED*\nUser `{applicant_id}`", ADMIN_GROUP_ID, call.message.message_id)
+    bot.answer_callback_query(call.id)
 
 def start_withdrawal(message):
     user_id = message.chat.id
@@ -559,10 +532,10 @@ def start_withdrawal(message):
     balance = user_info['balance']
     
     if balance < 500:
-        bot.send_message(user_id, f"❌ *Withdrawal Reject!*\n💰 Current Balance: `{balance} Mins`\n⚠️ Minimum withdrawal 500 Mins hai.")
+        bot.send_message(user_id, f"❌ *Withdrawal Reject!*\n💰 Balance: `{balance} Mins`\n⚠️ Minimum 500 Mins required.")
         return
 
-    msg = bot.send_message(user_id, f"💳 *HOST WITHDRAWAL*\n💰 Balance: `{balance} Mins` (Min: 500 | Max: 5000)\n\n👇 Kitne Mins withdraw karne hain enter karein:")
+    msg = bot.send_message(user_id, f"💳 *HOST WITHDRAWAL*\n💰 Balance: `{balance} Mins`\n\n👇 Kitne Mins withdraw karne hain enter karein (500-5000):")
     bot.register_next_step_handler(msg, process_withdraw_amount, balance)
 
 def process_withdraw_amount(message, total_balance):
@@ -570,12 +543,12 @@ def process_withdraw_amount(message, total_balance):
     amount_text = message.text.strip() if message.text else ""
     
     if not amount_text.isdigit() or int(amount_text) < 500 or int(amount_text) > 5000 or int(amount_text) > total_balance:
-        msg = bot.send_message(user_id, "❌ Invalid Amount! Limits (500-5000 Mins) ke andar daalein:")
+        msg = bot.send_message(user_id, "❌ Invalid Amount! 500 se 5000 ke beech daalein:")
         bot.register_next_step_handler(msg, process_withdraw_amount, total_balance)
         return
 
     amount = int(amount_text)
-    msg = bot.send_message(user_id, f"✅ Validated: `{amount} Mins`\n\n📲 Apna **UPI ID** type karke bhejein:")
+    msg = bot.send_message(user_id, f"✅ Amount: `{amount} Mins`\n\n📲 Apna **UPI ID** type karke bhejein:")
     bot.register_next_step_handler(msg, process_withdraw_upi, amount)
 
 def process_withdraw_upi(message, amount):
@@ -586,16 +559,28 @@ def process_withdraw_upi(message, amount):
     bot.send_message(user_id, f"🎉 *WITHDRAWAL REQUEST SUBMITTED!*\n💵 Amount: `{amount} Mins`\n📍 UPI: `{upi_id}`")
     
     admin_alert = f"💸 *HOST WITHDRAWAL REQUEST*\n\n👤 Host ID: `{user_id}`\n💰 Mins: `{amount}`\n📲 UPI ID: `{upi_id}`"
-    markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("✅ Mark Paid", callback_data=f"payout_done_{user_id}_{amount}"))
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        types.InlineKeyboardButton("✅ Mark Paid", callback_data=f"payout_done_{user_id}_{amount}"),
+        types.InlineKeyboardButton("❌ Reject & Refund", callback_data=f"payout_rej_{user_id}_{amount}")
+    )
     bot.send_message(ADMIN_GROUP_ID, admin_alert, reply_markup=markup)
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith("payout_done_"))
-def admin_payout_complete(call):
-    _, _, user_id, amount = call.data.split("_")
-    bot.edit_message_text(f"✅ *PAID & COMPLETED*\nHost ID `{user_id}` -> `{amount} Mins`", ADMIN_GROUP_ID, call.message.message_id)
-    bot.send_message(int(user_id), f"🔔 *PAYMENT SUCCESSFUL!*\nAapka `{amount} Mins` ka payout transfer ho gaya hai.")
-    bot.answer_callback_query(call.id, "Paid!")
+@bot.callback_query_handler(func=lambda call: call.data.startswith(("payout_done_", "payout_rej_")))
+def admin_payout_action(call):
+    parts = call.data.split("_")
+    action, user_id, amount = parts[1], int(parts[2]), int(parts[3])
+    
+    if action == "done":
+        bot.edit_message_text(f"✅ *PAID & COMPLETED*\nHost ID `{user_id}` -> `{amount} Mins`", ADMIN_GROUP_ID, call.message.message_id)
+        bot.send_message(user_id, f"🔔 *PAYMENT SUCCESSFUL!*\nAapka `{amount} Mins` ka payout transfer ho gaya hai.")
+        bot.answer_callback_query(call.id, "Paid!")
+    elif action == "rej":
+        # REFUND LOGIC: Add balance back to host
+        add_user_balance(user_id, amount)
+        bot.edit_message_text(f"❌ *WITHDRAWAL REJECTED & REFUNDED*\nHost ID `{user_id}` -> `{amount} Mins` balance refund kar diya gaya.", ADMIN_GROUP_ID, call.message.message_id)
+        bot.send_message(user_id, f"❌ Aapka `{amount} Mins` ka withdrawal request reject kar diya gaya hai. Balance aapke account me **Refund** kar diya gaya hai.")
+        bot.answer_callback_query(call.id, "Rejected & Refunded!")
 
 # --- 10. ADMIN COMMANDS ---
 @bot.message_handler(commands=['user'])
@@ -623,9 +608,7 @@ def check_stats(message):
 
 # --- MAIN RUNNER ---
 if __name__ == '__main__':
-    print("Vynora Bot Live with Fully Clean Layout...")
-    try:
-        bot.remove_webhook()
-    except Exception:
-        pass
+    print("Vynora Bot Live with Complete Features & Refunds...")
+    try: bot.remove_webhook()
+    except Exception: pass
     bot.infinity_polling(skip_pending=True)
