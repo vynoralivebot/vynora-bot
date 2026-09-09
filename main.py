@@ -146,20 +146,18 @@ init_db()
 # Pending UTR Storage
 pending_txns = {}
 
-# --- 3. BOT CONFIGURATION & HOST GROUPS MAPPING ---
+# --- 3. BOT CONFIGURATION & EXACT HOST GROUPS MAPPING ---
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 ADMIN_GROUP_ID = int(os.environ.get("ADMIN_GROUP_ID", "-1004325621712"))
 
-# 👇 YAHAN APNE HAR HOST KE GROUP KI TELEGRAM ID DAALEIN
+# 👇 AAPKE DENGAYE 6 HOST GROUPS KI EXACT TELEGRAM IDs
 HOST_GROUPS = {
-    "Priya": int(os.environ.get("GROUP_PRIYA", "-1001234567891")),
-    "Ananya": int(os.environ.get("GROUP_ANANYA", "-1001234567892")),
-    "Simran": int(os.environ.get("GROUP_SIMRAN", "-1001234567893")),
-    "Neha": int(os.environ.get("GROUP_NEHA", "-1001234567894")),
-    "Pooja": int(os.environ.get("GROUP_POOJA", "-1001234567895")),
-    "Riya": int(os.environ.get("GROUP_RIYA", "-1001234567896")),
-    "Kavya": int(os.environ.get("GROUP_KAVYA", "-1001234567897")),
-    "Aarti": int(os.environ.get("GROUP_AARTI", "-1001234567898"))
+    "Host Priya 01": int(os.environ.get("GROUP_PRIYA_01", "-1004312344325")),
+    "Host Ananya 02": int(os.environ.get("GROUP_ANANYA_02", "-1004330981781")),
+    "Host Simran 03": int(os.environ.get("GROUP_SIMRAN_03", "-1004350353315")),
+    "Host Neha 04": int(os.environ.get("GROUP_NEHA_04", "-1003939071012")),
+    "Host Pooja 05": int(os.environ.get("GROUP_POOJA_05", "-1004293963082")),
+    "Host Riya 06": int(os.environ.get("GROUP_RIYA_06", "-1004459506130"))
 }
 
 UPI_ID = os.environ.get("UPI_ID", "vynoralive@slc")
@@ -222,7 +220,6 @@ def bot_tutorial(message):
         "   • Bot aapko ek **1-Time Single-User Private Link** dega.\n"
         "   • Time poora hote hi system aapko group se automatic remove kar dega.\n\n"
         "─────────────────────────\n"
-        "📊 *Daily History:* `/data` command se apna daily record dekhein.\n"
         "📩 *Support:* Need help? Click `'🆘 Help / Support'` anytime."
     )
     bot.send_message(message.chat.id, tutorial_text)
@@ -230,9 +227,6 @@ def bot_tutorial(message):
 # --- 6. ADMIN PROBLEM SOLVER COMMANDS (/user, /search, /addbal, /hosts) ---
 @bot.message_handler(commands=['user'])
 def inspect_user(message):
-    if message.chat.id != ADMIN_GROUP_ID and message.from_user.id != ADMIN_GROUP_ID:
-        pass # Admin only feature
-        
     args = message.text.split()
     if len(args) < 2:
         bot.send_message(message.chat.id, "⚠️ Usage: `/user <user_id>` (e.g. `/user 7001825467`)")
@@ -255,7 +249,7 @@ def inspect_user(message):
         f"📞 *Today Calls Count:* `{len(sessions)}`\n"
         "─────────────────────────\n"
         "💡 *Admin Actions:*\n"
-        "• Balance Badhane ke liye: `/addbal <id> <mins>`\n"
+        "• Balance Badhane/Ghatane ke liye: `/addbal <id> <mins>`\n"
     )
     bot.send_message(message.chat.id, text)
 
@@ -274,7 +268,7 @@ def search_users(message):
     conn.close()
     
     if not results:
-        bot.send_message(message.chat.id, f"❌ Koi user nahi mila query `{query}` ke liye.")
+        bot.send_message(message.chat.id, f"❌ Koi account nahi mila search query `{query}` ke liye.")
         return
         
     text = f"🔍 *SEARCH RESULTS ({len(results)} Found):*\n\n"
@@ -295,7 +289,7 @@ def add_balance_manual(message):
         return
         
     add_user_balance(int(target_id), int(mins))
-    bot.send_message(message.chat.id, f"✅ User `{target_id}` ka balance `{mins} Mins` update kar diya gaya hai.")
+    bot.send_message(message.chat.id, f"✅ Account `{target_id}` ka balance `{mins} Mins` update kar diya gaya hai.")
 
 @bot.message_handler(commands=['hosts'])
 def check_host_slots(message):
@@ -303,7 +297,7 @@ def check_host_slots(message):
     text = "👑 *HOST SLOTS OCCUPANCY STATUS*\n─────────────────────────\n"
     for slot_name in HOST_GROUPS.keys():
         if slot_name in assigned:
-            text += f"🔴 *{slot_name}:* Occupied by Host ID `{assigned[slot_name]}`\n"
+            text += f"🔴 *{slot_name}:* Occupied by Host User ID `{assigned[slot_name]}`\n"
         else:
             text += f"🟢 *{slot_name}:* VACANT / KHAALI (Ready for New Host)\n"
     bot.send_message(message.chat.id, text)
@@ -332,7 +326,7 @@ def process_help_options(call):
     elif topic == "help_host":
         ans = "👑 *HOST HELP*\n\n• Policy check karne ke liye `/hostpolicy` likhein.\n• Daily min withdrawal 500 Mins & max 5000 Mins hai."
     else:
-        ans = "❓ *GENERAL HELP*\n\n• Screen recording prohibited hai."
+        ans = "❓ *GENERAL HELP*\n\n• Screen recording strictly prohibited hai."
         
     ans += "\n\n📩 *Direct Support Telegram:* @VynoraSupport"
     markup = types.InlineKeyboardMarkup()
@@ -419,7 +413,7 @@ def admin_payout_complete(call):
     bot.send_message(int(user_id), f"🔔 *PAYMENT SUCCESSFUL!*\nAapka `{amount} Mins` ka payout transfer ho gaya hai.")
     bot.answer_callback_query(call.id, "Marked as Paid!")
 
-# --- 9. HOST REGISTRATION WITH VACANT SLOT CHECK ---
+# --- 9. HOST REGISTRATION WITH VACANT SLOT AUTO-CHECK ---
 @bot.message_handler(func=lambda msg: msg.text in ["Register as Host", "👑 Register as Host"])
 def start_host_registration(message):
     user_id = message.chat.id
@@ -482,21 +476,22 @@ def handle_host_approval(call):
             bot.answer_callback_query(call.id, "❌ Koi bhi Host Slot khaali nahi hai!", show_alert=True)
             return
             
-        assigned_slot = vacant_slots[0] # Auto-assign pehla vacant slot
+        assigned_slot = vacant_slots[0] # Auto-assign first available vacant slot
         assign_host_slot(applicant_id, assigned_slot)
         group_id = HOST_GROUPS[assigned_slot]
         
         try:
             host_invite_link = bot.create_chat_invite_link(chat_id=group_id, member_limit=1).invite_link
-        except Exception:
+        except Exception as e:
+            print(f"Error creating link: {e}")
             host_invite_link = "https://t.me/+SampleHostGroupLink"
 
         bot.send_message(
             applicant_id, 
             f"🎉 *CONGRATULATIONS!* Application Approved!\n\n"
-            f"👑 *Assigned Host Slot Name:* `{assigned_slot}`\n"
+            f"👑 *Assigned Host Slot:* `{assigned_slot}`\n"
             f"🔗 *Join Your Host Group:* {host_invite_link}\n\n"
-            "⚠️ Aapko isi assigned group mein rehna hai jahan users aapke saath connect honge."
+            "⚠️ Aapko isi assigned group mein rehna hai. Users isi room mein aapke saath 1-on-1 connect honge."
         )
         bot.edit_message_text(f"✅ *HOST APPROVED*\nUser ID `{applicant_id}` assigned to slot *{assigned_slot}*.", ADMIN_GROUP_ID, call.message.message_id)
         bot.answer_callback_query(call.id, f"Approved for Slot {assigned_slot}!")
@@ -506,25 +501,30 @@ def handle_host_approval(call):
         bot.edit_message_text(f"❌ *HOST REJECTED*\nUser ID `{applicant_id}` rejected.", ADMIN_GROUP_ID, call.message.message_id)
         bot.answer_callback_query(call.id, "Rejected!")
 
-# --- 10. BOOK HOST SESSION (HOST SPECIFIC GROUP + AUTO KICK FOR THAT GROUP) ---
+# --- 10. BOOK HOST SESSION (HOST-SPECIFIC GROUP ROUTING) ---
 @bot.message_handler(func=lambda msg: msg.text in ["Book Host Session", "🔥 Book Host Session"])
 def book_host(message):
     user_id = message.chat.id
     user_info = get_user_data(user_id)
     assigned = get_assigned_hosts()
     
-    markup = types.InlineKeyboardMarkup(row_width=2)
-    # Only show active assigned hosts or all slots
+    markup = types.InlineKeyboardMarkup(row_width=1)
     for slot_name in HOST_GROUPS.keys():
-        status = "🟢" if slot_name in assigned else "🔴 (Offline)"
-        markup.add(types.InlineKeyboardButton(f"✨ Host {slot_name} — {status}", callback_data=f"select_host_{slot_name}"))
-        
+        if slot_name in assigned:
+            markup.add(types.InlineKeyboardButton(f"🟢 {slot_name} (Online)", callback_data=f"select_host_{slot_name}"))
+        else:
+            markup.add(types.InlineKeyboardButton(f"🔴 {slot_name} (Offline)", callback_data="host_offline"))
+            
     text = (
         "✨ *VYNORA LIVE - HOST SELECTION*\n\n"
         f"💰 *Available Balance:* `{user_info['balance']} Minutes`\n\n"
-        "👇 *Session ke liye host select karein:*"
+        "👇 *Session ke liye active host select karein:*"
     )
     bot.send_message(message.chat.id, text, reply_markup=markup)
+
+@bot.callback_query_handler(func=lambda call: call.data == "host_offline")
+def alert_host_offline(call):
+    bot.answer_callback_query(call.id, "⚠️ Yeh Host abhi offline hai. Kripya Online Host chunnein!", show_alert=True)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("select_host_"))
 def show_host_durations(call):
@@ -536,15 +536,16 @@ def show_host_durations(call):
         types.InlineKeyboardButton("⏱️ 20 Mins", callback_data=f"book_{host_name}_20"),
         types.InlineKeyboardButton("⏱️ 30 Mins", callback_data=f"book_{host_name}_30")
     )
-    text = f"👤 *Selected Host: {host_name}*\n\n👇 *Duration select karein:*"
+    text = f"👤 *Selected Host:* `{host_name}`\n\n👇 *Duration select karein:*"
     bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
     bot.answer_callback_query(call.id)
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("book_"))
 def process_booking_click(call):
     user_id = call.from_user.id
-    _, host_name, mins = call.data.split("_")
-    mins = int(mins)
+    parts = call.data.split("_")
+    host_name = parts[1]
+    mins = int(parts[2])
     
     user_info = get_user_data(user_id)
     if user_info['balance'] < mins:
@@ -555,7 +556,7 @@ def process_booking_click(call):
     log_session(user_id, host_name, mins)
     new_bal = user_info['balance'] - mins
     
-    # Get Specific Group ID for the selected Host
+    # Get Specific Group ID for the selected Host Slot
     target_group_id = HOST_GROUPS.get(host_name)
     
     try:
@@ -564,29 +565,29 @@ def process_booking_click(call):
         invite_link = "https://t.me/+SamplePrivateLink123"
         print(f"Error creating invite link for group {target_group_id}: {e}")
     
-    # Start Auto-Kick Timer Background Thread FOR THIS SPECIFIC HOST GROUP
+    # Start Auto-Kick Timer Background Thread FOR THIS SPECIFIC HOST GROUP ONLY
     threading.Thread(target=auto_kick_timer, args=(target_group_id, user_id, mins), daemon=True).start()
     
     # Notify User
     text = (
         "🎉 *SESSION BOOKING SUCCESSFUL!*\n\n"
-        f"👤 *Selected Host:* {host_name}\n"
+        f"👤 *Selected Host:* `{host_name}`\n"
         f"⏱️ *Duration:* `{mins} Minutes`\n"
         f"💰 *Remaining Balance:* `{new_bal} Mins`\n\n"
-        "🔒 *Note:* Link single-user exclusive hai. Call time khatam hote hi bot automatic group se kick kar dega.\n\n"
-        "👇 *Private Room join karein:*"
+        "🔒 *Note:* Invite link 1-time single use hai. Session time khatam hote hi bot aapko group se auto-kick kar dega.\n\n"
+        "👇 *Private Room Join Karein:*"
     )
     link_markup = types.InlineKeyboardMarkup()
     link_markup.add(types.InlineKeyboardButton("🔗 Join Private Session Now", url=invite_link))
     bot.send_message(user_id, text, reply_markup=link_markup)
     
-    # PRIVATE BOOKING LOG TO ADMIN GROUP ONLY
+    # Private Admin Log
     admin_private_log = (
         "📊 *NEW PRIVATE SESSION BOOKED*\n"
         "─────────────────────────\n"
         f"👤 *User ID:* `{user_id}`\n"
         f"👤 *User Name:* {call.from_user.first_name}\n"
-        f"💃 *Booked Host:* `{host_name}`\n"
+        f"💃 *Booked Host Slot:* `{host_name}`\n"
         f"⏱️ *Duration:* `{mins} Minutes`\n"
         f"💰 *User Left Balance:* `{new_bal} Mins`\n"
         "─────────────────────────\n"
@@ -594,7 +595,7 @@ def process_booking_click(call):
     )
     bot.send_message(ADMIN_GROUP_ID, admin_private_log)
 
-# --- 11. RECHARGE PLAN & SCREENSHOT + UTR ---
+# --- 11. RECHARGE PLAN & SCREENSHOT + UTR HANDLER ---
 @bot.message_handler(func=lambda msg: msg.text in ["Buy Minutes / Payment", "💳 Buy Minutes / Payment"])
 def buy_minutes(message):
     markup = types.InlineKeyboardMarkup(row_width=1)
@@ -644,7 +645,7 @@ def process_utr_submission(message, photo_id, txn_id):
     sent_msg = bot.send_photo(ADMIN_GROUP_ID, photo_id, caption=caption, reply_markup=markup)
     
     pending_txns[txn_id] = {"user_id": user_id, "utr": utr_number, "msg_id": sent_msg.message_id}
-    bot.send_message(user_id, f"⏳ *Verification Under Process!*\n• *UTR:* `{utr_number}`\nVerification ke baad balance add ho jayega.")
+    bot.send_message(user_id, f"⏳ *Verification Under Process!*\n• *UTR:* `{utr_number}`\nVerification ke baad balance credit kar diya jayega.")
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith(("app_", "rej_")))
 def process_admin_recharge_approval(call):
@@ -666,7 +667,7 @@ def process_admin_recharge_approval(call):
                 
         bot.send_message(
             ADMIN_GROUP_ID, 
-            f"✅ *PAYMENT APPROVED & ADDED*\n\n👤 *User ID:* `{user_id}`\n🔢 *UTR Number:* `{utr}`\n💰 *Credited:* `{mins} Mins`"
+            f"✅ *PAYMENT APPROVED & CREDITED*\n\n👤 *User ID:* `{user_id}`\n🔢 *UTR Number:* `{utr}`\n💰 *Credited:* `{mins} Mins`"
         )
         bot.send_message(user_id, f"✅ *Payment Approved!*\nAapke account mein *{mins} Minutes* add kar diye gaye hain.")
         bot.answer_callback_query(call.id, "Approved!")
@@ -728,8 +729,9 @@ def check_stats(message):
     users = get_all_db_users()
     bot.send_message(message.chat.id, f"📊 *VYNORA STATS*\n\n👤 *Total Users:* `{len(users)}`\n⏱️ *Total Active Balance:* `{sum([u[3] for u in users])} Mins`")
 
+# --- MAIN RUNNER ---
 if __name__ == '__main__':
-    print("Vynora Bot Live with Multi-Host Group Routing...")
+    print("Vynora Bot Live with Updated 6 Host Groups...")
     try:
         bot.remove_webhook()
     except Exception:
