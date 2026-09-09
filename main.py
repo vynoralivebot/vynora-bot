@@ -7,7 +7,7 @@ import telebot
 from telebot import types
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
-# --- 1. WEB SERVICE PORT BINDING (Render Tier) ---
+# --- 1. WEB SERVICE PORT BINDING (For Render Free Tier) ---
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -21,7 +21,7 @@ def run_server():
 
 threading.Thread(target=run_server, daemon=True).start()
 
-# --- 2. PERMANENT DATABASE SETUP ---
+# --- 2. PERMANENT SQLITE DATABASE SETUP ---
 DB_NAME = "vynora.db"
 
 def init_db():
@@ -36,7 +36,7 @@ def init_db():
             balance INTEGER DEFAULT 0
         )
     ''')
-    # Host Slots & Status Table (ONLINE/OFFLINE)
+    # Hosts Slot & Status Table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS host_assignments (
             user_id INTEGER PRIMARY KEY,
@@ -149,7 +149,7 @@ init_db()
 pending_txns = {}
 user_selected_plan = {}
 
-# --- 3. BOT CONFIGURATION ---
+# --- 3. BOT CONFIGURATION & ENVIRONMENT VARIABLES ---
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 ADMIN_GROUP_ID = int(os.environ.get("ADMIN_GROUP_ID", "-1004325621712"))
 
@@ -169,14 +169,14 @@ PAYEE_NAME = os.environ.get("PAYEE_NAME", "Rajnish Kumar")
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="Markdown")
 
-# --- SAFE INVITE & KICK FUNCTIONS ---
+# --- SAFE INVITE LINK & KICK TIMER ---
 def generate_safe_invite_link(group_id, user_id):
     try:
         link_obj = bot.create_chat_invite_link(chat_id=group_id, member_limit=1)
         return link_obj.invite_link
     except Exception as e:
         print(f"Invite Link Error: {e}")
-        bot.send_message(ADMIN_GROUP_ID, f"🚨 *INVITE LINK ERROR!*\nGroup `{group_id}` me Bot Permissions check karein.")
+        bot.send_message(ADMIN_GROUP_ID, f"🚨 *INVITE LINK ERROR!*\nGroup `{group_id}` me Bot permissions check karein.")
         return None
 
 def auto_kick_timer(chat_id, user_id, mins):
@@ -187,9 +187,9 @@ def auto_kick_timer(chat_id, user_id, mins):
         bot.send_message(user_id, f"⏰ *SESSION TIME EXPIRED!*\nAapka `{mins} Mins` ka session khatam ho gaya hai.")
     except Exception as e:
         print(f"Kick Error: {e}")
-        bot.send_message(ADMIN_GROUP_ID, f"🚨 *AUTO-KICK ERROR!*\nUser `{user_id}` ko Group `{chat_id}` se remove nahi kiya ja saka.")
+        bot.send_message(ADMIN_GROUP_ID, f"🚨 *AUTO-KICK FAILED!*\nUser `{user_id}` ko Group `{chat_id}` se remove nahi kiya ja saka.")
 
-# --- CLEAN 4-BUTTON MENU ---
+# --- CLEAN DYNAMIC MAIN MENU ---
 def get_main_keyboard(user_id=None):
     markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
     btn1 = types.KeyboardButton("🔥 Book Host Session")
@@ -208,7 +208,7 @@ def get_main_keyboard(user_id=None):
     markup.add(btn3, btn4)
     return markup
 
-# --- 4. START COMMAND ---
+# --- 4. START COMMAND (Auto Registration) ---
 @bot.message_handler(commands=['start'])
 def start_cmd(message):
     user_id = message.chat.id
@@ -220,7 +220,7 @@ def start_cmd(message):
         reply_markup=get_main_keyboard(user_id)
     )
 
-# --- 5. HOST ONLINE / OFFLINE COMMANDS (For Registered Hosts) ---
+# --- 5. HOST STATUS COMMANDS (/online & /offline) ---
 @bot.message_handler(commands=['online'])
 def host_go_online(message):
     user_id = message.chat.id
@@ -336,7 +336,7 @@ def process_booking_click(call):
     )
     bot.send_message(ADMIN_GROUP_ID, admin_private_log)
 
-# --- 7. RECHARGE & PLAN SELECTION ---
+# --- 7. RECHARGE & PAYMENT APPROVAL ---
 @bot.message_handler(func=lambda msg: msg.text in ["💳 Recharge Minutes", "Recharge Minutes", "💼 Wallet / Balance", "Wallet / Balance"])
 def buy_minutes(message):
     markup = types.InlineKeyboardMarkup(row_width=1)
@@ -475,7 +475,7 @@ def handle_profile_help_actions(call):
         start_withdrawal(call.message)
     bot.answer_callback_query(call.id)
 
-# --- 9. HOST REGISTRATION & WITHDRAWALS WITH REFUND LOGIC ---
+# --- 9. HOST REGISTRATION & WITHDRAWALS WITH AUTO REFUND ---
 def process_host_name(message):
     msg = bot.send_message(message.chat.id, "Step 2/4: Calling Phone Number enter karein:")
     bot.register_next_step_handler(msg, process_host_phone, message.text)
@@ -519,7 +519,7 @@ def handle_host_approval(call):
             
         assigned_slot = vacant_slots[0]
         assign_host_slot(applicant_id, assigned_slot)
-        bot.send_message(applicant_id, f"🎉 *HOST APPROVED!*\n👑 Slot: `{assigned_slot}`\n\n📌 *Note:* Offline/Online hone ke liye bot me `/offline` aur `/online` command use karein.")
+        bot.send_message(applicant_id, f"🎉 *HOST APPROVED!*\n👑 Slot: `{assigned_slot}`\n\n📌 *Note:* Status change karne ke liye `/offline` aur `/online` command use karein.")
         bot.edit_message_text(f"✅ *HOST APPROVED*\nUser `{applicant_id}` -> Slot *{assigned_slot}*", ADMIN_GROUP_ID, call.message.message_id)
     elif action == "hostrej":
         bot.send_message(applicant_id, "❌ *APPLICATION REJECTED*")
@@ -576,13 +576,12 @@ def admin_payout_action(call):
         bot.send_message(user_id, f"🔔 *PAYMENT SUCCESSFUL!*\nAapka `{amount} Mins` ka payout transfer ho gaya hai.")
         bot.answer_callback_query(call.id, "Paid!")
     elif action == "rej":
-        # REFUND LOGIC: Add balance back to host
         add_user_balance(user_id, amount)
         bot.edit_message_text(f"❌ *WITHDRAWAL REJECTED & REFUNDED*\nHost ID `{user_id}` -> `{amount} Mins` balance refund kar diya gaya.", ADMIN_GROUP_ID, call.message.message_id)
         bot.send_message(user_id, f"❌ Aapka `{amount} Mins` ka withdrawal request reject kar diya gaya hai. Balance aapke account me **Refund** kar diya gaya hai.")
         bot.answer_callback_query(call.id, "Rejected & Refunded!")
 
-# --- 10. ADMIN COMMANDS ---
+# --- 10. ADVANCED ADMIN COMMANDS ---
 @bot.message_handler(commands=['user'])
 def inspect_user(message):
     args = message.text.split()
@@ -592,6 +591,35 @@ def inspect_user(message):
     u_data = get_user_data(int(args[1]))
     bot.send_message(message.chat.id, f"🔍 *USER DATA:* `{args[1]}`\n👤 Name: `{u_data['name']}`\n📞 Phone: `{u_data['phone']}`\n💰 Balance: `{u_data['balance']} Mins`")
 
+@bot.message_handler(commands=['history'])
+def check_user_history(message):
+    args = message.text.split(maxsplit=1)
+    if len(args) < 2 or not args[1].isdigit():
+        bot.send_message(message.chat.id, "⚠️ Usage: `/history <user_id>`")
+        return
+        
+    target_id = int(args[1])
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT host_name, duration, created_at 
+        FROM sessions 
+        WHERE user_id = ? 
+        ORDER BY id DESC LIMIT 5
+    ''', (target_id,))
+    rows = cursor.fetchall()
+    conn.close()
+    
+    if not rows:
+        bot.send_message(message.chat.id, f"❌ User `{target_id}` ki koi booking history nahi mili.")
+        return
+        
+    history_text = f"📜 *LAST 5 SESSIONS FOR USER `{target_id}`*\n─────────────────────────\n"
+    for r in rows:
+        history_text += f"💃 Host: `{r[0]}` | ⏱️ `{r[1]} Mins` | 🕒 `{r[2]}`\n"
+        
+    bot.send_message(message.chat.id, history_text)
+
 @bot.message_handler(commands=['addbal'])
 def add_balance_manual(message):
     args = message.text.split()
@@ -599,7 +627,50 @@ def add_balance_manual(message):
         bot.send_message(message.chat.id, "⚠️ Usage: `/addbal <user_id> <mins>`")
         return
     add_user_balance(int(args[1]), int(args[2]))
-    bot.send_message(message.chat.id, f"✅ Account `{args[1]}` ka balance `{args[2]} Mins` update kar diya gaya.")
+    bot.send_message(message.chat.id, f"✅ Account `{args[1]}` me `{args[2]} Mins` add kar diye gaye.")
+
+@bot.message_handler(commands=['deductbal'])
+def deduct_balance_manual(message):
+    args = message.text.split()
+    if len(args) < 3 or not args[1].isdigit() or not args[2].isdigit():
+        bot.send_message(message.chat.id, "⚠️ Usage: `/deductbal <user_id> <mins>`")
+        return
+        
+    target_user = int(args[1])
+    mins = int(args[2])
+    deduct_user_balance(target_user, mins)
+    bot.send_message(message.chat.id, f"✅ Account `{target_user}` se `{mins} Mins` deduct kar diye gaye.")
+
+@bot.message_handler(commands=['broadcast'])
+def broadcast_message(message):
+    if message.chat.id != ADMIN_GROUP_ID:
+        return
+        
+    args = message.text.split(maxsplit=1)
+    if len(args) < 2:
+        bot.send_message(message.chat.id, "⚠️ Usage: `/broadcast <Aapka Message>`")
+        return
+        
+    broadcast_text = args[1]
+    users = get_all_db_users()
+    sent_count = 0
+    failed_count = 0
+    
+    bot.send_message(message.chat.id, f"📢 *Broadcast Shuru:* Total Users {len(users)} ko message bheja ja raha hai...")
+    
+    for u in users:
+        u_id = u[0]
+        try:
+            bot.send_message(u_id, f"📢 *ANNOUNCEMENT*\n\n{broadcast_text}")
+            sent_count += 1
+            time.sleep(0.05)
+        except Exception:
+            failed_count += 1
+            
+    bot.send_message(
+        message.chat.id, 
+        f"✅ *BROADCAST COMPLETE!*\n\n• Successfully Sent: `{sent_count}`\n• Failed / Blocked: `{failed_count}`"
+    )
 
 @bot.message_handler(commands=['stats'])
 def check_stats(message):
@@ -608,7 +679,7 @@ def check_stats(message):
 
 # --- MAIN RUNNER ---
 if __name__ == '__main__':
-    print("Vynora Bot Live with Complete Features & Refunds...")
+    print("Vynora Bot Live with 100% Complete Features...")
     try: bot.remove_webhook()
     except Exception: pass
     bot.infinity_polling(skip_pending=True)
