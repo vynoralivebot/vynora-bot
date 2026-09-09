@@ -150,15 +150,27 @@ pending_txns = {}
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 ADMIN_GROUP_ID = int(os.environ.get("ADMIN_GROUP_ID", "-1004325621712"))
 
-# 👇 AAPKE DENGAYE 6 HOST GROUPS KI EXACT TELEGRAM IDs
+# TOTAL 8 HOST GROUPS
 HOST_GROUPS = {
     "Host Priya 01": int(os.environ.get("GROUP_PRIYA_01", "-1004312344325")),
     "Host Ananya 02": int(os.environ.get("GROUP_ANANYA_02", "-1004330981781")),
     "Host Simran 03": int(os.environ.get("GROUP_SIMRAN_03", "-1004350353315")),
     "Host Neha 04": int(os.environ.get("GROUP_NEHA_04", "-1003939071012")),
     "Host Pooja 05": int(os.environ.get("GROUP_POOJA_05", "-1004293963082")),
-    "Host Riya 06": int(os.environ.get("GROUP_RIYA_06", "-1004459506130"))
+    "Host Riya 06": int(os.environ.get("GROUP_RIYA_06", "-1004459506130")),
+    "Host Kavya 07": int(os.environ.get("GROUP_KAVYA_07", "-1004459506131")),
+    "Host Sneha 08": int(os.environ.get("GROUP_SNEHA_08", "-1004459506132"))
 }
+
+# 6 ONLINE HOSTS LIST (Inhe 🟢 Online dikhaya jayega, baaki 2 ko 🔴 Offline)
+ONLINE_HOSTS = [
+    "Host Priya 01",
+    "Host Ananya 02",
+    "Host Simran 03",
+    "Host Neha 04",
+    "Host Pooja 05",
+    "Host Riya 06"
+]
 
 UPI_ID = os.environ.get("UPI_ID", "vynoralive@slc")
 PAYEE_NAME = os.environ.get("PAYEE_NAME", "Rajnish Kumar")
@@ -293,13 +305,12 @@ def add_balance_manual(message):
 
 @bot.message_handler(commands=['hosts'])
 def check_host_slots(message):
-    assigned = get_assigned_hosts()
     text = "👑 *HOST SLOTS OCCUPANCY STATUS*\n─────────────────────────\n"
     for slot_name in HOST_GROUPS.keys():
-        if slot_name in assigned:
-            text += f"🔴 *{slot_name}:* Occupied by Host User ID `{assigned[slot_name]}`\n"
+        if slot_name in ONLINE_HOSTS:
+            text += f"🟢 *{slot_name}:* ONLINE\n"
         else:
-            text += f"🟢 *{slot_name}:* VACANT / KHAALI (Ready for New Host)\n"
+            text += f"🔴 *{slot_name}:* OFFLINE\n"
     bot.send_message(message.chat.id, text)
 
 # --- 7. HELP & SUPPORT SYSTEM ---
@@ -476,7 +487,7 @@ def handle_host_approval(call):
             bot.answer_callback_query(call.id, "❌ Koi bhi Host Slot khaali nahi hai!", show_alert=True)
             return
             
-        assigned_slot = vacant_slots[0] # Auto-assign first available vacant slot
+        assigned_slot = vacant_slots[0]
         assign_host_slot(applicant_id, assigned_slot)
         group_id = HOST_GROUPS[assigned_slot]
         
@@ -501,16 +512,15 @@ def handle_host_approval(call):
         bot.edit_message_text(f"❌ *HOST REJECTED*\nUser ID `{applicant_id}` rejected.", ADMIN_GROUP_ID, call.message.message_id)
         bot.answer_callback_query(call.id, "Rejected!")
 
-# --- 10. BOOK HOST SESSION (HOST-SPECIFIC GROUP ROUTING) ---
+# --- 10. BOOK HOST SESSION (6 ONLINE & 2 OFFLINE) ---
 @bot.message_handler(func=lambda msg: msg.text in ["Book Host Session", "🔥 Book Host Session"])
 def book_host(message):
     user_id = message.chat.id
     user_info = get_user_data(user_id)
-    assigned = get_assigned_hosts()
     
     markup = types.InlineKeyboardMarkup(row_width=1)
     for slot_name in HOST_GROUPS.keys():
-        if slot_name in assigned:
+        if slot_name in ONLINE_HOSTS:
             markup.add(types.InlineKeyboardButton(f"🟢 {slot_name} (Online)", callback_data=f"select_host_{slot_name}"))
         else:
             markup.add(types.InlineKeyboardButton(f"🔴 {slot_name} (Offline)", callback_data="host_offline"))
@@ -556,7 +566,6 @@ def process_booking_click(call):
     log_session(user_id, host_name, mins)
     new_bal = user_info['balance'] - mins
     
-    # Get Specific Group ID for the selected Host Slot
     target_group_id = HOST_GROUPS.get(host_name)
     
     try:
@@ -565,10 +574,8 @@ def process_booking_click(call):
         invite_link = "https://t.me/+SamplePrivateLink123"
         print(f"Error creating invite link for group {target_group_id}: {e}")
     
-    # Start Auto-Kick Timer Background Thread FOR THIS SPECIFIC HOST GROUP ONLY
     threading.Thread(target=auto_kick_timer, args=(target_group_id, user_id, mins), daemon=True).start()
     
-    # Notify User
     text = (
         "🎉 *SESSION BOOKING SUCCESSFUL!*\n\n"
         f"👤 *Selected Host:* `{host_name}`\n"
@@ -581,7 +588,6 @@ def process_booking_click(call):
     link_markup.add(types.InlineKeyboardButton("🔗 Join Private Session Now", url=invite_link))
     bot.send_message(user_id, text, reply_markup=link_markup)
     
-    # Private Admin Log
     admin_private_log = (
         "📊 *NEW PRIVATE SESSION BOOKED*\n"
         "─────────────────────────\n"
@@ -731,7 +737,7 @@ def check_stats(message):
 
 # --- MAIN RUNNER ---
 if __name__ == '__main__':
-    print("Vynora Bot Live with Updated 6 Host Groups...")
+    print("Vynora Bot Live with Updated Host Groups...")
     try:
         bot.remove_webhook()
     except Exception:
