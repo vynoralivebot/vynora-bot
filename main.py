@@ -770,7 +770,7 @@ def profile_and_ref(message):
             types.InlineKeyboardButton("💸 Host Withdrawal (₹700-₹3000)", callback_data="action_withdraw")
         )
 
-    profile_card += f"\n🔗 *Your Referral Link (Get 5 Free Mins per Referral):*\n`{ref_link}`\n─────────────────────────"
+    profile_card += f"\n🔗 *Your Referral Link:*\n`{ref_link}`\n─────────────────────────"
     bot.send_message(user_id, profile_card, reply_markup=markup)
 
 @bot.message_handler(func=lambda msg: msg.text in ["Help & Support", "🆘 Help & Support"])
