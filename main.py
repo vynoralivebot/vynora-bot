@@ -91,10 +91,14 @@ def deduct_user_balance(user_id, mins):
     conn.commit()
     conn.close()
 
+# FIXED: Phone save database logic with UPSERT (inserts if user record missing)
 def save_user_phone(user_id, phone):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("UPDATE users SET phone = ? WHERE user_id = ?", (phone, user_id))
+    cursor.execute('''
+        INSERT INTO users (user_id, phone, balance) VALUES (?, ?, 0)
+        ON CONFLICT(user_id) DO UPDATE SET phone = ?
+    ''', (user_id, phone, phone))
     conn.commit()
     conn.close()
 
@@ -234,7 +238,7 @@ def host_go_offline(message):
     else:
         bot.send_message(user_id, "⚠️ Aap registered Host nahi hain ya aapka slot active nahi hai.")
 
-# --- 6. BOOK HOST SESSION (SECURITY & BALANCE FIXED) ---
+# --- 6. BOOK HOST SESSION & CONTACT VERIFICATION ---
 @bot.message_handler(func=lambda msg: msg.text in ["Book Host Session", "🔥 Book Host Session"])
 def book_host(message):
     user_id = message.chat.id
@@ -273,13 +277,13 @@ def book_host(message):
     )
     bot.send_message(message.chat.id, text, reply_markup=markup)
 
-# CONTACT HANDLER WITH SECURITY VALIDATION
+# FIXED: Handle Contact with Fake-Card Validation & DB Insert
 @bot.message_handler(content_types=['contact'])
 def handle_contact(message):
     if message.contact:
         user_id = message.chat.id
         
-        # Security Check: Ensure contact user_id matches sender
+        # Security Check: Contact user_id must match message sender
         if message.contact.user_id != message.from_user.id:
             markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
             markup.add(types.KeyboardButton("📱 Share Phone Number (1-Click)", request_contact=True))
