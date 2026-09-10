@@ -27,7 +27,6 @@ DB_NAME = "vynora.db"
 def init_db():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    # Users Table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,
@@ -36,7 +35,6 @@ def init_db():
             balance INTEGER DEFAULT 0
         )
     ''')
-    # Hosts Slot & Status Table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS host_assignments (
             user_id INTEGER PRIMARY KEY,
@@ -44,7 +42,6 @@ def init_db():
             status TEXT DEFAULT 'ONLINE'
         )
     ''')
-    # Sessions History Table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS sessions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -208,7 +205,7 @@ def get_main_keyboard(user_id=None):
     markup.add(btn3, btn4)
     return markup
 
-# --- 4. START COMMAND (Auto Registration) ---
+# --- 4. START COMMAND ---
 @bot.message_handler(commands=['start'])
 def start_cmd(message):
     user_id = message.chat.id
@@ -220,7 +217,7 @@ def start_cmd(message):
         reply_markup=get_main_keyboard(user_id)
     )
 
-# --- 5. HOST STATUS COMMANDS (/online & /offline) ---
+# --- 5. HOST STATUS COMMANDS ---
 @bot.message_handler(commands=['online'])
 def host_go_online(message):
     user_id = message.chat.id
@@ -237,16 +234,26 @@ def host_go_offline(message):
     else:
         bot.send_message(user_id, "⚠️ Aap registered Host nahi hain ya aapka slot active nahi hai.")
 
-# --- 6. BOOK HOST SESSION ---
+# --- 6. BOOK HOST SESSION (SECURITY & BALANCE FIXED) ---
 @bot.message_handler(func=lambda msg: msg.text in ["Book Host Session", "🔥 Book Host Session"])
 def book_host(message):
     user_id = message.chat.id
     user_info = get_user_data(user_id)
     
+    # Check 1: Phone Registration Check
     if not user_info['phone']:
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
         markup.add(types.KeyboardButton("📱 Share Phone Number (1-Click)", request_contact=True))
-        bot.send_message(user_id, "⚠️ *Phone Registration Required!*\n\nSession book karne ke liye kripya contact share karein:", reply_markup=markup)
+        bot.send_message(user_id, "⚠️ *Phone Registration Required!*\n\nSession book karne ke liye kripya button par click karke apna contact share karein:", reply_markup=markup)
+        return
+
+    # Check 2: Balance Check
+    if user_info['balance'] <= 0:
+        bot.send_message(
+            user_id, 
+            "⚠️ *Insufficient Balance!*\n\nAapka balance **0 Mins** hai. Session book karne ke liye pehle `💳 Recharge Minutes` par click karke recharge karein.",
+            reply_markup=get_main_keyboard(user_id)
+        )
         return
         
     status_map = get_hosts_status_map()
@@ -266,10 +273,24 @@ def book_host(message):
     )
     bot.send_message(message.chat.id, text, reply_markup=markup)
 
+# CONTACT HANDLER WITH SECURITY VALIDATION
 @bot.message_handler(content_types=['contact'])
 def handle_contact(message):
     if message.contact:
         user_id = message.chat.id
+        
+        # Security Check: Ensure contact user_id matches sender
+        if message.contact.user_id != message.from_user.id:
+            markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+            markup.add(types.KeyboardButton("📱 Share Phone Number (1-Click)", request_contact=True))
+            bot.send_message(
+                user_id, 
+                "❌ *Security Error:* Aap kisi aur ka contact card share nahi kar sakte.\n"
+                "Kripya niche diye gaye button par click karke apna original SIM number share karein.",
+                reply_markup=markup
+            )
+            return
+
         save_user_phone(user_id, message.contact.phone_number)
         bot.send_message(user_id, "🎉 *Registration Complete!* Ab aap Session Book kar sakte hain.", reply_markup=get_main_keyboard(user_id))
 
@@ -475,7 +496,7 @@ def handle_profile_help_actions(call):
         start_withdrawal(call.message)
     bot.answer_callback_query(call.id)
 
-# --- 9. HOST REGISTRATION & WITHDRAWALS WITH AUTO REFUND ---
+# --- 9. HOST REGISTRATION & WITHDRAWALS ---
 def process_host_name(message):
     msg = bot.send_message(message.chat.id, "Step 2/4: Calling Phone Number enter karein:")
     bot.register_next_step_handler(msg, process_host_phone, message.text)
@@ -680,6 +701,8 @@ def check_stats(message):
 # --- MAIN RUNNER ---
 if __name__ == '__main__':
     print("Vynora Bot Live with 100% Complete Features...")
-    try: bot.remove_webhook()
-    except Exception: pass
+    try: 
+        bot.remove_webhook()
+    except Exception: 
+        pass
     bot.infinity_polling(skip_pending=True)
