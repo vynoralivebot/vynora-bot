@@ -12,7 +12,7 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"Vynora Live Bot is Online & Fully Functional!")
+        self.wfile.write(b"Private Live Bot is Online & Fully Functional!")
 
 def run_server():
     port = int(os.environ.get("PORT", 8080))
@@ -214,9 +214,16 @@ def start_cmd(message):
     user_id = message.chat.id
     name = message.from_user.first_name
     auto_register_user(user_id, name)
+    
+    welcome_msg = (
+        "Welcome 🙏\n\n"
+        "**Private Live 1v1 calling** me aapka swagat hai! 🎥\n\n"
+        "Aap isme kisi bhi registered girl se direct video call par baat kar sakte hain.\n\n"
+        "Niche diye gaye menu se service chunein:"
+    )
     bot.send_message(
         user_id, 
-        f"✨ *Welcome to Vynora Live Official Bot!*\n\nNamaste *{name}*, niche diye gaye menu se service chunein:", 
+        welcome_msg, 
         reply_markup=get_main_keyboard(user_id)
     )
 
@@ -270,7 +277,7 @@ def book_host(message):
             markup.add(types.InlineKeyboardButton(f"🔴 {slot_name} (Offline)", callback_data="host_offline"))
             
     text = (
-        "✨ *VYNORA LIVE - HOST SELECTION*\n\n"
+        "✨ *PRIVATE LIVE - HOST SELECTION*\n\n"
         f"💰 *Available Balance:* `{user_info['balance']} Minutes`\n\n"
         "👇 *Session ke liye active host select karein:*"
     )
@@ -459,7 +466,7 @@ def profile_and_ref(message):
     ref_link = f"https://t.me/{bot_username}?start={user_id}"
     
     profile_card = (
-        "👤 *VYNORA USER PROFILE*\n─────────────────────────\n"
+        "👤 *PRIVATE LIVE USER PROFILE*\n─────────────────────────\n"
         f"🆔 *User ID:* `{user_id}`\n"
         f"📛 *Name:* `{user_info['name'] or message.from_user.first_name}`\n"
         f"📱 *Phone:* `{user_info['phone'] or 'Not Registered'}`\n"
@@ -523,7 +530,6 @@ def process_host_tg(message, name_age, phone, whatsapp):
     admin_card = f"👑 *NEW HOST APPLICATION*\n🆔 User ID: `{user_id}`\n👤 Name: `{name_age}`\n📞 Phone: `{phone}`\n💬 WhatsApp: `{whatsapp}`"
     bot.send_message(ADMIN_GROUP_ID, admin_card, reply_markup=admin_markup)
 
-# UPDATED: Host Approval with Automatic Group Link Generation
 @bot.callback_query_handler(func=lambda call: call.data.startswith(("hostapp_", "hostrej_")))
 def handle_host_approval(call):
     data = call.data.split("_")
@@ -544,7 +550,6 @@ def handle_host_approval(call):
         assigned_slot = vacant_slots[0]
         assign_host_slot(applicant_id, assigned_slot)
         
-        # --- NEW: Generate group link for host ---
         target_group_id = HOST_GROUPS.get(assigned_slot)
         host_invite_link = generate_safe_invite_link(target_group_id, applicant_id)
         
@@ -725,7 +730,7 @@ def check_stats(message):
 
 # --- MAIN RUNNER ---
 if __name__ == '__main__':
-    print("Vynora Bot Live with 100% Complete Features...")
+    print("Private Live Bot Live with 100% Complete Features...")
     try: 
         bot.remove_webhook()
     except Exception: 
