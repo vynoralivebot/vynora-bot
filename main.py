@@ -91,7 +91,6 @@ def deduct_user_balance(user_id, mins):
     conn.commit()
     conn.close()
 
-# FIXED: Phone save database logic with UPSERT (inserts if user record missing)
 def save_user_phone(user_id, phone):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -277,7 +276,6 @@ def book_host(message):
     )
     bot.send_message(message.chat.id, text, reply_markup=markup)
 
-# FIXED: Handle Contact with Fake-Card Validation & DB Insert
 @bot.message_handler(content_types=['contact'])
 def handle_contact(message):
     if message.contact:
@@ -525,6 +523,7 @@ def process_host_tg(message, name_age, phone, whatsapp):
     admin_card = f"👑 *NEW HOST APPLICATION*\n🆔 User ID: `{user_id}`\n👤 Name: `{name_age}`\n📞 Phone: `{phone}`\n💬 WhatsApp: `{whatsapp}`"
     bot.send_message(ADMIN_GROUP_ID, admin_card, reply_markup=admin_markup)
 
+# UPDATED: Host Approval with Automatic Group Link Generation
 @bot.callback_query_handler(func=lambda call: call.data.startswith(("hostapp_", "hostrej_")))
 def handle_host_approval(call):
     data = call.data.split("_")
@@ -544,11 +543,33 @@ def handle_host_approval(call):
             
         assigned_slot = vacant_slots[0]
         assign_host_slot(applicant_id, assigned_slot)
-        bot.send_message(applicant_id, f"🎉 *HOST APPROVED!*\n👑 Slot: `{assigned_slot}`\n\n📌 *Note:* Status change karne ke liye `/offline` aur `/online` command use karein.")
+        
+        # --- NEW: Generate group link for host ---
+        target_group_id = HOST_GROUPS.get(assigned_slot)
+        host_invite_link = generate_safe_invite_link(target_group_id, applicant_id)
+        
+        link_markup = types.InlineKeyboardMarkup()
+        if host_invite_link:
+            link_markup.add(types.InlineKeyboardButton("🔗 Join Your Host Group", url=host_invite_link))
+            host_msg = (
+                f"🎉 *HOST APPLICATION APPROVED!*\n\n"
+                f"👑 *Assigned Slot:* `{assigned_slot}`\n\n"
+                f"👇 *Group Joining Link:*\nNiche button par click karke turant apne assigned host group me join ho jayein.\n\n"
+                f"📌 *Note:* Status change karne ke liye `/offline` aur `/online` command use karein."
+            )
+        else:
+            host_msg = (
+                f"🎉 *HOST APPROVED!*\n👑 Slot: `{assigned_slot}`\n\n"
+                f"📌 *Note:* Status change karne ke liye `/offline` aur `/online` command use karein."
+            )
+
+        bot.send_message(applicant_id, host_msg, reply_markup=link_markup if host_invite_link else None)
         bot.edit_message_text(f"✅ *HOST APPROVED*\nUser `{applicant_id}` -> Slot *{assigned_slot}*", ADMIN_GROUP_ID, call.message.message_id)
+        
     elif action == "hostrej":
         bot.send_message(applicant_id, "❌ *APPLICATION REJECTED*")
         bot.edit_message_text(f"❌ *HOST REJECTED*\nUser `{applicant_id}`", ADMIN_GROUP_ID, call.message.message_id)
+        
     bot.answer_callback_query(call.id)
 
 def start_withdrawal(message):
