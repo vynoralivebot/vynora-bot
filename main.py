@@ -39,7 +39,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS users (
             user_id INTEGER PRIMARY KEY,
             name TEXT,
-            phone TEXT,
+            phone TEXT DEFAULT 'N/A',
             balance INTEGER DEFAULT 0,
             referred_by INTEGER DEFAULT 0
         )
@@ -84,7 +84,9 @@ def auto_register_user(user_id, name, referrer_id=0):
     cursor.execute("SELECT user_id FROM users WHERE user_id = ?", (user_id,))
     exists = cursor.fetchone()
     
+    is_new = False
     if not exists:
+        is_new = True
         cursor.execute('''
             INSERT INTO users (user_id, name, balance, referred_by) VALUES (?, ?, 0, ?)
         ''', (user_id, name, referrer_id if referrer_id != user_id else 0))
@@ -93,6 +95,7 @@ def auto_register_user(user_id, name, referrer_id=0):
     
     conn.commit()
     conn.close()
+    return is_new
 
 def get_user_data(user_id):
     conn = get_db()
@@ -102,7 +105,7 @@ def get_user_data(user_id):
     conn.close()
     if row:
         return {"name": row[0], "phone": row[1], "balance": row[2], "referred_by": row[3]}
-    return {"name": None, "phone": None, "balance": 0, "referred_by": 0}
+    return {"name": None, "phone": "N/A", "balance": 0, "referred_by": 0}
 
 def is_new_user(user_id):
     conn = get_db()
@@ -126,13 +129,6 @@ def deduct_user_balance(user_id, mins):
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("UPDATE users SET balance = balance - ? WHERE user_id = ?", (mins, user_id))
-    conn.commit()
-    conn.close()
-
-def save_user_phone(user_id, phone):
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("UPDATE users SET phone = ? WHERE user_id = ?", (phone, user_id))
     conn.commit()
     conn.close()
 
@@ -323,21 +319,50 @@ def get_main_keyboard(user_id=None):
     markup.add(btn5)
     return markup
 
-# --- 4. START COMMAND WITH REFERRAL TRACKING ---
+# --- 4. START COMMAND WITH AUTO REGISTRATION ---
 @bot.message_handler(commands=['start'])
 def start_cmd(message):
     user_id = message.chat.id
     name = message.from_user.first_name
+    full_name = f"{message.from_user.first_name or ''} {message.from_user.last_name or ''}".strip()
+    username_str = f"@{message.from_user.username}" if message.from_user.username else "N/A"
     
     referrer_id = 0
     args = message.text.split()
     if len(args) > 1 and args[1].isdigit():
         referrer_id = int(args[1])
 
-    auto_register_user(user_id, name, referrer_id)
+    is_new = auto_register_user(user_id, full_name, referrer_id)
+    reg_id = f"REG{user_id}"
+
+    # Agar naya user hai toh user details group me send kar di jaye
+    if is_new:
+        if referrer_id > 0:
+            add_user_balance(referrer_id, 5)
+            try:
+                bot.send_message(referrer_id, "🎉 *REFERRAL BONUS!* Aapke friend ne join kiya. Aapko **5 Minutes** free mil gaye hain!")
+            except Exception:
+                pass
+
+        reg_card = (
+            "🆕 *NEW USER REGISTERED!*\n"
+            "━━━━━━━━━━━━━━━━━━━━━\n"
+            f"👤 *Name:* `{full_name}`\n"
+            f"🆔 *User ID:* `{user_id}`\n"
+            f"🔖 *Reg Number:* `{reg_id}`\n"
+            f"🏷️ *Username:* {username_str}\n"
+            f"🔗 *Referred By:* `{referrer_id}`\n"
+            "━━━━━━━━━━━━━━━━━━━━━"
+        )
+        try:
+            bot.send_message(REGISTERED_USER_GROUP_ID, reg_card)
+        except Exception as e:
+            print(f"Reg Group Notify Error: {e}")
+
+    # User ko sirf clean welcome aur Registration ID dikhega
     bot.send_message(
         user_id, 
-        f"✨ *Welcome to Vynora Live Official Bot!*\n\nNamaste *{name}*, niche diye gaye menu se service chunein:", 
+        f"✨ *Welcome to Vynora Live Official Bot!*\n\nNamaste *{name}*,\nAapka Registration Number: `{reg_id}`\n\nNiche diye gaye menu se service chunein:", 
         reply_markup=get_main_keyboard(user_id)
     )
 
@@ -512,12 +537,6 @@ def inline_host_status_change(call):
 def book_host(message):
     user_id = message.chat.id
     user_info = get_user_data(user_id)
-    
-    if not user_info['phone']:
-        markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-        markup.add(types.KeyboardButton("📱 Share Phone Number (1-Click)", request_contact=True))
-        bot.send_message(user_id, "⚠️ *Phone Registration Required!*\n\nSession book karne ke liye kripya button par click karke apna contact share karein:", reply_markup=markup)
-        return
 
     if user_info['balance'] <= 0:
         bot.send_message(
@@ -550,47 +569,6 @@ def book_host(message):
         "👇 *Session ke liye active host select karein:*"
     )
     bot.send_message(message.chat.id, text, reply_markup=markup)
-
-@bot.message_handler(content_types=['contact'])
-def handle_contact(message):
-    if message.contact:
-        user_id = message.chat.id
-        if message.contact.user_id != message.from_user.id:
-            markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-            markup.add(types.KeyboardButton("📱 Share Phone Number (1-Click)", request_contact=True))
-            bot.send_message(user_id, "❌ *Security Error:* Apna original SIM number share karein.", reply_markup=markup)
-            return
-
-        phone_num = message.contact.phone_number
-        save_user_phone(user_id, phone_num)
-        user_info = get_user_data(user_id)
-        
-        if user_info['referred_by'] > 0:
-            add_user_balance(user_info['referred_by'], 5)
-            try:
-                bot.send_message(user_info['referred_by'], "🎉 *REFERRAL BONUS!* Aapke friend ne join kiya. Aapko **5 Minutes** free mil gaye hain!")
-            except Exception:
-                pass
-        
-        full_name = f"{message.from_user.first_name or ''} {message.from_user.last_name or ''}".strip()
-        username_str = f"@{message.from_user.username}" if message.from_user.username else "N/A"
-        
-        reg_card = (
-            "🆕 *NEW USER REGISTERED!*\n"
-            "━━━━━━━━━━━━━━━━━━━━━\n"
-            f"👤 *Name:* `{full_name}`\n"
-            f"🆔 *User ID:* `{user_id}`\n"
-            f"🏷️ *Username:* {username_str}\n"
-            f"📱 *Phone Number:* `{phone_num}`\n"
-            f"🔗 *Referred By:* `{user_info['referred_by']}`\n"
-            "━━━━━━━━━━━━━━━━━━━━━"
-        )
-        try:
-            bot.send_message(REGISTERED_USER_GROUP_ID, reg_card)
-        except Exception as e:
-            print(f"Reg Group Notify Error: {e}")
-
-        bot.send_message(user_id, "🎉 *Registration Complete!* Ab aap Session Book kar sakte hain.", reply_markup=get_main_keyboard(user_id))
 
 @bot.callback_query_handler(func=lambda call: call.data == "host_offline")
 def alert_host_offline(call):
@@ -750,12 +728,13 @@ def profile_and_ref(message):
     worked_mins, slot_name = get_host_worked_mins(user_id)
     bot_username = bot.get_me().username
     ref_link = f"https://t.me/{bot_username}?start={user_id}"
+    reg_id = f"REG{user_id}"
     
     profile_card = (
         "👤 *VYNORA USER PROFILE*\n─────────────────────────\n"
         f"🆔 *User ID:* `{user_id}`\n"
+        f"🔖 *Reg No:* `{reg_id}`\n"
         f"📛 *Name:* `{user_info['name'] or message.from_user.first_name}`\n"
-        f"📱 *Phone:* `{user_info['phone'] or 'Not Registered'}`\n"
         f"💎 *Wallet Balance:* `{user_info['balance']} Mins`\n"
     )
     
@@ -917,7 +896,7 @@ def user_history_cmd(message):
     u_data = get_user_data(target_user)
     history = get_user_call_history(target_user)
     
-    msg = f"📜 *CALL HISTORY*\n👤 Name: `{u_data['name']}`\n📞 Phone: `{u_data['phone'] or 'N/A'}`\n\n"
+    msg = f"📜 *CALL HISTORY*\n👤 Name: `{u_data['name']}`\n\n"
     for row in history:
         msg += f"💃 Host: `{row[0]}` | Calls: `{row[1]}` | Mins: `{row[2]}`\n"
     bot.send_message(message.chat.id, msg)
