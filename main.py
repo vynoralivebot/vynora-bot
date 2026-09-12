@@ -437,21 +437,43 @@ def generate_safe_invite_link(group_id, user_id):
         return None
 
 
-def kick_user_action(chat_id, user_id, mins):
+def kick_user_action(chat_id, user_id, mins, host_name):
     try:
         bot.ban_chat_member(chat_id, user_id)
         bot.unban_chat_member(chat_id, user_id)
+        
+        # User notification
         bot.send_message(
             user_id,
-            f"⏰ *SESSION TIME EXPIRED!*\nAapka `{mins} Mins` ka session khatam ho gaya hai.",
+            f"⏰ *SESSION TIME EXPIRED!*\n\nAapka `{mins} Mins` ka session khatam ho gaya hai aur aapko private room se hata diya gaya hai.",
         )
+
+        # Host Group Completion Notification with 30% deduction calculation
+        gross_earning = mins * HOST_RATE_PER_MIN
+        platform_deduction = round(gross_earning * 0.30, 2)
+        net_earning = round(gross_earning - platform_deduction, 2)
+        current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        completion_card = (
+            "🏁 *SESSION EXPIRED & COMPLETED*\n"
+            "━━━━━━━━━━━━━━━━━━━━━\n"
+            f"📅 *Date & Time:* `{current_time_str}`\n"
+            f"👤 *User ID:* `{user_id}`\n"
+            f"💃 *Host Slot:* `{host_name}`\n"
+            f"⏱️ *Call Duration:* `{mins} Minutes`\n"
+            f"💰 *Gross Earnings:* `₹{gross_earning}`\n"
+            f"📉 *Platform Deduction (30%):* `-₹{platform_deduction}`\n"
+            f"💵 *Net Earning Added:* `₹{net_earning}`\n"
+            "━━━━━━━━━━━━━━━━━━━━━"
+        )
+        bot.send_message(chat_id, completion_card)
     except Exception as e:
-        print(f"Kick Error: {e}")
+        print(f"Kick / Host Group Expiry Notification Error: {e}")
 
 
-def schedule_auto_kick(chat_id, user_id, mins):
+def schedule_auto_kick(chat_id, user_id, mins, host_name):
     timer = threading.Timer(
-        mins * 60, kick_user_action, args=(chat_id, user_id, mins)
+        mins * 60, kick_user_action, args=(chat_id, user_id, mins, host_name)
     )
     timer.daemon = True
     timer.start()
@@ -487,11 +509,12 @@ def start_cmd(message):
 
     auto_register_user(user_id, full_name, referrer_id)
     reg_id = f"REG{user_id}"
+    current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # Ye notification har baar /start dabane par group me aayegi
     reg_card = (
-        "🆕 *USER ACTIVITY / START!*\n"
+        "🆕 *NEW USER ACTIVITY / START*\n"
         "━━━━━━━━━━━━━━━━━━━━━\n"
+        f"📅 *Date & Time:* `{current_time_str}`\n"
         f"👤 *Name:* `{full_name}`\n"
         f"🆔 *User ID:* `{user_id}`\n"
         f"🔖 *Reg Number:* `{reg_id}`\n"
@@ -511,7 +534,7 @@ def start_cmd(message):
     )
 
 
-# --- ADMIN COMMANDS: BROADCAST, STATS, WITHDRAW ---
+# --- ADMIN COMMANDS: BROADCAST, STATS, WITHDRAW, ADD/DEDUCT MINS ---
 @bot.message_handler(commands=["broadcast"])
 def broadcast_cmd(message):
     if message.chat.id != ADMIN_GROUP_ID:
@@ -536,6 +559,68 @@ def broadcast_cmd(message):
         ADMIN_GROUP_ID,
         f"✅ *BROADCAST SENT!*\nTotal Delivered: `{count}/{len(all_users)} Users`",
     )
+
+
+@bot.message_handler(commands=["addmins", "givemins"])
+def admin_add_mins(message):
+    if message.chat.id != ADMIN_GROUP_ID:
+        return
+    args = message.text.split()
+    if len(args) < 3 or not args[1].isdigit() or not args[2].isdigit():
+        bot.send_message(
+            ADMIN_GROUP_ID,
+            "⚠️ Usage: `/addmins <user_id> <minutes>`\nExample: `/addmins 123456789 10`",
+        )
+        return
+
+    target_user = int(args[1])
+    mins = int(args[2])
+    add_user_balance(target_user, mins)
+
+    bot.send_message(
+        ADMIN_GROUP_ID,
+        f"✅ *MINUTES ADDED SUCCESSFULLY*\n"
+        f"👤 User ID: `{target_user}`\n"
+        f"⏱️ Added Minutes: `{mins} Mins`",
+    )
+    try:
+        bot.send_message(
+            target_user,
+            f"🎁 *BONUS / RECHARGE CREDITED!*\n\nAdmin dwara aapke account mein `{mins} Minutes` add kar diye gaye hain.",
+        )
+    except Exception:
+        pass
+
+
+@bot.message_handler(commands=["deductmins", "removemins"])
+def admin_deduct_mins(message):
+    if message.chat.id != ADMIN_GROUP_ID:
+        return
+    args = message.text.split()
+    if len(args) < 3 or not args[1].isdigit() or not args[2].isdigit():
+        bot.send_message(
+            ADMIN_GROUP_ID,
+            "⚠️ Usage: `/deductmins <user_id> <minutes>`\nExample: `/deductmins 123456789 5`",
+        )
+        return
+
+    target_user = int(args[1])
+    mins = int(args[2])
+    deduct_user_balance(target_user, mins)
+
+    bot.send_message(
+        ADMIN_GROUP_ID,
+        f"🗑️ *MINUTES DEDUCTED SUCCESSFULLY*\n"
+        f"👤 User ID: `{target_user}`\n"
+        f"⏱️ Deducted Minutes: `{mins} Mins`",
+    )
+    try:
+        bot.send_message(
+            target_user,
+            f"ℹ️ *BALANCE UPDATE*\n\nAdmin dwara aapke account se `{mins} Minutes` deduct kar liye gaye hain.",
+        )
+    except Exception:
+        pass
 
 
 @bot.message_handler(commands=["stats"])
@@ -673,7 +758,7 @@ def check_balance_earnings(message):
             "⚠️ *HOST NOT REGISTERED*\n─────────────────────────\n"
             f"👤 *User ID:* `{user_id}`\n"
             f"💎 *User Wallet Balance:* `{user_info['balance']} Mins`\n\n"
-            "📌 *Note:* Aap abhi kisi Host Slot से linked nahi hain."
+            "📌 *Note:* Aap abhi kisi Host Slot se linked nahi hain."
         )
         bot.send_message(user_id, msg)
         return
@@ -849,10 +934,21 @@ def process_booking_click(call):
     log_session(user_id, host_name, mins)
     new_bal = user_info["balance"] - mins
 
-    schedule_auto_kick(target_group_id, user_id, mins)
+    # Schedule auto-kick after selected duration expires
+    schedule_auto_kick(target_group_id, user_id, mins, host_name)
 
+    current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    user_full_name = (
+        f"{call.from_user.first_name or ''} {call.from_user.last_name or ''}"
+    ).strip()
+    username_str = (
+        f"@{call.from_user.username}" if call.from_user.username else "N/A"
+    )
+
+    # User confirmation message
     text = (
         "🎉 *SESSION BOOKING SUCCESSFUL!*\n\n"
+        f"📅 *Date & Time:* `{current_time_str}`\n"
         f"👤 *Selected Host:* `{host_name}`\n"
         f"⏱️ *Duration:* `{mins} Minutes`\n"
         f"💰 *Remaining Balance:* `{new_bal} Mins`\n\n"
@@ -866,15 +962,35 @@ def process_booking_click(call):
     )
     bot.send_message(user_id, text, reply_markup=link_markup)
 
-    bot.send_message(
-        ADMIN_GROUP_ID,
-        f"📊 *NEW BOOKING*\n👤 User: `{user_id}`\n💃 Host: `{host_name}`\n⏱️ Duration: `{mins} Mins`",
+    # Admin group notification with date & time
+    admin_card = (
+        "🔥 *NEW HOST SESSION BOOKING*\n"
+        "━━━━━━━━━━━━━━━━━━━━━\n"
+        f"📅 *Date & Time:* `{current_time_str}`\n"
+        f"👤 *User Name:* `{user_full_name}`\n"
+        f"🆔 *User ID:* `{user_id}`\n"
+        f"💃 *Assigned Host:* `{host_name}`\n"
+        f"⏱️ *Duration:* `{mins} Mins`\n"
+        "━━━━━━━━━━━━━━━━━━━━━"
     )
-    bot.send_message(
-        target_group_id,
-        f"🔔🔔 *CALL BOOKED!* `{host_name}` -> Duration: `{mins} Mins`",
-        disable_notification=False,
+    bot.send_message(ADMIN_GROUP_ID, admin_card)
+
+    # Host group notification with date, time, name, username
+    host_group_card = (
+        "🔔 *NEW CALL BOOKED IN SLOT!*\n"
+        "━━━━━━━━━━━━━━━━━━━━━\n"
+        f"📅 *Date & Time:* `{current_time_str}`\n"
+        f"👤 *User Name:* `{user_full_name}`\n"
+        f"🆔 *User ID:* `{user_id}`\n"
+        f"🏷️ *Username:* `{username_str}`\n"
+        f"⏱️ *Duration Booked:* `{mins} Minutes`\n"
+        "━━━━━━━━━━━━━━━━━━━━━\n"
+        "💡 *Kripya user ke sath private room me connect rahein!*"
     )
+    try:
+        bot.send_message(target_group_id, host_group_card)
+    except Exception as e:
+        print(f"Host Group Booking Notification Error: {e}")
 
 
 # --- 8. RECHARGE & PAYMENT APPROVAL ---
@@ -946,6 +1062,7 @@ def process_utr_submission(message, photo_id, txn_id):
     user_id = message.chat.id
     utr_number = message.text.strip() if message.text else "N/A"
     selected_plan = get_user_plan(user_id)
+    current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
@@ -969,11 +1086,15 @@ def process_utr_submission(message, photo_id, txn_id):
         ),
     )
     caption = (
-        f"📸 *NEW RECHARGE SCREENSHOT*\n\n"
+        "📸 *NEW RECHARGE SCREENSHOT SUBMISSION*\n"
+        "━━━━━━━━━━━━━━━━━━━━━\n"
+        f"📅 *Date & Time:* `{current_time_str}`\n"
         f"👤 *User ID:* `{user_id}`\n"
         f"🎯 *Selected Plan:* `{selected_plan}`\n"
-        f"🔢 *UTR:* `{utr_number}`\n"
-        f"🔖 *TXN ID:* `{txn_id}`"
+        f"🔢 *UTR Number:* `{utr_number}`\n"
+        f"🔖 *TXN ID:* `{txn_id}`\n"
+        "━━━━━━━━━━━━━━━━━━━━━\n"
+        "⚠️ *Bina approval ke balance add nahi hoga.*"
     )
     sent_msg = bot.send_photo(
         ADMIN_GROUP_ID, photo_id, caption=caption, reply_markup=markup
@@ -981,7 +1102,7 @@ def process_utr_submission(message, photo_id, txn_id):
     save_pending_txn(txn_id, user_id, utr_number, sent_msg.message_id)
     bot.send_message(
         user_id,
-        f"⏳ *Verification Under Process!*\n• *Plan:* `{selected_plan}`\n• *UTR:* `{utr_number}`",
+        f"⏳ *Verification Under Process!*\n• *Plan:* `{selected_plan}`\n• *UTR:* `{utr_number}`\n\nAdmin dwara verify hote hi aapke account mein minutes add kar diye jayenge.",
     )
 
 
@@ -1029,7 +1150,7 @@ def process_admin_recharge_approval(call):
 
         bot.send_message(
             ADMIN_GROUP_ID,
-            f"✅ *PAYMENT APPROVED*\n👤 User ID: `{user_id}`\n💰 Credited: `{mins} Mins`",
+            f"✅ *PAYMENT APPROVED & CREDITED*\n👤 User ID: `{user_id}`\n💰 Credited: `{mins} Mins`",
         )
         bot.send_message(
             user_id,
@@ -1046,7 +1167,7 @@ def process_admin_recharge_approval(call):
             except Exception:
                 pass
         bot.send_message(
-            user_id, "❌ Aapka payment verification reject ho gaya hai."
+            user_id, "❌ Aapka payment verification admin dwara reject kar diya gaya hai."
         )
 
 
@@ -1194,6 +1315,7 @@ def process_withdraw_upi(message, amount_inr, mins_equivalent):
     upi_id = message.text.strip()
     user_info = get_user_data(user_id)
     host_name = user_info["name"] or f"Host-{user_id}"
+    current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     bot.send_message(
         user_id,
@@ -1208,8 +1330,9 @@ def process_withdraw_upi(message, amount_inr, mins_equivalent):
     )
 
     admin_card = (
-        f"📥 *NEW HOST WITHDRAWAL REQUEST*\n"
-        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        "📥 *NEW HOST WITHDRAWAL REQUEST*\n"
+        "━━━━━━━━━━━━━━━━━━━━━\n"
+        f"📅 *Date & Time:* `{current_time_str}`\n"
         f"👤 *Host Name:* `{host_name}`\n"
         f"🆔 *Host ID:* `{user_id}`\n"
         f"🪙 *Mins Token:* `{mins_equivalent} Mins`\n"
@@ -1285,7 +1408,7 @@ def user_history_cmd(message):
 
 
 if __name__ == "__main__":
-    print("Vynora Bot Online - Group Registration Notifications Active...")
+    print("Vynora Bot Online - Professional Notifications & Host Expiry Tracking Active...")
     try:
         bot.remove_webhook()
     except Exception:
