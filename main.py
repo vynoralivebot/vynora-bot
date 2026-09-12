@@ -673,7 +673,7 @@ def check_balance_earnings(message):
             "⚠️ *HOST NOT REGISTERED*\n─────────────────────────\n"
             f"👤 *User ID:* `{user_id}`\n"
             f"💎 *User Wallet Balance:* `{user_info['balance']} Mins`\n\n"
-            "📌 *Note:* Aap abhi kisi Host Slot se linked nahi hain."
+            "📌 *Note:* Aap abhi kisi Host Slot से linked nahi hain."
         )
         bot.send_message(user_id, msg)
         return
