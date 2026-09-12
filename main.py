@@ -152,9 +152,7 @@ def auto_register_user(user_id, name, referrer_id=0):
     cursor.execute("SELECT user_id FROM users WHERE user_id = ?", (user_id,))
     exists = cursor.fetchone()
 
-    is_new = False
     if not exists:
-        is_new = True
         cursor.execute(
             """
             INSERT INTO users (user_id, name, balance, referred_by) VALUES (?, ?, 0, ?)
@@ -168,7 +166,6 @@ def auto_register_user(user_id, name, referrer_id=0):
 
     conn.commit()
     conn.close()
-    return is_new
 
 
 def get_user_data(user_id):
@@ -491,51 +488,44 @@ def get_main_keyboard(user_id=None):
 def start_cmd(message):
     user_id = message.chat.id
     name = message.from_user.first_name
-    full_name = (
-        f"{message.from_user.first_name or ''} {message.from_user.last_name or ''}".strip()
-    )
-    username_str = (
-        f"@{message.from_user.username}"
-        if message.from_user.username
-        else "N/A"
-    )
+    full_name = f"{message.from_user.first_name or ''} {message.from_user.last_name or ''}".strip()
+    username_str = f"@{message.from_user.username}" if message.from_user.username else "N/A"
 
     referrer_id = 0
     args = message.text.split()
     if len(args) > 1 and args[1].isdigit():
         referrer_id = int(args[1])
 
-    is_new = auto_register_user(user_id, full_name, referrer_id)
+    auto_register_user(user_id, full_name, referrer_id)
     reg_id = f"REG{user_id}"
 
-    if is_new:
-        reg_card = (
-            "🆕 *NEW USER REGISTERED!*\n"
-            "━━━━━━━━━━━━━━━━━━━━━\n"
-            f"👤 *Name:* `{full_name}`\n"
-            f"🆔 *User ID:* `{user_id}`\n"
-            f"🔖 *Reg Number:* `{reg_id}`\n"
-            f"🏷️ *Username:* {username_str}\n"
-            f"🔗 *Referred By:* `{referrer_id}`\n"
-            "━━━━━━━━━━━━━━━━━━━━━"
-        )
-        try:
-            bot.send_message(REGISTERED_USER_GROUP_ID, reg_card)
-        except Exception as e:
-            print(f"Reg Group Notify Error: {e}")
+    reg_card = (
+        "🆕 *USER ACTIVITY / START!*\n"
+        "━━━━━━━━━━━━━━━━━━━━━\n"
+        f"👤 *Name:* `{full_name}`\n"
+        f"🆔 *User ID:* `{user_id}`\n"
+        f"🔖 *Reg Number:* `{reg_id}`\n"
+        f"🏷️ *Username:* {username_str}\n"
+        f"🔗 *Referred By:* `{referrer_id}`\n"
+        "━━━━━━━━━━━━━━━━━━━━━"
+    )
+    try:
+        bot.send_message(REGISTERED_USER_GROUP_ID, reg_card)
+    except Exception as e:
+        print(f"Reg Group Notify Error: {e}")
 
-        # --- GOOGLE SHEET ENTRY (NEW USER) ---
-        reg_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        append_to_google_sheet(
-            "Users",
-            [
-                str(user_id),
-                full_name,
-                username_str,
-                str(referrer_id),
-                reg_time,
-            ],
-        )
+    # --- GOOGLE SHEET ENTRY ---
+    reg_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    append_to_google_sheet(
+        "Users",
+        [
+            str(user_id),
+            full_name,
+            username_str,
+            str(referrer_id),
+            reg_time,
+        ],
+    )
 
     bot.send_message(
         user_id,
@@ -635,7 +625,6 @@ def admin_manual_withdraw(message):
         f"🪙 Deducted: `{mins_to_deduct} Mins Token`",
     )
 
-    # --- GOOGLE SHEET ENTRY (MANUAL WITHDRAWAL) ---
     payout_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     u_data = get_user_data(host_id)
     append_to_google_sheet(
@@ -722,7 +711,7 @@ def check_balance_earnings(message):
             "⚠️ *HOST NOT REGISTERED*\n─────────────────────────\n"
             f"👤 *User ID:* `{user_id}`\n"
             f"💎 *User Wallet Balance:* `{user_info['balance']} Mins`\n\n"
-            "📌 *Note:* Aap abhi kisi Host Slot se linked nahi hain."
+            "📌 *Note:* Aap abhi kisi Host Slot से linked nahi hain."
         )
         bot.send_message(user_id, msg)
         return
@@ -925,7 +914,6 @@ def process_booking_click(call):
         disable_notification=False,
     )
 
-    # --- GOOGLE SHEET ENTRY (BOOKING) ---
     booking_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     append_to_google_sheet(
         "Bookings",
@@ -1100,7 +1088,6 @@ def process_admin_recharge_approval(call):
             reply_markup=get_main_keyboard(user_id),
         )
 
-        # --- GOOGLE SHEET ENTRY (RECHARGE) ---
         app_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         u_data = get_user_data(user_id)
         utr_val = txn_info.get("utr", "N/A") if txn_info else "N/A"
@@ -1207,7 +1194,6 @@ def handle_profile_help_actions(call):
     bot.answer_callback_query(call.id)
 
 
-# --- HOST WITHDRAWAL FLOW ---
 def start_withdrawal(message):
     user_id = message.chat.id
     worked_mins, slot_name = get_host_worked_mins(user_id)
@@ -1336,7 +1322,6 @@ def admin_payout_action(call):
             f"🔔 *PAYMENT SUCCESSFUL!*\n\nAapka `₹{amount_inr}` (`{mins_equivalent} Mins Token`) aapke UPI account me credit kar diya gaya hai.",
         )
 
-        # --- GOOGLE SHEET ENTRY (WITHDRAWAL APPROVED) ---
         payout_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         u_data = get_user_data(user_id)
         append_to_google_sheet(
@@ -1365,7 +1350,6 @@ def admin_payout_action(call):
         )
 
 
-# --- ADVANCED COMMANDS ---
 @bot.message_handler(commands=["history"])
 def user_history_cmd(message):
     args = message.text.split()
