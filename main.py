@@ -29,7 +29,7 @@ def run_server():
 threading.Thread(target=run_server, daemon=True).start()
 
 # --- RATES CONFIGURATION ---
-HOST_RATE_PER_MIN = 14  # Host ko ₹14 per worked min milenge
+HOST_RATE_PER_MIN = 14
 
 # --- 2. GOOGLE SHEETS SETUP & HELPER ---
 SHEET_NAME = os.environ.get("GOOGLE_SHEET_NAME", "Private_Live_Official")
@@ -51,35 +51,24 @@ def get_gsheet_client():
 
 
 def append_to_google_sheet(tab_name, row_data):
-    """Google Sheet me automated record add karne ka helper function with debug"""
-
     def _async_append():
         try:
             client = get_gsheet_client()
             if not client:
-                print("[Google Sheet Error] Gspread client authorization failed!")
                 return
-            
-            print(f"[Google Sheet Debug] Trying to open sheet: '{SHEET_NAME}'")
             spreadsheet = client.open(SHEET_NAME)
-            
             try:
                 worksheet = spreadsheet.worksheet(tab_name)
-                print(f"[Google Sheet Debug] Found worksheet: '{tab_name}'")
-            except Exception as ex:
-                print(f"[Google Sheet Debug] Worksheet '{tab_name}' not found, falling back to sheet1. Error: {ex}")
+            except Exception:
                 worksheet = spreadsheet.sheet1
-                
             worksheet.append_row(row_data)
-            print(f"✅ [Google Sheet Success] Data successfully added to '{tab_name}': {row_data}")
-            
         except Exception as e:
-            print(f"❌ [Google Sheet Save Error]: {type(e).__name__} - {e}")
+            print(f"❌ [Google Sheet Save Error]: {e}")
 
     threading.Thread(target=_async_append, daemon=True).start()
 
 
-# --- 3. PERMANENT SQLITE DATABASE SETUP WITH CONCURRENCY FIX ---
+# --- 3. PERMANENT SQLITE DATABASE SETUP ---
 DB_NAME = "vynora.db"
 
 
@@ -483,7 +472,7 @@ def get_main_keyboard(user_id=None):
     return markup
 
 
-# --- 5. START COMMAND WITH AUTO REGISTRATION & SHEET LOGIC ---
+# --- 5. START COMMAND (UNCONDITIONAL GROUP NOTIFICATION) ---
 @bot.message_handler(commands=["start"])
 def start_cmd(message):
     user_id = message.chat.id
@@ -499,6 +488,7 @@ def start_cmd(message):
     auto_register_user(user_id, full_name, referrer_id)
     reg_id = f"REG{user_id}"
 
+    # Ye notification har baar /start dabane par group me aayegi
     reg_card = (
         "🆕 *USER ACTIVITY / START!*\n"
         "━━━━━━━━━━━━━━━━━━━━━\n"
@@ -513,19 +503,6 @@ def start_cmd(message):
         bot.send_message(REGISTERED_USER_GROUP_ID, reg_card)
     except Exception as e:
         print(f"Reg Group Notify Error: {e}")
-
-    # --- GOOGLE SHEET ENTRY ---
-    reg_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    append_to_google_sheet(
-        "Users",
-        [
-            str(user_id),
-            full_name,
-            username_str,
-            str(referrer_id),
-            reg_time,
-        ],
-    )
 
     bot.send_message(
         user_id,
@@ -625,21 +602,6 @@ def admin_manual_withdraw(message):
         f"🪙 Deducted: `{mins_to_deduct} Mins Token`",
     )
 
-    payout_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    u_data = get_user_data(host_id)
-    append_to_google_sheet(
-        "Withdrawals",
-        [
-            str(host_id),
-            u_data.get("name", f"Host-{host_id}"),
-            str(amount_inr),
-            str(mins_to_deduct),
-            "MANUAL_ADMIN",
-            payout_time,
-            "SUCCESS",
-        ],
-    )
-
 
 @bot.message_handler(commands=["sethost"])
 def set_host_direct(message):
@@ -711,7 +673,7 @@ def check_balance_earnings(message):
             "⚠️ *HOST NOT REGISTERED*\n─────────────────────────\n"
             f"👤 *User ID:* `{user_id}`\n"
             f"💎 *User Wallet Balance:* `{user_info['balance']} Mins`\n\n"
-            "📌 *Note:* Aap abhi kisi Host Slot से linked nahi hain."
+            "📌 *Note:* Aap abhi kisi Host Slot se linked nahi hain."
         )
         bot.send_message(user_id, msg)
         return
@@ -914,19 +876,6 @@ def process_booking_click(call):
         disable_notification=False,
     )
 
-    booking_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    append_to_google_sheet(
-        "Bookings",
-        [
-            str(user_id),
-            user_info["name"] or f"User-{user_id}",
-            host_name,
-            str(mins),
-            str(new_bal),
-            booking_time,
-        ],
-    )
-
 
 # --- 8. RECHARGE & PAYMENT APPROVAL ---
 @bot.message_handler(
@@ -1086,22 +1035,6 @@ def process_admin_recharge_approval(call):
             user_id,
             f"✅ *Payment Approved!*\nAapke account mein *{mins} Minutes* add kar diye gaye hain.",
             reply_markup=get_main_keyboard(user_id),
-        )
-
-        app_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        u_data = get_user_data(user_id)
-        utr_val = txn_info.get("utr", "N/A") if txn_info else "N/A"
-        append_to_google_sheet(
-            "Recharges",
-            [
-                str(user_id),
-                u_data.get("name", f"User-{user_id}"),
-                str(mins),
-                str(utr_val),
-                txn_id,
-                app_time,
-                "APPROVED",
-            ],
         )
 
     elif action == "rej":
@@ -1322,21 +1255,6 @@ def admin_payout_action(call):
             f"🔔 *PAYMENT SUCCESSFUL!*\n\nAapka `₹{amount_inr}` (`{mins_equivalent} Mins Token`) aapke UPI account me credit kar diya gaya hai.",
         )
 
-        payout_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        u_data = get_user_data(user_id)
-        append_to_google_sheet(
-            "Withdrawals",
-            [
-                str(user_id),
-                u_data.get("name", f"Host-{user_id}"),
-                str(amount_inr),
-                str(mins_equivalent),
-                "APPROVED",
-                payout_time,
-                "SUCCESS",
-            ],
-        )
-
     elif action == "payout" and parts[1] == "reject":
         user_id = int(parts[2])
         bot.edit_message_text(
@@ -1367,7 +1285,7 @@ def user_history_cmd(message):
 
 
 if __name__ == "__main__":
-    print("Vynora Bot Online with Google Sheets Auto-Sync & First-Recharge Referral Logic...")
+    print("Vynora Bot Online - Group Registration Notifications Active...")
     try:
         bot.remove_webhook()
     except Exception:
