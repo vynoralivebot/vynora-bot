@@ -241,7 +241,7 @@ def assign_host_slot(user_id, slot_name, group_id):
 def remove_host_slot(identifier):
     conn = get_db()
     cursor = conn.cursor()
-    if str(identifier).isdigit():
+    if str(identifier).isdigit() or (str(identifier).startswith("-") and str(identifier)[1:].isdigit()):
         cursor.execute("DELETE FROM host_assignments WHERE user_id = ?", (int(identifier),))
     else:
         cursor.execute("DELETE FROM host_assignments WHERE slot_name = ?", (identifier,))
@@ -403,7 +403,6 @@ def start_cmd(message):
     full_name = f"{message.from_user.first_name or ''} {message.from_user.last_name or ''}".strip()
     username_str = f"@{message.from_user.username}" if message.from_user.username else "N/A"
 
-    # Check if user is a registered host -> Show Inline Dashboard
     host_info = get_host_info_by_userid(user_id)
     if host_info:
         text, markup = build_host_dashboard_content(user_id)
@@ -477,19 +476,29 @@ def host_dashboard_callbacks(call):
 def admin_add_host(message):
     if message.chat.id != ADMIN_GROUP_ID:
         return
-    args = message.text.split(maxsplit=3)
-    if len(args) < 4 or not args[1].isdigit() or not args[3].isdigit():
-        bot.send_message(ADMIN_GROUP_ID, "⚠️ Usage: `/addhost <telegram_id> <slot_name> <group_id>`\nExample: `/addhost 123456789 Priya -1004312344325`")
+    
+    args = message.text.split()
+    if len(args) < 3:
+        bot.send_message(ADMIN_GROUP_ID, "⚠️ Usage: `/addhost <telegram_id> <group_id>`\nExample: `/addhost 1108685585 -1004312344325`")
         return
     
-    target_user = int(args[1])
-    slot_name = args[2]
-    group_id = int(args[3])
+    try:
+        target_user = int(args[1])
+        group_id = int(args[2])
+    except ValueError:
+        bot.send_message(ADMIN_GROUP_ID, "⚠️ Invalid format! Telegram ID aur Group ID numbers hone chahiye.")
+        return
+
+    slot_name = f"Host_{target_user}"
+    for name, gid in DEFAULT_HOST_GROUPS.items():
+        if gid == group_id:
+            slot_name = name
+            break
 
     assign_host_slot(target_user, slot_name, group_id)
     bot.send_message(
         ADMIN_GROUP_ID,
-        f"✅ *Host Added & Approved*\n👤 Host: `{slot_name}`\n🆔 ID: `{target_user}`\n🏢 Group ID: `{group_id}`\n🟢 Status: `ONLINE`"
+        f"✅ *Host Added & Approved*\n👤 Slot: `{slot_name}`\n🆔 ID: `{target_user}`\n🏢 Group ID: `{group_id}`\n🟢 Status: `ONLINE`"
     )
     try:
         text, markup = build_host_dashboard_content(target_user)
@@ -510,7 +519,7 @@ def admin_remove_host(message):
         bot.send_message(ADMIN_GROUP_ID, "⚠️ Usage: `/removehost <telegram_id_or_slot_name>`")
         return
     identifier = args[1]
-    if identifier.isdigit():
+    if identifier.isdigit() or (identifier.startswith("-") and identifier[1:].isdigit()):
         identifier = int(identifier)
     remove_host_slot(identifier)
     bot.send_message(ADMIN_GROUP_ID, f"🗑️ Host slot `{identifier}` successfully removed from database.")
