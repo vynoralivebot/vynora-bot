@@ -8,6 +8,14 @@ from datetime import datetime, timedelta
 
 import telebot
 from telebot import types
+from flask import Flask, request
+
+
+# ============================================================
+# VYNORA LIVE BOT
+# Render Web Service + Telegram Webhook
+# Google Sheets logic removed
+# ============================================================
 
 
 # ============================================================
@@ -44,6 +52,25 @@ PAYEE_NAME = os.environ.get(
     "Rajnish Kumar"
 )
 
+# Optional. If empty, RENDER_EXTERNAL_URL will be used.
+WEBHOOK_URL = os.environ.get(
+    "WEBHOOK_URL",
+    ""
+).strip()
+
+# Optional extra Telegram webhook security.
+WEBHOOK_SECRET = os.environ.get(
+    "WEBHOOK_SECRET",
+    ""
+).strip()
+
+PORT = int(
+    os.environ.get(
+        "PORT",
+        "10000"
+    )
+)
+
 
 # ============================================================
 # HOST GROUPS
@@ -76,11 +103,9 @@ HOST_GROUPS = {
 # ============================================================
 
 PLATFORM_CHARGE_PERCENT = 30
-
 HOST_SHARE_PERCENT = 70
 
 
-# User plans
 PLANS = {
     5: 100,
     10: 200,
@@ -125,141 +150,73 @@ def get_db():
 def init_db():
 
     conn = get_db()
-
     cur = conn.cursor()
-
-
-    # --------------------------------------------------------
-    # USERS
-    # --------------------------------------------------------
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS users (
-
             user_id INTEGER PRIMARY KEY,
-
             name TEXT,
-
             username TEXT DEFAULT '',
-
             phone TEXT DEFAULT 'N/A',
-
             balance INTEGER DEFAULT 0,
-
             referred_by INTEGER DEFAULT 0,
-
             registered_at TEXT,
-
             last_seen TEXT
         )
     """)
 
-
-    # --------------------------------------------------------
-    # HOSTS
-    # --------------------------------------------------------
-
     cur.execute("""
         CREATE TABLE IF NOT EXISTS hosts (
-
             user_id INTEGER PRIMARY KEY,
-
             host_name TEXT NOT NULL,
-
             group_id INTEGER NOT NULL,
-
             status TEXT DEFAULT 'OFFLINE',
-
             approved INTEGER DEFAULT 1,
-
             wallet INTEGER DEFAULT 0,
-
             total_minutes INTEGER DEFAULT 0,
-
             total_gross INTEGER DEFAULT 0,
-
             total_platform_charge INTEGER DEFAULT 0,
-
             created_at TEXT
         )
     """)
 
-
-    # --------------------------------------------------------
-    # SESSIONS
-    # --------------------------------------------------------
-
     cur.execute("""
         CREATE TABLE IF NOT EXISTS sessions (
-
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-
             user_id INTEGER,
-
             host_user_id INTEGER,
-
             host_name TEXT,
-
             group_id INTEGER,
-
             duration INTEGER,
-
             amount INTEGER,
-
             platform_charge INTEGER DEFAULT 0,
-
             host_earning INTEGER DEFAULT 0,
-
             status TEXT DEFAULT 'ACTIVE',
-
             created_at TEXT,
-
             expires_at TEXT
         )
     """)
 
-
-    # --------------------------------------------------------
-    # PAYMENTS
-    # --------------------------------------------------------
-
     cur.execute("""
         CREATE TABLE IF NOT EXISTS pending_txns (
-
             txn_id TEXT PRIMARY KEY,
-
             user_id INTEGER,
-
             plan_minutes INTEGER,
-
             amount INTEGER,
-
             utr TEXT,
-
             msg_id INTEGER DEFAULT 0,
-
             status TEXT DEFAULT 'WAITING_PAYMENT',
-
             created_at TEXT,
-
             approved_at TEXT
         )
     """)
 
-
-    # --------------------------------------------------------
-    # FIRST OFFER
-    # --------------------------------------------------------
-
     cur.execute("""
         CREATE TABLE IF NOT EXISTS user_plans (
-
             user_id INTEGER PRIMARY KEY,
-
             first_offer_used INTEGER DEFAULT 0
         )
     """)
-
 
     conn.commit()
     conn.close()
@@ -276,6 +233,61 @@ bot = telebot.TeleBot(
     BOT_TOKEN,
     parse_mode="Markdown"
 )
+
+
+# ============================================================
+# FLASK / RENDER WEB SERVER
+# ============================================================
+
+app = Flask(__name__)
+
+
+@app.get("/")
+def health_check():
+    return "Vynora Live Bot is running", 200
+
+
+@app.get("/health")
+def health():
+    return "OK", 200
+
+
+@app.post("/webhook")
+def telegram_webhook():
+
+    if WEBHOOK_SECRET:
+        incoming_secret = request.headers.get(
+            "X-Telegram-Bot-Api-Secret-Token",
+            ""
+        )
+
+        if incoming_secret != WEBHOOK_SECRET:
+            return "Unauthorized", 401
+
+    try:
+        update_data = request.get_data(
+            as_text=True
+        )
+
+        if update_data:
+            update = telebot.types.Update.de_json(
+                update_data
+            )
+
+            bot.process_new_updates(
+                [update]
+            )
+
+        return "OK", 200
+
+    except Exception as e:
+
+        print(
+            "Webhook processing error:",
+            e
+        )
+
+        return "OK", 200
 
 
 # ============================================================
@@ -316,7 +328,6 @@ def register_user(user):
     user_id = user.id
 
     first_name = user.first_name or ""
-
     last_name = user.last_name or ""
 
     full_name = (
@@ -326,7 +337,6 @@ def register_user(user):
     username = user.username or ""
 
     existing = get_user(user_id)
-
 
     if existing:
 
@@ -353,7 +363,6 @@ def register_user(user):
         conn.close()
 
         return False
-
 
     conn = get_db()
 
@@ -435,11 +444,8 @@ def deduct_balance(
     cur.execute(
         """
         UPDATE users
-
         SET balance = balance - ?
-
         WHERE user_id=?
-
         AND balance >= ?
         """,
         (
@@ -560,21 +566,15 @@ def add_host(
             total_platform_charge,
             created_at
         )
-
         VALUES
         (
             ?, ?, ?, 'OFFLINE',
             1, 0, 0, 0, 0, ?
         )
-
         ON CONFLICT(user_id)
-
         DO UPDATE SET
-
             host_name=excluded.host_name,
-
             group_id=excluded.group_id,
-
             approved=1
         """,
         (
@@ -619,11 +619,8 @@ def set_host_status(
     cur.execute(
         """
         UPDATE hosts
-
         SET status=?
-
         WHERE user_id=?
-
         AND approved=1
         """,
         (
@@ -650,11 +647,8 @@ def get_online_hosts():
         """
         SELECT *
         FROM hosts
-
         WHERE approved=1
-
         AND status='ONLINE'
-
         ORDER BY host_name
         """
     ).fetchall()
@@ -708,10 +702,6 @@ def calculate_host_earning(
     )
 
 
-# ============================================================
-# ADD HOST WALLET
-# ============================================================
-
 def add_host_earning(
     host_user_id,
     minutes,
@@ -723,27 +713,17 @@ def add_host_earning(
             amount
         )
 
-
     conn = get_db()
 
     conn.execute(
         """
         UPDATE hosts
-
         SET
-
-            wallet =
-                wallet + ?,
-
-            total_minutes =
-                total_minutes + ?,
-
-            total_gross =
-                total_gross + ?,
-
+            wallet = wallet + ?,
+            total_minutes = total_minutes + ?,
+            total_gross = total_gross + ?,
             total_platform_charge =
                 total_platform_charge + ?
-
         WHERE user_id=?
         """,
         (
@@ -769,17 +749,11 @@ def add_host_earning(
 # ============================================================
 
 def create_session(
-
     user_id,
-
     host_user_id,
-
     host_name,
-
     group_id,
-
     minutes,
-
     amount
 ):
 
@@ -787,7 +761,6 @@ def create_session(
         calculate_host_earning(
             amount
         )
-
 
     created = datetime.now()
 
@@ -797,7 +770,6 @@ def create_session(
             minutes=minutes
         )
     )
-
 
     conn = get_db()
 
@@ -819,7 +791,6 @@ def create_session(
             created_at,
             expires_at
         )
-
         VALUES
         (
             ?, ?, ?, ?, ?, ?,
@@ -865,9 +836,7 @@ def get_active_session(
         """
         SELECT *
         FROM sessions
-
         WHERE id=?
-
         AND status='ACTIVE'
         """,
         (session_id,)
@@ -889,11 +858,8 @@ def finish_session(
     cur.execute(
         """
         UPDATE sessions
-
         SET status='COMPLETED'
-
         WHERE id=?
-
         AND status='ACTIVE'
         """,
         (session_id,)
@@ -907,6 +873,66 @@ def finish_session(
     conn.close()
 
     return success
+
+
+# ============================================================
+# RECOVER ACTIVE SESSIONS AFTER RESTART
+# ============================================================
+
+def recover_active_sessions():
+
+    conn = get_db()
+
+    rows = conn.execute(
+        """
+        SELECT *
+        FROM sessions
+        WHERE status='ACTIVE'
+        """
+    ).fetchall()
+
+    conn.close()
+
+    now = datetime.now()
+
+    for session in rows:
+
+        try:
+
+            expires_at = datetime.strptime(
+                session["expires_at"],
+                "%Y-%m-%d %H:%M:%S"
+            )
+
+            remaining = (
+                expires_at - now
+            ).total_seconds()
+
+            if remaining <= 0:
+
+                threading.Thread(
+                    target=auto_finish_session,
+                    args=(session["id"],),
+                    daemon=True
+                ).start()
+
+            else:
+
+                timer = threading.Timer(
+                    remaining,
+                    auto_finish_session,
+                    args=(session["id"],)
+                )
+
+                timer.daemon = True
+                timer.start()
+
+        except Exception as e:
+
+            print(
+                "Session recovery error:",
+                e
+            )
 
 
 # ============================================================
@@ -961,7 +987,7 @@ def create_private_invite(
 
 
 # ============================================================
-# REMOVE USER + HOST EARNING
+# AUTO FINISH SESSION
 # ============================================================
 
 def auto_finish_session(
@@ -975,35 +1001,16 @@ def auto_finish_session(
     if not session:
         return
 
-
     user_id = session["user_id"]
+    host_user_id = session["host_user_id"]
+    host_name = session["host_name"]
+    group_id = session["group_id"]
+    minutes = session["duration"]
+    amount = session["amount"]
+    platform_charge = session["platform_charge"]
+    host_earning = session["host_earning"]
 
-    host_user_id = \
-        session["host_user_id"]
-
-    host_name = \
-        session["host_name"]
-
-    group_id = \
-        session["group_id"]
-
-    minutes = \
-        session["duration"]
-
-    amount = \
-        session["amount"]
-
-    platform_charge = \
-        session["platform_charge"]
-
-    host_earning = \
-        session["host_earning"]
-
-
-    # --------------------------------------------------------
-    # REMOVE USER FROM GROUP
-    # --------------------------------------------------------
-
+    # Remove user from host group
     try:
 
         bot.ban_chat_member(
@@ -1029,33 +1036,20 @@ def auto_finish_session(
             e
         )
 
-
-    # --------------------------------------------------------
-    # FINISH SESSION
-    # --------------------------------------------------------
-
+    # Finish only once
     if not finish_session(
         session_id
     ):
-
         return
 
-
-    # --------------------------------------------------------
-    # ADD HOST WALLET
-    # --------------------------------------------------------
-
+    # Add host wallet
     add_host_earning(
         host_user_id,
         minutes,
         amount
     )
 
-
-    # --------------------------------------------------------
-    # USER NOTIFICATION
-    # --------------------------------------------------------
-
+    # User notification
     try:
 
         bot.send_message(
@@ -1086,20 +1080,18 @@ Thank you for using *Vynora Live*.
             e
         )
 
-
-    # --------------------------------------------------------
-    # HOST NOTIFICATION
-    # --------------------------------------------------------
-
+    # Host notification
     try:
 
         stats = get_host(
             host_user_id
         )
 
-        bot.send_message(
-            host_user_id,
-            f"""
+        if stats:
+
+            bot.send_message(
+                host_user_id,
+                f"""
 💰 *CALL EARNING RECEIVED*
 
 👑 Host:
@@ -1124,7 +1116,7 @@ Thank you for using *Vynora Live*.
 ⏱ Total Worked:
 *{stats["total_minutes"]} Minutes*
 """
-        )
+            )
 
     except Exception as e:
 
@@ -1133,11 +1125,7 @@ Thank you for using *Vynora Live*.
             e
         )
 
-
-    # --------------------------------------------------------
-    # HOST GROUP NOTIFICATION
-    # --------------------------------------------------------
-
+    # Host group notification
     try:
 
         bot.send_message(
@@ -1171,11 +1159,7 @@ Thank you for using *Vynora Live*.
             e
         )
 
-
-    # --------------------------------------------------------
-    # ADMIN NOTIFICATION
-    # --------------------------------------------------------
-
+    # Admin notification
     try:
 
         bot.send_message(
@@ -1280,11 +1264,6 @@ def start_handler(message):
         user
     )
 
-
-    # --------------------------------------------------------
-    # HOST CHECK
-    # --------------------------------------------------------
-
     host = get_host(
         user.id
     )
@@ -1311,11 +1290,6 @@ Use the buttons below.
         )
 
         return
-
-
-    # --------------------------------------------------------
-    # NEW USER REGISTRATION
-    # --------------------------------------------------------
 
     if is_new:
 
@@ -1356,11 +1330,6 @@ Use the buttons below.
                 e
             )
 
-
-    # --------------------------------------------------------
-    # WELCOME
-    # --------------------------------------------------------
-
     bot.send_message(
         message.chat.id,
         f"""
@@ -1394,8 +1363,6 @@ def recharge_handler(message):
 
     kb = types.InlineKeyboardMarkup()
 
-
-    # First time offer
     if is_first_offer_available(
         user_id
     ):
@@ -1407,8 +1374,6 @@ def recharge_handler(message):
             )
         )
 
-
-    # Regular plans
     for minutes, amount in PLANS.items():
 
         kb.add(
@@ -1418,7 +1383,6 @@ def recharge_handler(message):
                 f"plan:{minutes}:{amount}"
             )
         )
-
 
     bot.send_message(
         message.chat.id,
@@ -1461,19 +1425,13 @@ def plan_callback(call):
 
     parts = call.data.split(":")
 
-    minutes = int(
-        parts[1]
-    )
-
-    amount = int(
-        parts[2]
-    )
+    minutes = int(parts[1])
+    amount = int(parts[2])
 
     is_first = (
         len(parts) > 3
         and parts[3] == "first"
     )
-
 
     if is_first:
 
@@ -1488,7 +1446,6 @@ def plan_callback(call):
 
             return
 
-
     txn_id = (
         "TXN-"
         + datetime.now().strftime(
@@ -1497,7 +1454,6 @@ def plan_callback(call):
         + "-"
         + uuid.uuid4().hex[:6].upper()
     )
-
 
     conn = get_db()
 
@@ -1514,7 +1470,6 @@ def plan_callback(call):
             status,
             created_at
         )
-
         VALUES
         (?, ?, ?, ?, '', 0, 'WAITING_PAYMENT', ?)
         """,
@@ -1529,11 +1484,6 @@ def plan_callback(call):
 
     conn.commit()
     conn.close()
-
-
-    # --------------------------------------------------------
-    # UPI QR
-    # --------------------------------------------------------
 
     upi_data = (
         f"upi://pay?"
@@ -1551,7 +1501,6 @@ def plan_callback(call):
         )
     )
 
-
     kb = types.InlineKeyboardMarkup()
 
     kb.add(
@@ -1561,7 +1510,6 @@ def plan_callback(call):
             f"upload:{txn_id}"
         )
     )
-
 
     bot.send_message(
         call.message.chat.id,
@@ -1595,7 +1543,6 @@ def plan_callback(call):
 """,
         reply_markup=kb
     )
-
 
     try:
 
@@ -1642,7 +1589,6 @@ def upload_callback(call):
         1
     )[1]
 
-
     bot.send_message(
         call.message.chat.id,
         f"""
@@ -1655,7 +1601,6 @@ Transaction:
 Please send the payment screenshot as a photo.
 """
     )
-
 
     bot.register_next_step_handler(
         call.message,
@@ -1688,10 +1633,8 @@ def receive_payment_screenshot(
 
         return
 
-
     screenshot_file_id = \
         message.photo[-1].file_id
-
 
     bot.send_message(
         message.chat.id,
@@ -1704,7 +1647,6 @@ Transaction:
 Now send your *UTR / Transaction Number*.
 """
     )
-
 
     bot.register_next_step_handler(
         message,
@@ -1728,7 +1670,6 @@ def receive_utr(
         message.text or ""
     ).strip()
 
-
     if len(utr) < 4:
 
         bot.send_message(
@@ -1745,7 +1686,6 @@ def receive_utr(
 
         return
 
-
     conn = get_db()
 
     txn = conn.execute(
@@ -1756,7 +1696,6 @@ def receive_utr(
         """,
         (txn_id,)
     ).fetchone()
-
 
     if not txn:
 
@@ -1769,15 +1708,27 @@ def receive_utr(
 
         return
 
+    # Prevent changing an already processed transaction.
+    if txn["status"] in (
+        "APPROVED",
+        "REJECTED"
+    ):
+
+        conn.close()
+
+        bot.send_message(
+            message.chat.id,
+            "❌ This transaction has already been processed."
+        )
+
+        return
 
     conn.execute(
         """
         UPDATE pending_txns
-
         SET
             utr=?,
             status='PENDING'
-
         WHERE txn_id=?
         """,
         (
@@ -1789,7 +1740,6 @@ def receive_utr(
     conn.commit()
     conn.close()
 
-
     user = message.from_user
 
     username = (
@@ -1797,7 +1747,6 @@ def receive_utr(
         if user.username
         else "N/A"
     )
-
 
     kb = types.InlineKeyboardMarkup()
 
@@ -1815,7 +1764,6 @@ def receive_utr(
             f"reject:{txn_id}"
         )
     )
-
 
     admin_text = f"""
 💳 *NEW PAYMENT VERIFICATION*
@@ -1847,7 +1795,6 @@ def receive_utr(
 Please verify the payment.
 """
 
-
     try:
 
         sent = bot.send_photo(
@@ -1857,15 +1804,12 @@ Please verify the payment.
             reply_markup=kb
         )
 
-
         conn = get_db()
 
         conn.execute(
             """
             UPDATE pending_txns
-
             SET msg_id=?
-
             WHERE txn_id=?
             """,
             (
@@ -1877,14 +1821,12 @@ Please verify the payment.
         conn.commit()
         conn.close()
 
-
     except Exception as e:
 
         print(
             "Admin payment message error:",
             e
         )
-
 
     bot.send_message(
         message.chat.id,
@@ -1908,7 +1850,6 @@ After admin approval, minutes will automatically be added to your wallet.
 )
 def approve_payment(call):
 
-    # SECURITY
     if call.message.chat.id != \
             ADMIN_GROUP_ID:
 
@@ -1920,12 +1861,10 @@ def approve_payment(call):
 
         return
 
-
     txn_id = call.data.split(
         ":",
         1
     )[1]
-
 
     conn = get_db()
 
@@ -1933,12 +1872,10 @@ def approve_payment(call):
         """
         SELECT *
         FROM pending_txns
-
         WHERE txn_id=?
         """,
         (txn_id,)
     ).fetchone()
-
 
     if not txn:
 
@@ -1952,8 +1889,6 @@ def approve_payment(call):
 
         return
 
-
-    # Prevent duplicate approval
     if txn["status"] == "APPROVED":
 
         conn.close()
@@ -1965,7 +1900,6 @@ def approve_payment(call):
         )
 
         return
-
 
     if txn["status"] != "PENDING":
 
@@ -1979,7 +1913,6 @@ def approve_payment(call):
 
         return
 
-
     user_id = int(
         txn["user_id"]
     )
@@ -1988,16 +1921,14 @@ def approve_payment(call):
         txn["plan_minutes"]
     )
 
-
     conn.execute(
         """
         UPDATE pending_txns
-
         SET
             status='APPROVED',
             approved_at=?
-
         WHERE txn_id=?
+        AND status='PENDING'
         """,
         (
             now_text(),
@@ -2008,23 +1939,16 @@ def approve_payment(call):
     conn.commit()
     conn.close()
 
-
-    # Add wallet
     add_balance(
         user_id,
         minutes
     )
 
-
-    # First offer
-    if minutes == 1:
-
+    if minutes == FIRST_TIME_MINUTES:
         mark_first_offer_used(
             user_id
         )
 
-
-    # Remove admin buttons
     try:
 
         bot.edit_message_reply_markup(
@@ -2036,8 +1960,6 @@ def approve_payment(call):
     except Exception:
         pass
 
-
-    # User notification
     try:
 
         bot.send_message(
@@ -2064,16 +1986,16 @@ You can now book an online host.
     except Exception:
         pass
 
-
     bot.answer_callback_query(
         call.id,
         "Payment approved."
     )
 
+    try:
 
-    bot.send_message(
-        ADMIN_GROUP_ID,
-        f"""
+        bot.send_message(
+            ADMIN_GROUP_ID,
+            f"""
 ✅ *PAYMENT APPROVED*
 
 👤 User ID:
@@ -2091,7 +2013,10 @@ You can now book an online host.
 📅 Approved:
 {now_text()}
 """
-    )
+        )
+
+    except Exception:
+        pass
 
 
 # ============================================================
@@ -2115,12 +2040,10 @@ def reject_payment(call):
 
         return
 
-
     txn_id = call.data.split(
         ":",
         1
     )[1]
-
 
     conn = get_db()
 
@@ -2128,12 +2051,10 @@ def reject_payment(call):
         """
         SELECT *
         FROM pending_txns
-
         WHERE txn_id=?
         """,
         (txn_id,)
     ).fetchone()
-
 
     if not txn:
 
@@ -2146,7 +2067,6 @@ def reject_payment(call):
         )
 
         return
-
 
     if txn["status"] in (
         "APPROVED",
@@ -2163,13 +2083,10 @@ def reject_payment(call):
 
         return
 
-
     conn.execute(
         """
         UPDATE pending_txns
-
         SET status='REJECTED'
-
         WHERE txn_id=?
         """,
         (txn_id,)
@@ -2177,7 +2094,6 @@ def reject_payment(call):
 
     conn.commit()
     conn.close()
-
 
     try:
 
@@ -2199,7 +2115,6 @@ If you believe this is incorrect, please contact admin.
     except Exception:
         pass
 
-
     try:
 
         bot.edit_message_reply_markup(
@@ -2210,7 +2125,6 @@ If you believe this is incorrect, please contact admin.
 
     except Exception:
         pass
-
 
     bot.answer_callback_query(
         call.id,
@@ -2234,7 +2148,6 @@ def book_host(message):
         user_id
     )
 
-
     if balance <= 0:
 
         bot.send_message(
@@ -2249,9 +2162,7 @@ Please recharge your wallet first.
 
         return
 
-
     hosts = get_online_hosts()
-
 
     if not hosts:
 
@@ -2266,9 +2177,7 @@ Please try again later.
 
         return
 
-
     kb = types.InlineKeyboardMarkup()
-
 
     for host in hosts:
 
@@ -2279,7 +2188,6 @@ Please try again later.
                 f"hsel:{host['user_id']}"
             )
         )
-
 
     bot.send_message(
         message.chat.id,
@@ -2309,16 +2217,13 @@ def host_select(call):
         call.id
     )
 
-
     host_id = int(
         call.data.split(":")[1]
     )
 
-
     host = get_host(
         host_id
     )
-
 
     if not host:
 
@@ -2329,7 +2234,6 @@ def host_select(call):
 
         return
 
-
     if host["status"] != "ONLINE":
 
         bot.send_message(
@@ -2339,32 +2243,30 @@ def host_select(call):
 
         return
 
-
     user_id = call.from_user.id
 
     balance = get_balance(
         user_id
     )
 
-
     kb = types.InlineKeyboardMarkup()
 
-
-    # First-time offer
     if is_first_offer_available(
         user_id
     ):
 
-        kb.add(
-            types.InlineKeyboardButton(
-                "🔥 FIRST CALL — 1 MIN ₹20",
-                callback_data=
-                f"book:{host_id}:1:20"
+        # First-call option is only shown when
+        # the user has at least 1 minute available.
+        if balance >= FIRST_TIME_MINUTES:
+
+            kb.add(
+                types.InlineKeyboardButton(
+                    "🔥 FIRST CALL — 1 MIN ₹20",
+                    callback_data=
+                    f"book:{host_id}:1:20"
+                )
             )
-        )
 
-
-    # Regular plans
     for minutes, amount in PLANS.items():
 
         if balance >= minutes:
@@ -2377,6 +2279,14 @@ def host_select(call):
                 )
             )
 
+    if not kb.keyboard:
+
+        bot.send_message(
+            call.message.chat.id,
+            "❌ Your wallet does not have enough minutes for the available plans."
+        )
+
+        return
 
     bot.send_message(
         call.message.chat.id,
@@ -2409,29 +2319,48 @@ def booking_callback(call):
         call.id
     )
 
-
     parts = call.data.split(":")
 
+    if len(parts) != 4:
 
-    host_id = int(
-        parts[1]
-    )
+        bot.send_message(
+            call.message.chat.id,
+            "❌ Invalid booking request."
+        )
 
-    minutes = int(
-        parts[2]
-    )
+        return
 
-    amount = int(
-        parts[3]
-    )
+    host_id = int(parts[1])
+    minutes = int(parts[2])
+    amount = int(parts[3])
 
     user_id = call.from_user.id
 
+    # Validate the selected plan server-side.
+    valid_plan = (
+        amount == FIRST_TIME_AMOUNT
+        and minutes == FIRST_TIME_MINUTES
+    )
+
+    if not valid_plan:
+
+        valid_plan = (
+            minutes in PLANS
+            and PLANS[minutes] == amount
+        )
+
+    if not valid_plan:
+
+        bot.send_message(
+            call.message.chat.id,
+            "❌ Invalid plan."
+        )
+
+        return
 
     host = get_host(
         host_id
     )
-
 
     if not host:
 
@@ -2442,8 +2371,6 @@ def booking_callback(call):
 
         return
 
-
-    # Check online again
     if host["status"] != "ONLINE":
 
         bot.send_message(
@@ -2457,8 +2384,8 @@ Please select another host.
 
         return
 
+    user_id = call.from_user.id
 
-    # Check balance
     if get_balance(user_id) < minutes:
 
         bot.send_message(
@@ -2472,8 +2399,20 @@ Please recharge.
 
         return
 
+    # First offer must still be available.
+    if (
+        minutes == FIRST_TIME_MINUTES
+        and amount == FIRST_TIME_AMOUNT
+        and not is_first_offer_available(user_id)
+    ):
 
-    # Deduct
+        bot.send_message(
+            call.message.chat.id,
+            "❌ First-time offer already used."
+        )
+
+        return
+
     if not deduct_balance(
         user_id,
         minutes
@@ -2486,16 +2425,15 @@ Please recharge.
 
         return
 
-
-    # First offer
-    if minutes == 1:
+    if (
+        minutes == FIRST_TIME_MINUTES
+        and amount == FIRST_TIME_AMOUNT
+    ):
 
         mark_first_offer_used(
             user_id
         )
 
-
-    # Create session
     session_id, expires_at = \
         create_session(
             user_id,
@@ -2506,23 +2444,18 @@ Please recharge.
             amount
         )
 
-
-    # Invite
     invite_link = \
         create_private_invite(
             host["group_id"],
             expires_at
         )
 
-
-    # Refund if invite failed
     if not invite_link:
 
         add_balance(
             user_id,
             minutes
         )
-
 
         conn = get_db()
 
@@ -2537,7 +2470,6 @@ Please recharge.
         conn.commit()
         conn.close()
 
-
         bot.send_message(
             call.message.chat.id,
             """
@@ -2551,11 +2483,9 @@ Please try again later.
 
         return
 
-
     user = get_user(
         user_id
     )
-
 
     username = (
         f"@{user['username']}"
@@ -2563,17 +2493,12 @@ Please try again later.
         else "N/A"
     )
 
-
     platform_charge, host_earning = \
         calculate_host_earning(
             amount
         )
 
-
-    # ========================================================
     # USER
-    # ========================================================
-
     bot.send_message(
         user_id,
         f"""
@@ -2608,11 +2533,7 @@ You will automatically be removed when your session time ends.
 """
     )
 
-
-    # ========================================================
     # ADMIN
-    # ========================================================
-
     try:
 
         bot.send_message(
@@ -2671,11 +2592,7 @@ You will automatically be removed when your session time ends.
             e
         )
 
-
-    # ========================================================
     # HOST GROUP
-    # ========================================================
-
     try:
 
         bot.send_message(
@@ -2728,11 +2645,6 @@ You will automatically be removed when your session time ends.
             e
         )
 
-
-    # ========================================================
-    # TIMER
-    # ========================================================
-
     timer = threading.Timer(
         minutes * 60,
         auto_finish_session,
@@ -2740,7 +2652,6 @@ You will automatically be removed when your session time ends.
     )
 
     timer.daemon = True
-
     timer.start()
 
 
@@ -2760,7 +2671,6 @@ def profile_handler(message):
         user_id
     )
 
-
     if not user:
 
         register_user(
@@ -2771,13 +2681,11 @@ def profile_handler(message):
             user_id
         )
 
-
     username = (
         f"@{user['username']}"
         if user["username"]
         else "N/A"
     )
-
 
     bot.send_message(
         message.chat.id,
@@ -2835,7 +2743,6 @@ def host_online(message):
         message.from_user.id
     )
 
-
     if not host:
 
         bot.send_message(
@@ -2845,12 +2752,10 @@ def host_online(message):
 
         return
 
-
     set_host_status(
         message.from_user.id,
         "ONLINE"
     )
-
 
     bot.send_message(
         message.chat.id,
@@ -2880,7 +2785,6 @@ def host_offline(message):
         message.from_user.id
     )
 
-
     if not host:
 
         bot.send_message(
@@ -2890,12 +2794,10 @@ def host_offline(message):
 
         return
 
-
     set_host_status(
         message.from_user.id,
         "OFFLINE"
     )
-
 
     bot.send_message(
         message.chat.id,
@@ -2925,7 +2827,6 @@ def host_earnings(message):
         message.from_user.id
     )
 
-
     if not host:
 
         bot.send_message(
@@ -2934,7 +2835,6 @@ def host_earnings(message):
         )
 
         return
-
 
     bot.send_message(
         message.chat.id,
@@ -2981,7 +2881,6 @@ def host_stats(message):
         message.from_user.id
     )
 
-
     if not host:
 
         bot.send_message(
@@ -2990,7 +2889,6 @@ def host_stats(message):
         )
 
         return
-
 
     bot.send_message(
         message.chat.id,
@@ -3032,9 +2930,7 @@ def admin_add_host(message):
 
         return
 
-
     parts = message.text.split()
-
 
     if len(parts) < 4:
 
@@ -3053,7 +2949,6 @@ Example:
 
         return
 
-
     try:
 
         host_user_id = int(
@@ -3068,7 +2963,6 @@ Example:
             parts[2:-1]
         )
 
-
         if group_id not in \
                 HOST_GROUPS.values():
 
@@ -3079,13 +2973,11 @@ Example:
 
             return
 
-
         add_host(
             host_user_id,
             host_name,
             group_id
         )
-
 
         bot.reply_to(
             message,
@@ -3110,8 +3002,6 @@ Host should open the bot and press:
 """
         )
 
-
-        # Notify host
         try:
 
             bot.send_message(
@@ -3139,7 +3029,6 @@ Then press 🟢 *GO ONLINE*.
                 e
             )
 
-
     except Exception as e:
 
         bot.reply_to(
@@ -3162,9 +3051,7 @@ def admin_remove_host(message):
 
         return
 
-
     parts = message.text.split()
-
 
     if len(parts) != 2:
 
@@ -3174,7 +3061,6 @@ def admin_remove_host(message):
         )
 
         return
-
 
     try:
 
@@ -3186,7 +3072,6 @@ def admin_remove_host(message):
             host_id
         )
 
-
         if not host:
 
             bot.reply_to(
@@ -3196,11 +3081,9 @@ def admin_remove_host(message):
 
             return
 
-
         remove_host(
             host_id
         )
-
 
         bot.reply_to(
             message,
@@ -3212,7 +3095,6 @@ def admin_remove_host(message):
 🆔 `{host_id}`
 """
         )
-
 
     except Exception as e:
 
@@ -3236,9 +3118,7 @@ def admin_hosts(message):
 
         return
 
-
     hosts = get_all_hosts()
-
 
     if not hosts:
 
@@ -3249,9 +3129,7 @@ def admin_hosts(message):
 
         return
 
-
     text = "👑 *HOST MANAGEMENT*\n\n"
-
 
     for host in hosts:
 
@@ -3264,7 +3142,6 @@ def admin_hosts(message):
             f"💰 ₹{host['wallet']}\n"
             f"──────────────\n"
         )
-
 
     bot.reply_to(
         message,
@@ -3286,9 +3163,7 @@ def admin_add_minutes(message):
 
         return
 
-
     parts = message.text.split()
-
 
     if len(parts) != 3:
 
@@ -3298,7 +3173,6 @@ def admin_add_minutes(message):
         )
 
         return
-
 
     try:
 
@@ -3310,6 +3184,14 @@ def admin_add_minutes(message):
             parts[2]
         )
 
+        if mins <= 0:
+
+            bot.reply_to(
+                message,
+                "❌ Minutes must be greater than 0."
+            )
+
+            return
 
         if not get_user(
             user_id
@@ -3322,12 +3204,10 @@ def admin_add_minutes(message):
 
             return
 
-
         add_balance(
             user_id,
             mins
         )
-
 
         bot.reply_to(
             message,
@@ -3344,7 +3224,6 @@ def admin_add_minutes(message):
 *{get_balance(user_id)} Minutes*
 """
         )
-
 
         try:
 
@@ -3363,7 +3242,6 @@ def admin_add_minutes(message):
 
         except Exception:
             pass
-
 
     except Exception as e:
 
@@ -3387,9 +3265,7 @@ def admin_deduct_minutes(message):
 
         return
 
-
     parts = message.text.split()
-
 
     if len(parts) != 3:
 
@@ -3399,7 +3275,6 @@ def admin_deduct_minutes(message):
         )
 
         return
-
 
     try:
 
@@ -3411,6 +3286,14 @@ def admin_deduct_minutes(message):
             parts[2]
         )
 
+        if mins <= 0:
+
+            bot.reply_to(
+                message,
+                "❌ Minutes must be greater than 0."
+            )
+
+            return
 
         if not deduct_balance(
             user_id,
@@ -3423,7 +3306,6 @@ def admin_deduct_minutes(message):
             )
 
             return
-
 
         bot.reply_to(
             message,
@@ -3440,7 +3322,6 @@ def admin_deduct_minutes(message):
 *{get_balance(user_id)} Minutes*
 """
         )
-
 
     except Exception as e:
 
@@ -3464,9 +3345,7 @@ def admin_user_lookup(message):
 
         return
 
-
     parts = message.text.split()
-
 
     if len(parts) != 2:
 
@@ -3476,7 +3355,6 @@ def admin_user_lookup(message):
         )
 
         return
-
 
     try:
 
@@ -3488,7 +3366,6 @@ def admin_user_lookup(message):
             user_id
         )
 
-
         if not user:
 
             bot.reply_to(
@@ -3497,7 +3374,6 @@ def admin_user_lookup(message):
             )
 
             return
-
 
         bot.reply_to(
             message,
@@ -3524,7 +3400,6 @@ Wallet:
 """
         )
 
-
     except Exception as e:
 
         bot.reply_to(
@@ -3534,257 +3409,23 @@ Wallet:
 
 
 # ============================================================
-# BROADCAST / ANNOUNCEMENT
+# BROADCAST
 # ============================================================
 
 @bot.message_handler(
     commands=["broadcast"]
 )
-def broadcast_start(message):
+def broadcast_handler(message):
 
     if message.chat.id != \
             ADMIN_GROUP_ID:
 
         return
 
-
-    bot.reply_to(
-        message,
-        """
-📢 *BROADCAST MODE*
-
-अब अपना announcement message भेजिए।
-
-Example:
-
-`/broadcast` के बाद अलग message भेजें।
-
-या सीधे:
-
-`/broadcast आज रात 8 बजे special offer शुरू होगा।`
-"""
-    )
-
-
-# ============================================================
-# DIRECT BROADCAST
-# ============================================================
-
-@bot.message_handler(
-    commands=["broadcast"],
-    func=lambda m:
-        m.chat.id == ADMIN_GROUP_ID
-)
-def broadcast_message(message):
-
-    # Text after /broadcast
     text = message.text[
-        len("/broadcast"):
-    ].strip()
 
 
-    # If no text, next message is not automatically
-    # captured here; use direct command format.
-    if not text:
 
-        return
 
 
-    conn = get_db()
 
-    users = conn.execute(
-        """
-        SELECT user_id
-        FROM users
-        """
-    ).fetchall()
-
-    conn.close()
-
-
-    total = len(users)
-
-    sent = 0
-
-    failed = 0
-
-
-    status_message = bot.reply_to(
-        message,
-        f"""
-📢 *BROADCAST STARTED*
-
-👥 Registered Users:
-*{total}*
-
-Sending...
-"""
-    )
-
-
-    for row in users:
-
-        user_id = row["user_id"]
-
-
-        try:
-
-            bot.send_message(
-                user_id,
-                f"""
-📢 *ANNOUNCEMENT*
-
-{text}
-"""
-            )
-
-            sent += 1
-
-            time.sleep(
-                0.05
-            )
-
-        except Exception:
-
-            failed += 1
-
-
-    try:
-
-        bot.edit_message_text(
-            f"""
-✅ *BROADCAST COMPLETED*
-
-👥 Total Users:
-*{total}*
-
-✅ Sent:
-*{sent}*
-
-❌ Failed:
-*{failed}*
-
-📅 Time:
-{now_text()}
-""",
-            ADMIN_GROUP_ID,
-            status_message.message_id
-        )
-
-    except Exception:
-        pass
-
-
-# ============================================================
-# HELP
-# ============================================================
-
-@bot.message_handler(
-    func=lambda m:
-        m.text == "🆘 Help & Support"
-)
-def help_handler(message):
-
-    bot.send_message(
-        message.chat.id,
-        f"""
-🆘 *VYNORA LIVE SUPPORT*
-
-For payment, booking or account issues:
-
-🏢 Admin:
-*NGMedia Agency*
-
-📱 WhatsApp:
-`+91 8417046044`
-
-💳 UPI:
-`{UPI_ID}`
-
-Please keep your Transaction ID / UTR ready.
-"""
-    )
-
-
-# ============================================================
-# FALLBACK
-# ============================================================
-
-@bot.message_handler(
-    func=lambda m: True,
-    content_types=["text"]
-)
-def fallback_handler(message):
-
-    host = get_host(
-        message.from_user.id
-    )
-
-
-    if host and int(
-        host["approved"]
-    ) == 1:
-
-        bot.send_message(
-            message.chat.id,
-            "Please use the host panel buttons.",
-            reply_markup=host_keyboard()
-        )
-
-        return
-
-
-    bot.send_message(
-        message.chat.id,
-        "Please use the menu buttons.",
-        reply_markup=main_keyboard()
-    )
-
-
-# ============================================================
-# START
-# ============================================================
-
-if __name__ == "__main__":
-
-    print(
-        "===================================="
-    )
-
-    print(
-        "VYNORA LIVE BOT STARTED"
-    )
-
-    print(
-        "===================================="
-    )
-
-    print(
-        "Admin Group:",
-        ADMIN_GROUP_ID
-    )
-
-    print(
-        "Registered User Group:",
-        REGISTERED_USER_GROUP_ID
-    )
-
-    print(
-        "Host Groups:",
-        HOST_GROUPS
-    )
-
-
-    try:
-
-        bot.remove_webhook()
-
-    except Exception:
-        pass
-
-
-    bot.infinity_polling(
-        skip_pending=True,
-        timeout=30,
-        long_polling_timeout=30
-    )
