@@ -32,7 +32,7 @@ threading.Thread(target=run_server, daemon=True).start()
 HOST_RATE_PER_MIN = 14  # Host ko ₹14 per worked min milenge
 
 # --- 2. GOOGLE SHEETS SETUP & HELPER ---
-SHEET_NAME = os.environ.get("GOOGLE_SHEET_NAME", "Private Live Bot Data")
+SHEET_NAME = os.environ.get("GOOGLE_SHEET_NAME", "Private_Live_Official")
 
 
 def get_gsheet_client():
@@ -51,21 +51,30 @@ def get_gsheet_client():
 
 
 def append_to_google_sheet(tab_name, row_data):
-    """Google Sheet me automated record add karne ka helper function"""
+    """Google Sheet me automated record add karne ka helper function with debug"""
 
     def _async_append():
         try:
             client = get_gsheet_client()
-            if client:
-                spreadsheet = client.open(SHEET_NAME)
-                try:
-                    worksheet = spreadsheet.worksheet(tab_name)
-                except Exception:
-                    worksheet = spreadsheet.sheet1
-                worksheet.append_row(row_data)
-                print(f"[Google Sheet] Data added to '{tab_name}': {row_data}")
+            if not client:
+                print("[Google Sheet Error] Gspread client authorization failed!")
+                return
+            
+            print(f"[Google Sheet Debug] Trying to open sheet: '{SHEET_NAME}'")
+            spreadsheet = client.open(SHEET_NAME)
+            
+            try:
+                worksheet = spreadsheet.worksheet(tab_name)
+                print(f"[Google Sheet Debug] Found worksheet: '{tab_name}'")
+            except Exception as ex:
+                print(f"[Google Sheet Debug] Worksheet '{tab_name}' not found, falling back to sheet1. Error: {ex}")
+                worksheet = spreadsheet.sheet1
+                
+            worksheet.append_row(row_data)
+            print(f"✅ [Google Sheet Success] Data successfully added to '{tab_name}': {row_data}")
+            
         except Exception as e:
-            print(f"[Google Sheet Save Error]: {e}")
+            print(f"❌ [Google Sheet Save Error]: {type(e).__name__} - {e}")
 
     threading.Thread(target=_async_append, daemon=True).start()
 
@@ -500,7 +509,6 @@ def start_cmd(message):
     reg_id = f"REG{user_id}"
 
     if is_new:
-        # Note: Referral bonus yahan par nahi milega, pehle recharge approval par milega.
         reg_card = (
             "🆕 *NEW USER REGISTERED!*\n"
             "━━━━━━━━━━━━━━━━━━━━━\n"
@@ -1051,15 +1059,12 @@ def process_admin_recharge_approval(call):
         mins, txn_id = int(data[2]), data[3]
         txn_info = get_pending_txn(txn_id)
 
-        # User details for referral logic check
         user_info = get_user_data(user_id)
         referrer_id = user_info.get("referred_by", 0)
 
-        # Agar user referral link se aaya tha, to 1st Recharge Approval par Referrer ko 1 Min milega
         if referrer_id > 0:
             add_user_balance(referrer_id, 1)
 
-            # Referred_by ko 0 set karna taaki agle recharges par dobara referral reward na mile
             conn = get_db()
             cursor = conn.cursor()
             cursor.execute(
@@ -1077,7 +1082,6 @@ def process_admin_recharge_approval(call):
             except Exception:
                 pass
 
-        # Target user ke wallet me recharge minutes add karna
         add_user_balance(user_id, mins)
 
         if txn_info and txn_info.get("msg_id"):
