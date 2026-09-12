@@ -18,7 +18,7 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.end_headers()
-        self.wfile.write(b"Vynora Live Bot is Online & Fully Functional!")
+        self.wfile.write(b"Vynora Live Bot with Inline Host Dashboard is Online!")
 
 def run_server():
     port = int(os.environ.get("PORT", 8080))
@@ -88,6 +88,7 @@ def init_db():
     CREATE TABLE IF NOT EXISTS host_assignments (
         user_id INTEGER PRIMARY KEY,
         slot_name TEXT UNIQUE,
+        group_id INTEGER,
         status TEXT DEFAULT 'ONLINE'
     )
     """)
@@ -227,13 +228,13 @@ def get_host_worked_mins(host_user_id):
     total_worked = sum_row[0] if sum_row and sum_row[0] else 0
     return max(0, total_worked), slot_name
 
-def assign_host_slot(user_id, slot_name):
+def assign_host_slot(user_id, slot_name, group_id):
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
-    INSERT INTO host_assignments (user_id, slot_name, status) VALUES (?, ?, 'ONLINE')
-    ON CONFLICT(user_id) DO UPDATE SET slot_name = ?, status = 'ONLINE'
-    """, (user_id, slot_name, slot_name))
+    INSERT INTO host_assignments (user_id, slot_name, group_id, status) VALUES (?, ?, ?, 'ONLINE')
+    ON CONFLICT(user_id) DO UPDATE SET slot_name = ?, group_id = ?, status = 'ONLINE'
+    """, (user_id, slot_name, group_id, slot_name, group_id))
     conn.commit()
     conn.close()
 
@@ -256,13 +257,26 @@ def update_host_status(user_id, status):
     conn.close()
     return affected > 0
 
-def get_hosts_status_map():
+def get_host_info_by_userid(user_id):
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("SELECT slot_name, status FROM host_assignments")
+    cursor.execute("SELECT slot_name, group_id, status FROM host_assignments WHERE user_id = ?", (user_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return {"slot_name": row[0], "group_id": row[1], "status": row[2]}
+    return None
+
+def get_all_hosts_map():
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT user_id, slot_name, group_id, status FROM host_assignments")
     rows = cursor.fetchall()
     conn.close()
-    return {row[0]: row[1] for row in rows}
+    hosts = {}
+    for r in rows:
+        hosts[r[1]] = {"user_id": r[0], "group_id": r[2], "status": r[3]}
+    return hosts
 
 init_db()
 
@@ -272,7 +286,7 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN")
 ADMIN_GROUP_ID = int(os.environ.get("ADMIN_GROUP_ID", "-1004325621712"))
 REGISTERED_USER_GROUP_ID = int(os.environ.get("REGISTERED_USER_GROUP_ID", "-1003698246938"))
 
-HOST_GROUPS = {
+DEFAULT_HOST_GROUPS = {
     "Host Priya 01": int(os.environ.get("GROUP_PRIYA_01", "-1004312344325")),
     "Host Ananya 02": int(os.environ.get("GROUP_ANANYA_02", "-1004330981781")),
     "Host Simran 03": int(os.environ.get("GROUP_SIMRAN_03", "-1004350353315")),
@@ -301,13 +315,11 @@ def kick_user_action(chat_id, user_id, mins, host_name):
         bot.ban_chat_member(chat_id, user_id)
         bot.unban_chat_member(chat_id, user_id)
 
-        # User notification
         bot.send_message(
             user_id,
             f"⏰ *SESSION TIME EXPIRED!*\n\nAapka `{mins} Mins` ka session khatam ho gaya hai aur aapko private room se hata diya gaya hai."
         )
 
-        # Host Group Completion Notification with 30% deduction calculation
         gross_earning = mins * HOST_RATE_PER_MIN
         platform_deduction = round(gross_earning * 0.30, 2)
         net_earning = round(gross_earning - platform_deduction, 2)
@@ -334,7 +346,7 @@ def schedule_auto_kick(chat_id, user_id, mins, host_name):
     timer.daemon = True
     timer.start()
 
-# --- KEYBOARD MENU ---
+# --- KEYBOARDS & INLINE DASHBOARD BUILDERS ---
 
 def get_main_keyboard(user_id=None):
     markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
@@ -347,6 +359,41 @@ def get_main_keyboard(user_id=None):
     )
     return markup
 
+def get_host_dashboard_markup(status):
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    if status == "ONLINE":
+        markup.add(types.InlineKeyboardButton("🔴 GO OFFLINE", callback_data="hd_offline"))
+    else:
+        markup.add(types.InlineKeyboardButton("🟢 GO ONLINE", callback_data="hd_online"))
+    markup.add(
+        types.InlineKeyboardButton("🔄 Refresh Stats", callback_data="hd_refresh"),
+        types.InlineKeyboardButton("🆘 Support", callback_data="hd_support")
+    )
+    return markup
+
+def build_host_dashboard_content(user_id):
+    worked_mins, slot_name = get_host_worked_mins(user_id)
+    host_info = get_host_info_by_userid(user_id)
+    status = host_info["status"] if host_info else "OFFLINE"
+    
+    gross_earning = worked_mins * HOST_RATE_PER_MIN
+    platform_deduction = round(gross_earning * 0.30, 2)
+    net_earning = round(gross_earning - platform_deduction, 2)
+    emoji = "🟢" if status == "ONLINE" else "🔴"
+
+    text = (
+        "👩‍💼 *VYNORA HOST DASHBOARD*\n"
+        "━━━━━━━━━━━━━━━━━━━━━\n"
+        f"👤 *Assigned Slot:* `{slot_name}`\n"
+        f"📊 *Current Status:* {emoji} `{status}`\n"
+        f"⏱️ *Total Worked Minutes:* `{worked_mins} Mins`\n"
+        f"💰 *Gross Earnings:* `₹{gross_earning}`\n"
+        f"📉 *Platform Cut (30%):* `-₹{platform_deduction}`\n"
+        f"💵 *Net Total Earnings:* `₹{net_earning}`\n"
+        "━━━━━━━━━━━━━━━━━━━━━"
+    )
+    return text, get_host_dashboard_markup(status)
+
 # --- START COMMAND ---
 
 @bot.message_handler(commands=["start"])
@@ -355,6 +402,13 @@ def start_cmd(message):
     name = message.from_user.first_name
     full_name = f"{message.from_user.first_name or ''} {message.from_user.last_name or ''}".strip()
     username_str = f"@{message.from_user.username}" if message.from_user.username else "N/A"
+
+    # Check if user is a registered host -> Show Inline Dashboard
+    host_info = get_host_info_by_userid(user_id)
+    if host_info:
+        text, markup = build_host_dashboard_content(user_id)
+        bot.send_message(user_id, text, reply_markup=markup)
+        return
 
     referrer_id = 0
     args = message.text.split()
@@ -387,7 +441,97 @@ def start_cmd(message):
         reply_markup=get_main_keyboard(user_id)
     )
 
-# --- ADMIN COMMANDS ---
+# --- INLINE HOST DASHBOARD CALLBACK HANDLERS ---
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("hd_"))
+def host_dashboard_callbacks(call):
+    user_id = call.from_user.id
+    action = call.data.replace("hd_", "", 1)
+    
+    host_info = get_host_info_by_userid(user_id)
+    if not host_info:
+        bot.answer_callback_query(call.id, "⚠️ Aap registered host nahi hain.", show_alert=True)
+        return
+
+    if action == "online":
+        update_host_status(user_id, "ONLINE")
+        bot.answer_callback_query(call.id, "Status changed to ONLINE!")
+    elif action == "offline":
+        update_host_status(user_id, "OFFLINE")
+        bot.answer_callback_query(call.id, "Status changed to OFFLINE!")
+    elif action == "refresh":
+        bot.answer_callback_query(call.id, "Stats refreshed successfully!")
+    elif action == "support":
+        bot.answer_callback_query(call.id, "Support: @VynoraSupport", show_alert=True)
+        return
+
+    text, markup = build_host_dashboard_content(user_id)
+    try:
+        bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+    except Exception:
+        pass
+
+# --- ADMIN HOST MANAGEMENT COMMANDS ---
+
+@bot.message_handler(commands=["addhost"])
+def admin_add_host(message):
+    if message.chat.id != ADMIN_GROUP_ID:
+        return
+    args = message.text.split(maxsplit=3)
+    if len(args) < 4 or not args[1].isdigit() or not args[3].isdigit():
+        bot.send_message(ADMIN_GROUP_ID, "⚠️ Usage: `/addhost <telegram_id> <slot_name> <group_id>`\nExample: `/addhost 123456789 Priya -1004312344325`")
+        return
+    
+    target_user = int(args[1])
+    slot_name = args[2]
+    group_id = int(args[3])
+
+    assign_host_slot(target_user, slot_name, group_id)
+    bot.send_message(
+        ADMIN_GROUP_ID,
+        f"✅ *Host Added & Approved*\n👤 Host: `{slot_name}`\n🆔 ID: `{target_user}`\n🏢 Group ID: `{group_id}`\n🟢 Status: `ONLINE`"
+    )
+    try:
+        text, markup = build_host_dashboard_content(target_user)
+        bot.send_message(
+            target_user,
+            f"🎉 *Aapko Vynora Live par Host ke roop mein approve kar diya gaya hai!*\nAapka slot: `{slot_name}`\n\nNeeche aapka live dashboard hai:",
+            reply_markup=markup
+        )
+    except Exception:
+        pass
+
+@bot.message_handler(commands=["removehost"])
+def admin_remove_host(message):
+    if message.chat.id != ADMIN_GROUP_ID:
+        return
+    args = message.text.split()
+    if len(args) < 2:
+        bot.send_message(ADMIN_GROUP_ID, "⚠️ Usage: `/removehost <telegram_id_or_slot_name>`")
+        return
+    identifier = args[1]
+    if identifier.isdigit():
+        identifier = int(identifier)
+    remove_host_slot(identifier)
+    bot.send_message(ADMIN_GROUP_ID, f"🗑️ Host slot `{identifier}` successfully removed from database.")
+
+@bot.message_handler(commands=["hosts"])
+def admin_list_hosts(message):
+    if message.chat.id != ADMIN_GROUP_ID:
+        return
+    hosts = get_all_hosts_map()
+    if not hosts:
+        bot.send_message(ADMIN_GROUP_ID, "⚠️ Koi bhi host database mein registered nahi hai.")
+        return
+    
+    text = "👩‍💼 *HOST MANAGEMENT LIST*\n━━━━━━━━━━━━━━━━━━━━━\n"
+    for slot, data in hosts.items():
+        emoji = "🟢" if data["status"] == "ONLINE" else "🔴"
+        text += f"{emoji} `{slot}` — Status: *{data['status']}* (ID: `{data['user_id']}`)\n"
+    text += "━━━━━━━━━━━━━━━━━━━━━"
+    bot.send_message(ADMIN_GROUP_ID, text)
+
+# --- ADMIN BALANCE COMMANDS ---
 
 @bot.message_handler(commands=["addmins", "givemins"])
 def admin_add_mins(message):
@@ -421,6 +565,18 @@ def admin_deduct_mins(message):
     except Exception:
         pass
 
+# --- HOST EARNINGS (USER MENU) ---
+
+@bot.message_handler(func=lambda msg: msg.text in ["👑 Host Earnings", "Host Earnings"])
+def user_menu_host_earnings(message):
+    user_id = message.chat.id
+    host_info = get_host_info_by_userid(user_id)
+    if host_info:
+        text, markup = build_host_dashboard_content(user_id)
+        bot.send_message(user_id, text, reply_markup=markup)
+    else:
+        bot.send_message(user_id, "⚠️ Aap ek registered Host nahi hain.", reply_markup=get_main_keyboard(user_id))
+
 # --- BOOK HOST SESSION ---
 
 @bot.message_handler(func=lambda msg: msg.text in ["Book Host Session", "🔥 Book Host Session"])
@@ -436,13 +592,17 @@ def book_host(message):
         )
         return
 
-    status_map = get_hosts_status_map()
+    all_hosts = get_all_hosts_map()
+    if not all_hosts:
+        for slot, gid in DEFAULT_HOST_GROUPS.items():
+            all_hosts[slot] = {"group_id": gid, "status": "ONLINE"}
+
     markup = types.InlineKeyboardMarkup(row_width=1)
     active_count = 0
-    for slot_name in HOST_GROUPS.keys():
-        if slot_name in status_map and status_map[slot_name] == "ONLINE":
+    for slot_name, data in all_hosts.items():
+        if data["status"] == "ONLINE":
             active_count += 1
-            markup.add(types.InlineKeyboardButton(f"🟢 {slot_name} (Online)", callback_data=f"select_host_{slot_name}"))
+            markup.add(types.InlineKeyboardButton(f"🟢 {slot_name} (Online)", callback_data=f"sh_{slot_name}"))
 
     if active_count == 0:
         bot.send_message(user_id, "⚠️ *Abhi koi Host active nahi hai.* Kripya baad mein try karein!")
@@ -450,38 +610,49 @@ def book_host(message):
 
     bot.send_message(message.chat.id, "✨ *VYNORA LIVE - HOST SELECTION*\n\n👇 *Active host select karein:*", reply_markup=markup)
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith("select_host_"))
+@bot.callback_query_handler(func=lambda call: call.data.startswith("sh_"))
 def show_host_durations(call):
     user_id = call.from_user.id
-    host_name = call.data.replace("select_host_", "")
+    host_name = call.data.replace("sh_", "", 1)
     markup = types.InlineKeyboardMarkup(row_width=2)
 
     if is_new_user(user_id):
-        markup.add(types.InlineKeyboardButton("🎁 1 Min (New User Offer - ₹20)", callback_data=f"book_{host_name}_1"))
+        markup.add(types.InlineKeyboardButton("🎁 1 Min (New User Offer - ₹20)", callback_data=f"bk_{host_name}_1"))
 
     markup.add(
-        types.InlineKeyboardButton("⏱️ 5 Mins", callback_data=f"book_{host_name}_5"),
-        types.InlineKeyboardButton("⏱️ 10 Mins", callback_data=f"book_{host_name}_10"),
-        types.InlineKeyboardButton("⏱️ 20 Mins", callback_data=f"book_{host_name}_20"),
-        types.InlineKeyboardButton("⏱️ 30 Mins", callback_data=f"book_{host_name}_30")
+        types.InlineKeyboardButton("⏱️ 5 Mins", callback_data=f"bk_{host_name}_5"),
+        types.InlineKeyboardButton("⏱️ 10 Mins", callback_data=f"bk_{host_name}_10"),
+        types.InlineKeyboardButton("⏱️ 20 Mins", callback_data=f"bk_{host_name}_20"),
+        types.InlineKeyboardButton("⏱️ 30 Mins", callback_data=f"bk_{host_name}_30"),
+        types.InlineKeyboardButton("⏱️ 40 Mins", callback_data=f"bk_{host_name}_40")
     )
     bot.edit_message_text(f"👤 *Selected Host:* `{host_name}`\n\n👇 *Duration select karein:*", call.message.chat.id, call.message.message_id, reply_markup=markup)
     bot.answer_callback_query(call.id)
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith("book_"))
+@bot.callback_query_handler(func=lambda call: call.data.startswith("bk_"))
 def process_booking_click(call):
     user_id = call.from_user.id
     parts = call.data.split("_")
-    host_name, mins = parts[1], int(parts[2])
+    mins = int(parts[-1])
+    host_name = "_".join(parts[1:-1])
 
     user_info = get_user_data(user_id)
     if user_info["balance"] < mins:
         bot.answer_callback_query(call.id, f"❌ Balance Kam Hai! {mins} Mins chahiye.", show_alert=True)
         return
 
-    target_group_id = HOST_GROUPS.get(host_name)
-    invite_link = generate_safe_invite_link(target_group_id)
+    all_hosts = get_all_hosts_map()
+    target_group_id = None
+    if host_name in all_hosts:
+        target_group_id = all_hosts[host_name]["group_id"]
+    else:
+        target_group_id = DEFAULT_HOST_GROUPS.get(host_name)
 
+    if not target_group_id:
+        bot.answer_callback_query(call.id, "⚠️ Host group configuration nahi mili.", show_alert=True)
+        return
+
+    invite_link = generate_safe_invite_link(target_group_id)
     if not invite_link:
         bot.send_message(user_id, "⚠️ Technical Issue ke karan link generate nahi ho paya.")
         return
@@ -496,7 +667,6 @@ def process_booking_click(call):
     user_full_name = f"{call.from_user.first_name or ''} {call.from_user.last_name or ''}".strip()
     username_str = f"@{call.from_user.username}" if call.from_user.username else "N/A"
 
-    # User confirmation
     text = (
         "🎉 *SESSION BOOKING SUCCESSFUL!*\n\n"
         f"📅 *Date & Time:* `{current_time_str}`\n"
@@ -509,7 +679,6 @@ def process_booking_click(call):
     link_markup.add(types.InlineKeyboardButton("🔗 Join Private Session Now", url=invite_link))
     bot.send_message(user_id, text, reply_markup=link_markup)
 
-    # Admin group notification with date & time
     admin_card = (
         "🔥 *NEW HOST SESSION BOOKING*\n"
         "━━━━━━━━━━━━━━━━━━━━━\n"
@@ -522,7 +691,6 @@ def process_booking_click(call):
     )
     bot.send_message(ADMIN_GROUP_ID, admin_card)
 
-    # Host group notification with date, time, name, username
     host_group_card = (
         "🔔 *NEW CALL BOOKED IN SLOT!*\n"
         "━━━━━━━━━━━━━━━━━━━━━\n"
@@ -564,42 +732,17 @@ def profile_handler(message):
     )
     bot.send_message(user_id, profile_text, reply_markup=get_main_keyboard(user_id))
 
-# --- HOST EARNINGS HANDLER ---
-
-@bot.message_handler(func=lambda msg: msg.text in ["👑 Host Earnings", "Host Earnings"])
-def host_earnings_handler(message):
-    user_id = message.chat.id
-    worked_mins, slot_name = get_host_worked_mins(user_id)
-    if not slot_name:
-        bot.send_message(user_id, "⚠️ Aap ek registered Host nahi hain ya aapko koi slot assign nahi hai.")
-        return
-
-    gross_earning = worked_mins * HOST_RATE_PER_MIN
-    platform_deduction = round(gross_earning * 0.30, 2)
-    net_earning = round(gross_earning - platform_deduction, 2)
-
-    card = (
-        "👑 *HOST EARNINGS SUMMARY*\n"
-        "━━━━━━━━━━━━━━━━━━━━━\n"
-        f"💃 *Assigned Slot:* `{slot_name}`\n"
-        f"⏱️ *Total Worked Minutes:* `{worked_mins} Mins`\n"
-        f"💰 *Gross Earnings:* `₹{gross_earning}`\n"
-        f"📉 *Platform Cut (30%):* `-₹{platform_deduction}`\n"
-        f"💵 *Net Total Earnings:* `₹{net_earning}`\n"
-        "━━━━━━━━━━━━━━━━━━━━━"
-    )
-    bot.send_message(user_id, card, reply_markup=get_main_keyboard(user_id))
-
 # --- HELP & SUPPORT HANDLER ---
 
 @bot.message_handler(func=lambda msg: msg.text in ["🆘 Help & Support", "Help & Support"])
 def support_handler(message):
+    user_id = message.chat.id
     text = (
         "🆘 *VYNORA LIVE SUPPORT*\n\n"
         "Agar aapko recharge, booking ya kisi bhi cheez me samasya aa rahi hai, toh kripya admin se sampark karein:\n\n"
         "💬 Support Admin: `@VynoraSupport`"
     )
-    bot.send_message(message.chat.id, text, reply_markup=get_main_keyboard(message.chat.id))
+    bot.send_message(user_id, text, reply_markup=get_main_keyboard(user_id))
 
 # --- RECHARGE FLOW ---
 
@@ -613,7 +756,8 @@ def buy_minutes(message):
         types.InlineKeyboardButton("⭐ ₹100 — 5 Minutes", callback_data="payplan_100_5"),
         types.InlineKeyboardButton("🔥 ₹200 — 10 Minutes", callback_data="payplan_200_10"),
         types.InlineKeyboardButton("🚀 ₹400 — 20 Minutes", callback_data="payplan_400_20"),
-        types.InlineKeyboardButton("💎 ₹600 — 30 Minutes", callback_data="payplan_600_30")
+        types.InlineKeyboardButton("💎 ₹600 — 30 Minutes", callback_data="payplan_600_30"),
+        types.InlineKeyboardButton("👑 ₹800 — 40 Minutes", callback_data="payplan_800_40")
     )
     bot.send_message(message.chat.id, "💳 SELECT RECHARGE PLAN", reply_markup=markup)
 
@@ -649,6 +793,7 @@ def process_utr_submission(message, photo_id, txn_id):
         types.InlineKeyboardButton("10 Min (Rs.200)", callback_data=f"app_{user_id}_10_{txn_id}"),
         types.InlineKeyboardButton("20 Min (Rs.400)", callback_data=f"app_{user_id}_20_{txn_id}"),
         types.InlineKeyboardButton("30 Min (Rs.600)", callback_data=f"app_{user_id}_30_{txn_id}"),
+        types.InlineKeyboardButton("40 Min (Rs.800)", callback_data=f"app_{user_id}_40_{txn_id}"),
         types.InlineKeyboardButton("❌ Reject", callback_data=f"rej_{user_id}_{txn_id}")
     )
     caption = (
@@ -697,7 +842,7 @@ def process_admin_recharge_approval(call):
         bot.answer_callback_query(call.id, "Rejected successfully!")
 
 if __name__ == "__main__":
-    print("Vynora Bot Online - All Host & Admin Features Active...")
+    print("Vynora Bot Online - Inline Dashboard & All Features Active...")
     try:
         bot.remove_webhook()
     except Exception:
