@@ -12,30 +12,24 @@ import motor.motor_asyncio
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-# Logging setup
 logging.basicConfig(level=logging.INFO)
 
-# Environment Variables
 MONGO_URI = os.getenv("MONGO_URI", "")
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 SUPER_ADMIN_ID = int(os.getenv("SUPER_ADMIN_ID", "7001825467"))
 GROUP_1_ID = int(os.getenv("GROUP_1_ID", "-1001234567890"))
-GROUP_2_ID = int(os.getenv("GROUP_2_ID", "-1001234567891"))
-GROUP_3_ID = int(os.getenv("GROUP_3_ID", "-1001234567892"))
 
-# FastAPI App & Bot Init
 app = FastAPI()
 bot = Bot(token=BOT_TOKEN) if BOT_TOKEN else None
 dp = Dispatcher()
 
-# MongoDB Connection
 client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URI, serverSelectionTimeoutMS=10000)
 db = client.get_database("vynora_live_db")
 
 users_col = db.users
 recharges_col = db.recharges
 hosts_col = db.hosts
-transactions_col = db.transactions
+bookings_col = db.bookings
 
 # --- Request Models ---
 class RechargeReq(BaseModel):
@@ -43,11 +37,12 @@ class RechargeReq(BaseModel):
     amount_inr: float
     utr_number: str
 
-class GiftReq(BaseModel):
+class BookingReq(BaseModel):
     user_id: int
     host_id: str
-    gift_type: str
-    token_price: int
+    host_name: str
+    duration_mins: int
+    token_cost: int
 
 class RegisterHostReq(BaseModel):
     user_id: int
@@ -61,8 +56,10 @@ class RegisterHostReq(BaseModel):
 
 class ToggleLiveReq(BaseModel):
     user_id: int
+    is_private: Optional[bool] = False
+    entry_gift_cost: Optional[int] = 0
 
-# --- API Endpoints ---
+# --- APIs ---
 
 @app.get("/")
 async def serve_home():
@@ -72,10 +69,10 @@ async def serve_home():
 async def get_user_profile(user_id: int):
     user = await users_col.find_one({"_id": user_id})
     if not user:
-        new_user = {"_id": user_id, "tokens": 0, "role": "user", "created_at": datetime.utcnow()}
+        new_user = {"_id": user_id, "tokens": 0, "credits": 0, "role": "user", "created_at": datetime.utcnow()}
         await users_col.insert_one(new_user)
-        return {"user_id": user_id, "tokens": 0}
-    return {"user_id": user_id, "tokens": user.get("tokens", 0)}
+        return {"user_id": user_id, "tokens": 0, "credits": 0}
+    return {"user_id": user_id, "tokens": user.get("tokens", 0), "credits": user.get("credits", 0)}
 
 @app.post("/api/recharge")
 async def process_recharge(req: RechargeReq):
@@ -100,9 +97,52 @@ async def process_recharge(req: RechargeReq):
         try:
             await bot.send_message(chat_id=GROUP_1_ID, text=msg, reply_markup=kb, parse_mode="Markdown")
         except Exception as e:
-            logging.error(f"Bot notification error: {e}")
+            logging.error(f"Error notifying group: {e}")
 
     return {"status": "success", "message": "UTR submitted for Admin approval!"}
+
+# --- SLOT BOOKING API ---
+@app.post("/api/book-slot")
+async def book_slot(req: BookingReq):
+    user = await users_col.find_one({"_id": req.user_id})
+    if not user or user.get("tokens", 0) < req.token_cost:
+        return {"status": "error", "message": "Insufficient Token Balance!"}
+
+    booking_id = f"bk_{int(time.time())}"
+    doc = {
+        "_id": booking_id,
+        "user_id": req.user_id,
+        "host_id": req.host_id,
+        "host_name": req.host_name,
+        "duration_mins": req.duration_mins,
+        "token_cost": req.token_cost,
+        "status": "pending",
+        "timestamp": datetime.utcnow()
+    }
+    await bookings_col.insert_one(doc)
+    
+    # Deduct tokens temporarily
+    await users_col.update_one({"_id": req.user_id}, {"$inc": {"tokens": -req.token_cost}})
+
+    # Notify Admin Group 1
+    if bot:
+        kb = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="✅ Host Accept", callback_data=f"accbk_{booking_id}"),
+            InlineKeyboardButton(text="❌ Cancel Booking", callback_data=f"canbk_{booking_id}")
+        ]])
+        msg = (
+            f"📅 **NEW 1v1 SLOT BOOKING REQUEST**\n\n"
+            f"👤 **User ID:** `{req.user_id}`\n"
+            f"👩 **Host:** {req.host_name}\n"
+            f"⏱️ **Duration:** {req.duration_mins} Minutes\n"
+            f"🪙 **Token Amount:** {req.token_cost} Tokens"
+        )
+        try:
+            await bot.send_message(chat_id=GROUP_1_ID, text=msg, reply_markup=kb, parse_mode="Markdown")
+        except Exception as e:
+            logging.error(f"Booking notify error: {e}")
+
+    return {"status": "success", "message": f"Slot Booking Request of {req.duration_mins} mins sent to {req.host_name}!"}
 
 @app.get("/api/hosts")
 async def get_online_hosts():
@@ -117,8 +157,8 @@ async def get_online_hosts():
                 "rate": doc.get("rate", 50),
                 "lang": doc.get("lang", "Hindi"),
                 "loc": doc.get("loc", "India 🇮🇳"),
-                "rating": doc.get("rating", "5.0"),
-                "calls": doc.get("calls", "10+"),
+                "isPrivate": doc.get("isPrivate", False),
+                "entryGiftCost": doc.get("entryGiftCost", 0),
                 "isReal": True,
                 "img": doc.get("img", ""),
                 "bio": doc.get("bio", "")
@@ -142,8 +182,8 @@ async def register_host(req: RegisterHostReq):
             "bio": req.bio,
             "status": "pending",
             "isReal": True,
-            "isVerified": False,
             "isOnline": False,
+            "isPrivate": False,
             "created_at": datetime.utcnow()
         }
         await hosts_col.update_one({"_id": doc["_id"]}, {"$set": doc}, upsert=True)
@@ -153,19 +193,10 @@ async def register_host(req: RegisterHostReq):
                 InlineKeyboardButton(text="✅ Approve Host", callback_data=f"apphost_{req.user_id}"),
                 InlineKeyboardButton(text="❌ Reject", callback_data=f"rejhost_{req.user_id}")
             ]])
-            msg = (
-                f"👩 **NEW HOST REGISTRATION REQUEST**\n\n"
-                f"👤 **User ID:** `{req.user_id}`\n"
-                f"📛 **Name:** {req.name}\n"
-                f"🎂 **Age:** {req.age}\n"
-                f"🪙 **Rate:** {req.rate} Tokens/min\n"
-                f"🗣️ **Languages:** {req.lang}\n"
-                f"📍 **Location:** {req.loc}\n"
-                f"📝 **Bio:** {req.bio}"
-            )
+            msg = f"👩 **NEW HOST REGISTRATION**\n\n👤 **User ID:** `{req.user_id}`\n📛 **Name:** {req.name}\n🪙 **Rate:** {req.rate}/min"
             try:
                 await bot.send_photo(chat_id=GROUP_1_ID, photo=req.img, caption=msg, reply_markup=kb, parse_mode="Markdown")
-            except Exception as photo_err:
+            except:
                 await bot.send_message(chat_id=GROUP_1_ID, text=msg, reply_markup=kb, parse_mode="Markdown")
 
         return {"status": "success", "message": "Host Application submitted for Admin approval!"}
@@ -176,11 +207,13 @@ async def register_host(req: RegisterHostReq):
 async def get_host_info(user_id: int):
     doc = await hosts_col.find_one({"_id": f"host_{user_id}"})
     if not doc:
-        return {"status": "none", "isOnline": False}
+        return {"status": "none", "isOnline": False, "credits": 0}
     return {
         "status": doc.get("status", "none"),
         "isOnline": doc.get("isOnline", False),
-        "isVerified": doc.get("isVerified", False)
+        "isPrivate": doc.get("isPrivate", False),
+        "entryGiftCost": doc.get("entryGiftCost", 0),
+        "credits": doc.get("credits", 0)
     }
 
 @app.post("/api/host/toggle-live")
@@ -188,64 +221,47 @@ async def toggle_live(req: ToggleLiveReq):
     doc = await hosts_col.find_one({"_id": f"host_{req.user_id}"})
     if doc and doc.get("status") == "approved":
         new_online = not doc.get("isOnline", False)
-        await hosts_col.update_one({"_id": f"host_{req.user_id}"}, {"$set": {"isOnline": new_online}})
-        return {"status": "success", "isOnline": new_online}
+        await hosts_col.update_one(
+            {"_id": f"host_{req.user_id}"},
+            {"$set": {
+                "isOnline": new_online,
+                "isPrivate": req.is_private,
+                "entryGiftCost": req.entry_gift_cost
+            }}
+        )
+        return {"status": "success", "isOnline": new_online, "isPrivate": req.is_private}
     return {"status": "error", "message": "Not an approved host"}
 
-# Static Files Mount
 if os.path.exists("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# --- Telegram Bot Callback Handlers ---
-
+# Callback Handlers
 @dp.callback_query(F.data.startswith("appr_"))
 async def approve_recharge(call: types.CallbackQuery):
-    if call.from_user.id != SUPER_ADMIN_ID:
-        await call.answer("❌ Only Super Admin can approve!", show_alert=True)
-        return
+    if call.from_user.id != SUPER_ADMIN_ID: return
     tx_id = call.data.split("_")[1]
     tx = await recharges_col.find_one({"_id": tx_id})
     if tx and tx.get("status") == "pending":
         await recharges_col.update_one({"_id": tx_id}, {"$set": {"status": "approved"}})
         await users_col.update_one({"_id": tx["user_id"]}, {"$inc": {"tokens": tx["tokens"]}}, upsert=True)
         await call.message.edit_text(call.message.text + "\n\n✅ **APPROVED BY ADMIN**", parse_mode="Markdown")
-        await call.answer("Recharge Approved!")
 
 @dp.callback_query(F.data.startswith("rejc_"))
 async def reject_recharge(call: types.CallbackQuery):
-    if call.from_user.id != SUPER_ADMIN_ID:
-        await call.answer("❌ Only Super Admin can reject!", show_alert=True)
-        return
+    if call.from_user.id != SUPER_ADMIN_ID: return
     tx_id = call.data.split("_")[1]
     await recharges_col.update_one({"_id": tx_id}, {"$set": {"status": "rejected"}})
     await call.message.edit_text(call.message.text + "\n\n❌ **REJECTED BY ADMIN**", parse_mode="Markdown")
-    await call.answer("Recharge Rejected!")
 
 @dp.callback_query(F.data.startswith("apphost_"))
 async def approve_host_cb(call: types.CallbackQuery):
-    if call.from_user.id != SUPER_ADMIN_ID:
-        await call.answer("❌ Only Super Admin can approve hosts!", show_alert=True)
-        return
+    if call.from_user.id != SUPER_ADMIN_ID: return
     host_u_id = int(call.data.split("_")[1])
-    await hosts_col.update_one(
-        {"_id": f"host_{host_u_id}"},
-        {"$set": {"status": "approved", "isVerified": True, "isOnline": True}}
-    )
-    if call.message.caption:
-        await call.message.edit_caption(caption=call.message.caption + "\n\n✅ **APPROVED BY ADMIN (LIVE ACTIVE)**", reply_markup=None)
-    else:
-        await call.message.edit_text(text=call.message.text + "\n\n✅ **APPROVED BY ADMIN (LIVE ACTIVE)**", reply_markup=None)
+    await hosts_col.update_one({"_id": f"host_{host_u_id}"}, {"$set": {"status": "approved", "isOnline": True}})
     await call.answer("Host Approved!")
 
-@dp.callback_query(F.data.startswith("rejhost_"))
-async def reject_host_cb(call: types.CallbackQuery):
-    if call.from_user.id != SUPER_ADMIN_ID:
-        await call.answer("❌ Only Super Admin can reject hosts!", show_alert=True)
-        return
-    host_u_id = int(call.data.split("_")[1])
-    await hosts_col.update_one({"_id": f"host_{host_u_id}"}, {"$set": {"status": "rejected", "isOnline": False}})
-    if call.message.caption:
-        await call.message.edit_caption(caption=call.message.caption + "\n\n❌ **REJECTED BY ADMIN**", reply_markup=None)
-    else:
-        await call.message.edit_text(text=call.message.text + "\n\n❌ **REJECTED BY ADMIN**", reply_markup=None)
-    await call.answer("Host Rejected!")
+@dp.callback_query(F.data.startswith("accbk_"))
+async def accept_booking(call: types.CallbackQuery):
+    bk_id = call.data.split("_")[1]
+    await bookings_col.update_one({"_id": bk_id}, {"$set": {"status": "accepted"}})
+    await call.message.edit_text(call.message.text + "\n\n✅ **BOOKING ACCEPTED BY HOST/ADMIN**", parse_mode="Markdown")
