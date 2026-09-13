@@ -1,54 +1,24 @@
 import os
-import asyncio
-import logging
-from aiogram import Bot, Dispatcher, types
-from aiogram.filters import Command
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+import telebot
 from dotenv import load_dotenv
 from database import users_collection
 
 load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
-WEBAPP_URL = os.getenv("WEBAPP_URL")
-GROUP_2_ID = int(os.getenv("GROUP_2_ID", 0))
 
-bot = Bot(token=TOKEN)
-dp = Dispatcher()
+if not TOKEN:
+    print("CRITICAL ERROR: BOT_TOKEN is missing from environment variables!")
+    exit(1)
 
-@dp.message(Command("start"))
-async def cmd_start(message: types.Message):
+bot = telebot.TeleBot(TOKEN)
+
+@bot.message_handler(commands=['start'])
+def send_welcome(message):
     user_id = message.from_user.id
-    name = message.from_user.full_name
+    name = message.from_user.first_name
     
-    existing_user = await users_collection.find_one({"telegram_id": user_id})
-    if not existing_user:
-        await users_collection.insert_one({
-            "telegram_id": user_id,
-            # Use raw string interpolation safely or fallback
-            "name": name or "Unknown",
-            "phone": None,
-            "balance_minutes": 0
-        })
-        if GROUP_2_ID:
-            await bot.send_message(
-                GROUP_2_ID, 
-                f"👤 **New User Registration**\nName: {name}\nID: `{user_id}`",
-                parse_mode="Markdown"
-            )
-
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="🚀 Open Hosts & Mini App", web_app=WebAppInfo(url=WEBAPP_URL))]
-        ]
-    )
-    await message.answer(
-        f"Welcome, {name}! Tap the button below to view available hosts and manage your sessions.",
-        reply_markup=keyboard
-    )
-
-async def main():
-    logging.basicConfig(level=logging.INFO)
-    await dp.start_polling(bot)
+    bot.reply_to(message, f"Welcome, {name}! Your setup is working successfully.")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    print("Bot is polling...")
+    bot.infinity_polling()
