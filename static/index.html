@@ -13,6 +13,7 @@
             --card-border: rgba(255, 255, 255, 0.12);
             --primary-gradient: linear-gradient(135deg, #FF007A 0%, #7928CA 100%);
             --secondary-gradient: linear-gradient(135deg, #FF9900 0%, #FF5500 100%);
+            --admin-gold-gradient: linear-gradient(135deg, #FFE600 0%, #FF9900 100%);
             --accent-cyan: #00F5D4;
             --text-main: #FFFFFF;
             --text-muted: #A1A1AA;
@@ -54,10 +55,14 @@
             align-items: center;
             gap: 8px;
             font-weight: 800;
-            font-size: 1.2rem;
-            background: var(--primary-gradient);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            font-size: 1.1rem;
+            cursor: pointer;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
         .user-wallet {
@@ -68,27 +73,34 @@
             border: 1px solid rgba(255, 215, 0, 0.3);
             padding: 6px 12px;
             border-radius: 20px;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             font-weight: 700;
             color: var(--gold);
         }
 
-        .add-token-btn {
-            background: var(--primary-gradient);
-            border: none;
-            color: white;
-            width: 24px;
-            height: 24px;
+        .profile-avatar-btn {
+            width: 34px;
+            height: 34px;
             border-radius: 50%;
+            background: var(--primary-gradient);
+            border: 2px solid var(--card-border);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 0.8rem;
+            font-weight: 700;
             cursor: pointer;
-            box-shadow: 0 0 10px rgba(255, 0, 122, 0.5);
+            position: relative;
         }
 
-        /* --- BANNER & DYNAMIC FILTERS --- */
+        .crown-badge {
+            position: absolute;
+            top: -6px;
+            right: -4px;
+            font-size: 0.85rem;
+            filter: drop-shadow(0 0 4px #FFD700);
+        }
+
+        /* --- BANNER & FILTERS --- */
         .hero-banner {
             margin: 14px 16px;
             background: linear-gradient(135deg, rgba(255,0,122,0.2) 0%, rgba(121,40,202,0.2) 100%);
@@ -98,16 +110,6 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-        }
-
-        .hero-text h3 {
-            font-size: 1.1rem;
-            margin-bottom: 4px;
-        }
-
-        .hero-text p {
-            font-size: 0.8rem;
-            color: var(--text-muted);
         }
 
         .category-scroll {
@@ -127,7 +129,6 @@
             white-space: nowrap;
             color: var(--text-muted);
             cursor: pointer;
-            transition: all 0.2s ease;
         }
 
         .chip.active {
@@ -135,16 +136,14 @@
             color: white;
             border-color: transparent;
             font-weight: 600;
-            box-shadow: 0 4px 12px rgba(255, 0, 122, 0.4);
         }
 
         /* --- HOST GRID --- */
         .section-title {
             padding: 0 16px 10px 16px;
-            font-size: 1rem;
+            font-size: 0.95rem;
             font-weight: 700;
             display: flex;
-            align-items: center;
             justify-content: space-between;
         }
 
@@ -161,65 +160,43 @@
             border-radius: 16px;
             overflow: hidden;
             position: relative;
-            backdrop-filter: blur(10px);
             cursor: pointer;
-            transition: transform 0.2s ease;
-        }
-
-        .host-card:active {
-            transform: scale(0.97);
         }
 
         .host-thumb {
             width: 100%;
             height: 190px;
             object-fit: cover;
-            display: block;
         }
 
         .status-badge {
             position: absolute;
-            top: 10px;
-            left: 10px;
+            top: 10px; left: 10px;
             background: rgba(0, 0, 0, 0.65);
-            backdrop-filter: blur(6px);
-            border: 1px solid rgba(0, 245, 212, 0.4);
             padding: 4px 8px;
             border-radius: 12px;
             font-size: 0.7rem;
-            font-weight: 600;
             color: var(--accent-cyan);
             display: flex;
             align-items: center;
             gap: 4px;
         }
 
-        .pulse-dot {
-            width: 6px;
-            height: 6px;
-            background-color: var(--accent-cyan);
-            border-radius: 50%;
-            box-shadow: 0 0 8px var(--accent-cyan);
-            animation: pulse 1.5s infinite;
-        }
-
-        @keyframes pulse {
-            0% { opacity: 0.4; }
-            50% { opacity: 1; }
-            100% { opacity: 0.4; }
+        .verified-icon {
+            color: #00B2FF;
+            font-size: 0.85rem;
+            margin-left: 4px;
         }
 
         .price-tag {
             position: absolute;
-            top: 10px;
-            right: 10px;
+            top: 10px; right: 10px;
             background: rgba(0, 0, 0, 0.65);
-            backdrop-filter: blur(6px);
             padding: 4px 8px;
             border-radius: 12px;
             font-size: 0.75rem;
-            font-weight: 700;
             color: var(--gold);
+            font-weight: 700;
         }
 
         .host-info {
@@ -230,18 +207,11 @@
         }
 
         .host-name {
-            font-size: 0.95rem;
+            font-size: 0.9rem;
             font-weight: 700;
             margin-bottom: 4px;
-        }
-
-        .host-bio {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            margin-bottom: 8px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            display: flex;
+            align-items: center;
         }
 
         .call-btn {
@@ -253,23 +223,10 @@
             border-radius: 10px;
             font-weight: 700;
             font-size: 0.85rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
             cursor: pointer;
-            box-shadow: 0 4px 12px rgba(255, 0, 122, 0.3);
         }
 
-        .empty-msg {
-            grid-column: span 2;
-            text-align: center;
-            padding: 40px 10px;
-            color: var(--text-muted);
-            font-size: 0.9rem;
-        }
-
-        /* --- MODALS --- */
+        /* --- MODALS & DRAWERS --- */
         .modal-overlay {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
@@ -292,12 +249,6 @@
             padding: 20px;
             max-height: 85vh;
             overflow-y: auto;
-            animation: slideUp 0.3s ease;
-        }
-
-        @keyframes slideUp {
-            from { transform: translateY(100%); }
-            to { transform: translateY(0); }
         }
 
         .modal-header {
@@ -311,9 +262,20 @@
             background: rgba(255, 255, 255, 0.1);
             border: none;
             color: white;
-            width: 30px;
-            height: 30px;
+            width: 30px; height: 30px;
             border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .menu-list-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            margin-bottom: 10px;
             cursor: pointer;
         }
 
@@ -325,33 +287,32 @@
             border-radius: 12px;
             color: white;
             margin-bottom: 12px;
-            font-size: 0.95rem;
-            outline: none;
         }
 
-        .recharge-presets {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-            margin-bottom: 16px;
+        /* --- ADMIN BROADCAST BANNER IN CALL --- */
+        .admin-entry-banner {
+            position: absolute;
+            top: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--admin-gold-gradient);
+            color: #000;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-weight: 800;
+            font-size: 0.9rem;
+            display: none;
+            align-items: center;
+            gap: 8px;
+            z-index: 330;
+            box-shadow: 0 0 20px #FFD700;
+            animation: glow 1s infinite alternate;
         }
 
-        .preset-card {
-            background: var(--card-bg);
-            border: 1px solid var(--card-border);
-            padding: 12px 8px;
-            border-radius: 12px;
-            text-align: center;
-            cursor: pointer;
+        @keyframes glow {
+            from { box-shadow: 0 0 10px #FFD700; }
+            to { box-shadow: 0 0 25px #FF007A; }
         }
-
-        .preset-card.selected {
-            border-color: #FF007A;
-            background: rgba(255, 0, 122, 0.15);
-        }
-
-        .preset-amount { font-weight: 700; font-size: 1rem; color: white; }
-        .preset-tokens { font-size: 0.75rem; color: var(--gold); }
 
         /* --- 1v1 CALL OVERLAY --- */
         .call-screen {
@@ -372,7 +333,6 @@
             top: 0; left: 0;
             width: 100%; height: 100%;
             object-fit: cover;
-            background: #1a162b;
         }
 
         .local-video-pip {
@@ -395,19 +355,6 @@
             background: linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%);
         }
 
-        .call-timer-badge {
-            background: rgba(0,0,0,0.6);
-            backdrop-filter: blur(8px);
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: 700;
-            border: 1px solid rgba(255,255,255,0.2);
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
         .call-controls {
             position: relative;
             z-index: 320;
@@ -425,36 +372,10 @@
             background: rgba(255, 255, 255, 0.2);
             color: white;
             font-size: 1.2rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
             cursor: pointer;
         }
 
-        .ctrl-btn.end-call {
-            background: #FF0055;
-            box-shadow: 0 0 20px rgba(255, 0, 85, 0.6);
-            width: 64px; height: 64px;
-        }
-
-        .gift-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 12px;
-            margin-bottom: 16px;
-        }
-
-        .gift-item {
-            background: var(--card-bg);
-            border: 1px solid var(--card-border);
-            border-radius: 12px;
-            padding: 10px 4px;
-            text-align: center;
-            cursor: pointer;
-        }
-
-        .gift-icon { font-size: 1.8rem; margin-bottom: 4px; }
-        .gift-price { font-size: 0.75rem; color: var(--gold); font-weight: 700; }
+        .ctrl-btn.end-call { background: #FF0055; width: 64px; height: 64px; }
     </style>
 </head>
 <body>
@@ -462,73 +383,63 @@
     <!-- TOP HEADER -->
     <header class="app-header">
         <div class="brand-logo">
-            <i class="fa-solid fa-bolt"></i> Vynora Live
+            <i class="fa-solid fa-bolt" style="color:#FF007A;"></i> Vynora Live
         </div>
-        <div class="user-wallet">
-            <span>🪙 <span id="user-token-bal">0</span></span>
-            <button class="add-token-btn" onclick="openRechargeModal()"><i class="fa-solid fa-plus"></i></button>
+        <div class="header-actions">
+            <div class="user-wallet">
+                <span>🪙 <span id="user-token-bal">0</span></span>
+                <i class="fa-solid fa-plus-circle" onclick="openRechargeModal()" style="cursor:pointer; color:#FF007A;"></i>
+            </div>
+            <div class="profile-avatar-btn" onclick="openUserProfileModal()">
+                <span id="user-avatar-initial">U</span>
+                <span id="admin-crown-icon" class="crown-badge" style="display:none;">👑</span>
+            </div>
         </div>
     </header>
 
-    <!-- HERO BANNER -->
+    <!-- BANNER & FILTERS -->
     <div class="hero-banner">
-        <div class="hero-text">
-            <h3>🔥 1v1 Private Video Call</h3>
-            <p>Connect instantly with top online hosts!</p>
+        <div>
+            <h3>🔥 1v1 Live Video Chat</h3>
+            <p style="font-size:0.8rem; color:var(--text-muted);">Connect with verified hosts</p>
         </div>
-        <i class="fa-solid fa-video" style="font-size: 2rem; color: #FF007A;"></i>
+        <i class="fa-solid fa-shield-halved" style="font-size: 2rem; color: var(--accent-cyan);"></i>
     </div>
 
-    <!-- DYNAMIC CATEGORY FILTERS -->
-    <div class="category-scroll" id="filter-chips">
+    <div class="category-scroll">
         <div class="chip active" onclick="setFilter('all', this)">🔥 All Live</div>
-        <div class="chip" onclick="setFilter('hot', this)">✨ Hot & Trending</div>
-        <div class="chip" onclick="setFilter('new', this)">🌟 New Hosts</div>
-        <div class="chip" onclick="setFilter('top', this)">👑 Top Rated</div>
-        <div class="chip" onclick="setFilter('budget', this)">🪙 Low Rate (≤50)</div>
+        <div class="chip" onclick="setFilter('hot', this)">✨ Hot Hosts</div>
+        <div class="chip" onclick="setFilter('top', this)">👑 Verified VIP</div>
     </div>
 
-    <!-- HOSTS SECTION -->
+    <!-- HOST GRID -->
     <div class="section-title">
-        <span><i class="fa-solid fa-circle" style="color: var(--accent-cyan); font-size: 0.6rem;"></i> Available Hosts</span>
-        <span id="host-count" style="font-size: 0.8rem; color: var(--text-muted); font-weight: 400;">4 Hosts</span>
+        <span>Available Hosts</span>
+        <span id="host-count" style="font-size: 0.8rem; color: var(--text-muted);">4 Hosts</span>
     </div>
-
     <div class="host-grid" id="host-grid-container"></div>
 
-    <!-- RECHARGE MODAL -->
-    <div class="modal-overlay" id="recharge-modal">
+    <!-- USER PROFILE MODAL -->
+    <div class="modal-overlay" id="user-profile-modal">
         <div class="modal-card">
             <div class="modal-header">
-                <h3>💳 Recharge Vynora Tokens</h3>
-                <button class="close-btn" onclick="closeModal('recharge-modal')">✕</button>
+                <h3>My Profile</h3>
+                <button class="close-btn" onclick="closeModal('user-profile-modal')">✕</button>
             </div>
-            
-            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px;">
-                Pay via UPI: <b style="color:#FF007A;">vynoralive@slc</b> (Slice - Rajnish Kumar)
-            </p>
-
-            <div class="recharge-presets">
-                <div class="preset-card selected" onclick="selectAmount(100)">
-                    <div class="preset-amount">₹100</div>
-                    <div class="preset-tokens">100 Tokens</div>
-                </div>
-                <div class="preset-card" onclick="selectAmount(500)">
-                    <div class="preset-amount">₹500</div>
-                    <div class="preset-tokens">550 Tokens 🔥</div>
-                </div>
-                <div class="preset-card" onclick="selectAmount(1000)">
-                    <div class="preset-amount">₹1000</div>
-                    <div class="preset-tokens">1200 Tokens 👑</div>
-                </div>
+            <div style="text-align: center; margin-bottom: 20px;">
+                <div style="font-size: 2.5rem; margin-bottom: 6px;" id="profile-modal-icon">👤</div>
+                <h3 id="profile-user-name">User</h3>
+                <p id="profile-user-role" style="font-size:0.85rem; color:var(--text-muted);">User ID: <span id="profile-user-id">0000</span></p>
             </div>
 
-            <input type="number" id="recharge-amount" class="input-box" value="100" placeholder="Enter Amount (INR)">
-            <input type="text" id="recharge-utr" class="input-box" placeholder="Enter 12-Digit UTR Number">
-
-            <button class="call-btn" style="padding: 14px;" onclick="submitRecharge()">
-                🚀 Submit UTR For Approval
-            </button>
+            <div class="menu-list-item" onclick="openRulesModal('user')">
+                <span><i class="fa-solid fa-file-contract" style="color:#FF007A; margin-right:8px;"></i> User Terms & Rules</span>
+                <i class="fa-solid fa-chevron-right" style="font-size:0.8rem;"></i>
+            </div>
+            <div class="menu-list-item" onclick="openSupportLink()">
+                <span><i class="fa-solid fa-headset" style="color:var(--accent-cyan); margin-right:8px;"></i> Help & Customer Support</span>
+                <i class="fa-solid fa-chevron-right" style="font-size:0.8rem;"></i>
+            </div>
         </div>
     </div>
 
@@ -541,26 +452,63 @@
             </div>
             <img id="modal-host-img" src="" style="width: 100%; height: 220px; object-fit: cover; border-radius: 16px; margin-bottom: 12px;">
             
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <div>
+            <div style="margin-bottom: 16px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
                     <span id="modal-host-rate" style="color: var(--gold); font-weight: 700; font-size: 1.1rem;">🪙 50/min</span>
-                    <p id="modal-host-bio" style="font-size: 0.85rem; color: var(--text-muted);"></p>
+                    <span style="color:#00B2FF; font-size:0.85rem;"><i class="fa-solid fa-circle-check"></i> Official Verified Host</span>
                 </div>
-                <button class="call-btn" style="width: auto; padding: 10px 20px;" onclick="startCallFromModal()">
-                    <i class="fa-solid fa-video"></i> Start Call
-                </button>
+                <p id="modal-host-bio" style="font-size: 0.85rem; color: var(--text-muted); margin-top:6px;"></p>
             </div>
+
+            <div class="menu-list-item" onclick="openRulesModal('host')">
+                <span><i class="fa-solid fa-scroll" style="color:var(--gold); margin-right:8px;"></i> Host Guidelines & Rules</span>
+                <i class="fa-solid fa-chevron-right" style="font-size:0.8rem;"></i>
+            </div>
+
+            <button class="call-btn" style="padding: 12px; margin-top:8px;" onclick="startCallFromModal()">
+                <i class="fa-solid fa-video"></i> Start 1v1 Private Call
+            </button>
+        </div>
+    </div>
+
+    <!-- RULES & POLICIES MODAL -->
+    <div class="modal-overlay" id="rules-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="rules-title">Platform Rules</h3>
+                <button class="close-btn" onclick="closeModal('rules-modal')">✕</button>
+            </div>
+            <div id="rules-body-content" style="font-size:0.85rem; line-height:1.6; color:var(--text-muted);"></div>
+        </div>
+    </div>
+
+    <!-- RECHARGE MODAL -->
+    <div class="modal-overlay" id="recharge-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>💳 Recharge Tokens</h3>
+                <button class="close-btn" onclick="closeModal('recharge-modal')">✕</button>
+            </div>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px;">
+                UPI: <b style="color:#FF007A;">vynoralive@slc</b> (Rajnish Kumar)
+            </p>
+            <input type="number" id="recharge-amount" class="input-box" value="100" placeholder="Amount (INR)">
+            <input type="text" id="recharge-utr" class="input-box" placeholder="12-Digit UTR Number">
+            <button class="call-btn" style="padding: 12px;" onclick="submitRecharge()">Submit UTR</button>
         </div>
     </div>
 
     <!-- 1v1 VIDEO CALL SCREEN -->
     <div class="call-screen" id="call-screen">
+        <div class="admin-entry-banner" id="admin-entry-banner">
+            👑 VIP SUPER ADMIN ENTERED THE BROADCAST!
+        </div>
+
         <img src="" class="remote-video-container" id="call-remote-img">
         <img src="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=300&auto=format&fit=crop" class="local-video-pip">
 
         <div class="call-top-bar">
-            <div class="call-timer-badge">
-                <i class="fa-solid fa-circle" style="color: #FF0055; font-size: 0.5rem;"></i>
+            <div style="background:rgba(0,0,0,0.6); padding:6px 12px; border-radius:20px; font-size:0.85rem; font-weight:700;">
                 <span id="call-duration">00:00</span>
             </div>
             <div class="user-wallet" style="background: rgba(0,0,0,0.6);">
@@ -569,38 +517,9 @@
         </div>
 
         <div class="call-controls">
-            <button class="ctrl-btn" onclick="toggleMute()"><i class="fa-solid fa-microphone"></i></button>
-            <button class="ctrl-btn" style="background: var(--secondary-gradient);" onclick="openGiftSheet()"><i class="fa-solid fa-gift"></i></button>
+            <button class="ctrl-btn" onclick="endCall()"><i class="fa-solid fa-microphone"></i></button>
             <button class="ctrl-btn end-call" onclick="endCall()"><i class="fa-solid fa-phone-slash"></i></button>
-            <button class="ctrl-btn" onclick="toggleCam()"><i class="fa-solid fa-camera-rotate"></i></button>
-        </div>
-    </div>
-
-    <!-- GIFT SHEET MODAL -->
-    <div class="modal-overlay" id="gift-modal" style="z-index: 350;">
-        <div class="modal-card">
-            <div class="modal-header">
-                <h3>🎁 Send Live Gift</h3>
-                <button class="close-btn" onclick="closeModal('gift-modal')">✕</button>
-            </div>
-            <div class="gift-grid">
-                <div class="gift-item" onclick="sendGift('Rose', 10)">
-                    <div class="gift-icon">🌹</div>
-                    <div class="gift-price">10 Tokens</div>
-                </div>
-                <div class="gift-item" onclick="sendGift('Heart', 50)">
-                    <div class="gift-icon">💖</div>
-                    <div class="gift-price">50 Tokens</div>
-                </div>
-                <div class="gift-item" onclick="sendGift('Crown', 200)">
-                    <div class="gift-icon">👑</div>
-                    <div class="gift-price">200 Tokens</div>
-                </div>
-                <div class="gift-item" onclick="sendGift('Sports Car', 500)">
-                    <div class="gift-icon">🏎️</div>
-                    <div class="gift-price">500 Tokens</div>
-                </div>
-            </div>
+            <button class="ctrl-btn" onclick="endCall()"><i class="fa-solid fa-camera-rotate"></i></button>
         </div>
     </div>
 
@@ -608,23 +527,34 @@
         const tg = window.Telegram?.WebApp;
         if (tg) tg.expand();
 
-        const userId = tg?.initDataUnsafe?.user?.id || 1108685585;
+        const SUPER_ADMIN_ID = 7001825467;
+        const userId = tg?.initDataUnsafe?.user?.id || SUPER_ADMIN_ID;
+        const userName = tg?.initDataUnsafe?.user?.first_name || "User";
+        
         let userTokens = 0;
         let selectedHost = null;
         let callTimer = null;
         let secondsElapsed = 0;
-        let activeFilter = 'all';
 
-        // Categorized Hosts Dataset
         const hosts = [
-            { id: "h1", name: "Ananya Sharma 🇮🇳", age: 22, rate: 50, category: "hot", img: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop", bio: "Friendly chats & music lovers 💖" },
-            { id: "h2", name: "Sophia Rose 🇬🇧", age: 24, rate: 80, category: "top", img: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=600&auto=format&fit=crop", bio: "Available for private video calls 🚀" },
-            { id: "h3", name: "Priya Roy 🇮🇳", age: 21, rate: 40, category: "budget", img: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=600&auto=format&fit=crop", bio: "Late night casual talks ✨" },
-            { id: "h4", name: "Elena Rostova 🇷🇺", age: 23, rate: 100, category: "new", img: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=600&auto=format&fit=crop", bio: "High quality 1v1 experience 👑" }
+            { id: "h1", name: "Ananya Sharma 🇮🇳", rate: 50, isVerified: true, img: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop", bio: "Friendly chats & music lovers 💖" },
+            { id: "h2", name: "Sophia Rose 🇬🇧", rate: 80, isVerified: true, img: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=600&auto=format&fit=crop", bio: "Available for private video calls 🚀" },
+            { id: "h3", name: "Priya Roy 🇮🇳", rate: 40, isVerified: true, img: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=600&auto=format&fit=crop", bio: "Late night casual talks ✨" },
+            { id: "h4", name: "Elena Rostova 🇷🇺", rate: 100, isVerified: true, img: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=600&auto=format&fit=crop", bio: "High quality 1v1 experience 👑" }
         ];
 
-        // Fetch User Data
         async function loadUserData() {
+            document.getElementById('user-avatar-initial').innerText = userName.charAt(0).toUpperCase();
+            document.getElementById('profile-user-name').innerText = userName;
+            document.getElementById('profile-user-id').innerText = userId;
+
+            // Apply Crown to Super Admin Profile
+            if (userId === SUPER_ADMIN_ID) {
+                document.getElementById('admin-crown-icon').style.display = 'block';
+                document.getElementById('profile-user-role').innerHTML = `<b style="color:#FFD700;">👑 Super Admin VIP</b> | ID: ${userId}`;
+                document.getElementById('profile-modal-icon').innerText = '👑';
+            }
+
             try {
                 const res = await fetch(`/api/user/${userId}`);
                 const data = await res.json();
@@ -634,40 +564,17 @@
             } catch (e) { console.log(e); }
         }
 
-        // Filter Functionality
-        function setFilter(filterType, element) {
-            activeFilter = filterType;
-            const chips = document.querySelectorAll('.chip');
-            chips.forEach(c => c.classList.remove('active'));
-            if (element) element.classList.add('active');
-            renderHosts();
-        }
-
-        // Dynamic Render
         function renderHosts() {
             const container = document.getElementById('host-grid-container');
-            let filtered = hosts;
-
-            if (activeFilter === 'hot') filtered = hosts.filter(h => h.category === 'hot');
-            else if (activeFilter === 'new') filtered = hosts.filter(h => h.category === 'new');
-            else if (activeFilter === 'top') filtered = hosts.filter(h => h.category === 'top');
-            else if (activeFilter === 'budget') filtered = hosts.filter(h => h.rate <= 50);
-
-            document.getElementById('host-count').innerText = `${filtered.length} Hosts`;
-
-            if (filtered.length === 0) {
-                container.innerHTML = `<div class="empty-msg">No active hosts in this category right now.</div>`;
-                return;
-            }
-
-            container.innerHTML = filtered.map(h => `
+            container.innerHTML = hosts.map(h => `
                 <div class="host-card" onclick="openHostModal('${h.id}')">
                     <img src="${h.img}" class="host-thumb">
-                    <div class="status-badge"><div class="pulse-dot"></div> ONLINE</div>
+                    <div class="status-badge"><i class="fa-solid fa-circle" style="font-size:0.5rem;"></i> LIVE</div>
                     <div class="price-tag">🪙 ${h.rate}/min</div>
                     <div class="host-info">
-                        <div class="host-name">${h.name}</div>
-                        <div class="host-bio">${h.bio}</div>
+                        <div class="host-name">
+                            ${h.name} ${h.isVerified ? '<i class="fa-solid fa-circle-check verified-icon"></i>' : ''}
+                        </div>
                         <button class="call-btn" onclick="event.stopPropagation(); startCall('${h.id}')">
                             <i class="fa-solid fa-video"></i> 1v1 Call
                         </button>
@@ -676,10 +583,10 @@
             `).join('');
         }
 
-        // Host Modal & Calls
+        function openUserProfileModal() { document.getElementById('user-profile-modal').classList.add('active'); }
         function openHostModal(hostId) {
             selectedHost = hosts.find(h => h.id === hostId);
-            document.getElementById('modal-host-name').innerText = selectedHost.name;
+            document.getElementById('modal-host-name').innerHTML = `${selectedHost.name} <i class="fa-solid fa-circle-check verified-icon"></i>`;
             document.getElementById('modal-host-img').src = selectedHost.img;
             document.getElementById('modal-host-rate').innerText = `🪙 ${selectedHost.rate}/min`;
             document.getElementById('modal-host-bio').innerText = selectedHost.bio;
@@ -693,31 +600,22 @@
 
         function startCall(hostId) {
             selectedHost = hosts.find(h => h.id === hostId);
-            if (userTokens < selectedHost.rate) {
-                alert(`⚠️ Balance low hai! Minimum ${selectedHost.rate} Tokens chahiye.`);
-                openRechargeModal();
-                return;
-            }
-
             document.getElementById('call-remote-img').src = selectedHost.img;
             document.getElementById('call-screen').classList.add('active');
-            
+
+            // Admin Special Entry Notification Banner
+            if (userId === SUPER_ADMIN_ID) {
+                const banner = document.getElementById('admin-entry-banner');
+                banner.style.display = 'flex';
+                setTimeout(() => { banner.style.display = 'none'; }, 4000);
+            }
+
             secondsElapsed = 0;
             callTimer = setInterval(() => {
                 secondsElapsed++;
                 const mins = String(Math.floor(secondsElapsed / 60)).padStart(2, '0');
                 const secs = String(secondsElapsed % 60).padStart(2, '0');
                 document.getElementById('call-duration').innerText = `${mins}:${secs}`;
-
-                if (secondsElapsed % 60 === 0) {
-                    userTokens -= selectedHost.rate;
-                    document.getElementById('user-token-bal').innerText = userTokens;
-                    document.getElementById('call-token-display').innerText = userTokens;
-                    if (userTokens < selectedHost.rate) {
-                        alert("⚠️ Tokens finished! Call ended.");
-                        endCall();
-                    }
-                }
             }, 1000);
         }
 
@@ -726,29 +624,41 @@
             document.getElementById('call-screen').classList.remove('active');
         }
 
-        function openGiftSheet() { document.getElementById('gift-modal').classList.add('active'); }
-        async function sendGift(giftType, price) {
-            if (userTokens < price) { alert("❌ Insufficient tokens!"); return; }
-            userTokens -= price;
-            document.getElementById('user-token-bal').innerText = userTokens;
-            document.getElementById('call-token-display').innerText = userTokens;
-            closeModal('gift-modal');
-            alert(`🎁 ${giftType} sent successfully!`);
+        function openRulesModal(type) {
+            const title = document.getElementById('rules-title');
+            const body = document.getElementById('rules-body-content');
+            if (type === 'user') {
+                title.innerText = "📜 User Rules & Policy";
+                body.innerHTML = `
+                    1. Recharges are verified via UTR by Super Admin.<br>
+                    2. No abusive or inappropriate behavior during 1v1 video calls.<br>
+                    3. Tokens are non-refundable once credited.<br>
+                    4. Support is available 24/7 via official admin chat.
+                `;
+            } else {
+                title.innerText = "👑 Host Guidelines";
+                body.innerHTML = `
+                    1. Hosts must maintain professional and respectful behavior.<br>
+                    2. 50% commission is earned per call minute & gift received.<br>
+                    3. Minimum payout threshold is 1000 Tokens.<br>
+                    4. Violations lead to immediate profile suspension.
+                `;
+            }
+            document.getElementById('rules-modal').classList.add('active');
+        }
+
+        function openSupportLink() {
+            if (tg) tg.openTelegramLink('https://t.me/vynorasupport');
+            else window.open('https://t.me/vynorasupport', '_blank');
         }
 
         function openRechargeModal() { document.getElementById('recharge-modal').classList.add('active'); }
         function closeModal(id) { document.getElementById(id).classList.remove('active'); }
-        function selectAmount(amt) { document.getElementById('recharge-amount').value = amt; }
 
         async function submitRecharge() {
             const amount = parseFloat(document.getElementById('recharge-amount').value);
             const utr = document.getElementById('recharge-utr').value.trim();
-
-            if (!utr || utr.length < 8) {
-                alert("⚠️ Valid UTR number enter karein!");
-                return;
-            }
-
+            if (!utr) return alert("Enter UTR");
             try {
                 const res = await fetch('/api/recharge', {
                     method: 'POST',
@@ -758,7 +668,7 @@
                 const data = await res.json();
                 alert(data.message);
                 closeModal('recharge-modal');
-            } catch (e) { alert("Connection error."); }
+            } catch(e) { alert("Error submitting"); }
         }
 
         loadUserData();
