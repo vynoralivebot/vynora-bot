@@ -1,52 +1,67 @@
-import os
-import asyncio
-from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
-from aiogram import Bot, Dispatcher, types
-from aiogram.filters import CommandStart
+import logging
+from aiogram import Bot, Dispatcher, F, types
+from aiogram.filters import Command
+from aiogram.fsm.storage.memory import MemoryStorage
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-WEB_APP_URL = os.getenv("WEB_APP_URL")
+# Bot Token aur Configurations
+TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
+SUPER_ADMIN_ID = 7001825467
+SUPPORT_USERNAME = "@VynoraSupport"
+UPI_ID = "vynoralive@slc"
+ACCOUNT_HOLDER = "Rajnish Kumar"
 
-app = FastAPI()
+# Telegram Group IDs (Yahan apne groups ki ID dalein)
+GROUP_2_REGISTRATION_ID = -100XXXXXXXXXX  # New User Registration Group
+GROUP_1_MAIN_ID = -100XXXXXXXXXX          # Main Command Center / UTR Group
+GROUP_3_AUDIT_ID = -100XXXXXXXXXX         # Verified Payment & Audit Group
 
-# Mount Static Folder (CSS, JS, Images ke liye)
-app.mount("/static", StaticFiles(directory="static"), name="static")
+bot = Bot(token=TOKEN)
+dp = Dispatcher(storage=MemoryStorage())
 
-bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher()
-
-# Bot Start Command Handler
-@dp.message(CommandStart())
-async def start_cmd(message: types.Message):
-    markup = types.InlineKeyboardMarkup(
-        inline_keyboard=[[
-            types.InlineKeyboardButton(text="🚀 Open Vynora App", web_app=types.WebAppInfo(url=WEB_APP_URL))
-        ]]
+@dp.message(Command("start"))
+async def cmd_start(message: types.Message):
+    user = message.from_user
+    
+    # Group 2 me naye user ka registration log bhejna
+    reg_text = (
+        f"👤 **New User Registered!**\n"
+        f"• Name: {user.full_name}\n"
+        f"• Username: @{user.username if user.username else 'None'}\n"
+        f"• User ID: `{user.id}`"
     )
-    await message.answer("Vynora Live me aapka swagat hai!", reply_markup=markup)
+    await bot.send_message(GROUP_2_REGISTRATION_ID, reg_text, parse_mode="Markdown")
+    
+    # User ke liye Welcome Message aur Mini App Button
+    welcome_message = (
+        f"✨ **Welcome to Vynora Live 1v1** ✨\n\n"
+        f"Aap yahan 1-on-1 video calls, private live streams, aur Vynora Token gifting ka anand le sakte hain.\n"
+        f"Kisi bhi sahayata ke liye sampark karein: {SUPPORT_USERNAME}"
+    )
+    
+    keyboard = types.InlineKeyboardMarkup(
+        inline_keyboard=[
+            [types.InlineKeyboardButton(text="🚀 Open Vynora Live App", web_app=types.WebAppInfo(url="YOUR_MINI_APP_URL"))],
+            [types.InlineKeyboardButton(text="💳 Recharge Wallet (UPI)", callback_data="recharge_menu")]
+        ]
+    )
+    
+    await message.answer(welcome_message, reply_markup=keyboard, parse_mode="Markdown")
 
-# Telegram Webhook Endpoint
-@app.post("/webhook")
-async def webhook(request: Request):
-    update = types.Update.model_validate(await request.json(), context={"bot": bot})
-    await dp.feed_update(bot, update)
-    return {"status": "ok"}
+@dp.callback_query(F.data == "recharge_menu")
+async def recharge_menu(callback: types.CallbackQuery):
+    text = (
+        f"💎 **Vynora Recharge Gateway**\n\n"
+        f"• **UPI ID:** `{UPI_ID}`\n"
+        f"• **Name:** {ACCOUNT_HOLDER}\n\n"
+        f"Payment karne ke baad apna UTR number aur screenshot Group 1 me ya bot par bhejein."
+    )
+    await callback.message.edit_text(text, parse_mode="Markdown")
+    await callback.answer()
 
-# Frontend UI Root Endpoint
-@app.get("/")
-async def root():
-    return FileResponse("static/index.html")
-
-# Startup Event for Webhook Setup
-@app.on_event("startup")
-async def on_startup():
-    if WEB_APP_URL:
-        webhook_url = f"{WEB_APP_URL.rstrip('/')}/webhook"
-        await bot.set_webhook(webhook_url)
+async def main():
+    logging.basicConfig(level=logging.INFO)
+    await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    import uvicorn
-    port = int(os.environ.get("PORT", 8080))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    import asyncio
+    asyncio.run(main())
