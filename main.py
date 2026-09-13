@@ -1,4 +1,6 @@
 import os
+import asyncio
+import logging
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -6,14 +8,31 @@ from dotenv import load_dotenv
 from database import hosts_collection, users_collection
 from agora_token_builder import RtcTokenBuilder
 import time
+from aiogram import Bot, Dispatcher, types
+from aiogram.filters import Command
 
 load_dotenv()
 app = FastAPI()
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 AGORA_APP_ID = os.getenv("AGORA_APP_ID")
 AGORA_APP_CERTIFICATE = os.getenv("AGORA_APP_CERTIFICATE")
+
+bot = Bot(token=BOT_TOKEN) if BOT_TOKEN else None
+dp = Dispatcher()
+
+if bot:
+    @dp.message(Command("start"))
+    async def cmd_start(message: types.Message):
+        await message.answer("Welcome to Vynora Live! Open the Mini App to explore hosts.")
+
+@app.on_event("startup")
+async def startup_event():
+    if bot:
+        asyncio.create_task(dp.start_polling(bot))
+        print("Telegram bot started successfully in background.")
 
 @app.get("/api/hosts")
 async def get_hosts():
