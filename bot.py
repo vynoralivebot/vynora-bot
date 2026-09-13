@@ -7,8 +7,13 @@ from dotenv import load_dotenv
 load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
 
+# Debugging ke liye token check print
+if TOKEN:
+    print(f"DEBUG: Token successfully loaded (Length: {len(TOKEN)})")
+else:
+    print("CRITICAL ERROR: BOT_TOKEN is missing or empty in Render environment!")
+
 if not TOKEN:
-    print("CRITICAL ERROR: BOT_TOKEN environment variable is missing!")
     exit(1)
 
 bot = Bot(token=TOKEN)
