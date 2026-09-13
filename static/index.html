@@ -31,9 +31,9 @@
         .brand-logo { font-weight: 800; font-size: 1.15rem; background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .header-right { display: flex; align-items: center; gap: 10px; }
         .wallet-badge { display: flex; align-items: center; gap: 6px; background: rgba(255, 215, 0, 0.12); border: 1px solid rgba(255, 215, 0, 0.3); padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 700; color: var(--gold); cursor: pointer; }
-        .profile-btn { width: 34px; height: 34px; border-radius: 50%; background: var(--primary-gradient); border: 2px solid var(--card-border); display: flex; align-items: center; justify-content: center; font-weight: 700; cursor: pointer; color: white; }
+        .profile-btn { width: 34px; height: 34px; border-radius: 50%; background: var(--primary-gradient); border: 2px solid var(--card-border); display: flex; align-items: center; justify-content: center; font-weight: 700; cursor: pointer; color: white; overflow: hidden; }
+        .profile-btn img { width: 100%; height: 100%; object-fit: cover; }
 
-        /* VYNORA LUXURY PROMO BANNER */
         .promo-banner {
             margin: 12px 16px; background: var(--banner-pink); border-radius: 16px; padding: 16px;
             display: flex; justify-content: space-between; align-items: center; color: white; box-shadow: 0 4px 15px rgba(255, 0, 122, 0.4);
@@ -55,21 +55,17 @@
 
         .call-btn { width: 100%; background: var(--primary-gradient); border: none; color: white; padding: 8px; border-radius: 10px; font-weight: 700; font-size: 0.82rem; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; }
 
-        /* SHALU PROFILE VIEW (MATCHING SCREENSHOT WITH EARNINGS) */
+        /* PROFILE VIEW (CLEAN SHALU STYLE WITHOUT FOLLOWERS) */
         .profile-container { display: none; padding: 16px; }
         .profile-container.active { display: block; }
 
-        .profile-header-card { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
-        .profile-avatar-wrapper { position: relative; }
-        .profile-avatar-img { width: 70px; height: 70px; border-radius: 50%; object-fit: cover; border: 2px solid #FF007A; }
-        .cam-edit-icon { position: absolute; bottom: 0; right: 0; background: #FF007A; color: white; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; }
+        .profile-header-card { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+        .profile-avatar-wrapper { position: relative; width: 75px; height: 75px; border-radius: 50%; overflow: hidden; border: 2px solid #FF007A; }
+        .profile-avatar-img { width: 100%; height: 100%; object-fit: cover; }
+        .cam-edit-icon { position: absolute; bottom: 0; right: 0; background: #FF007A; color: white; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; cursor: pointer; }
 
         .user-meta h2 { font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 6px; }
         .user-id-text { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; }
-
-        .stats-banner { display: grid; grid-template-columns: repeat(3, 1fr); text-align: center; background: rgba(255,255,255,0.04); border: 1px solid var(--card-border); padding: 12px; border-radius: 16px; margin-bottom: 16px; }
-        .stat-num { font-size: 1.05rem; font-weight: 800; }
-        .stat-sub { font-size: 0.7rem; color: var(--text-muted); }
 
         .wallet-banner-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
         .wallet-box { background: rgba(255,255,255,0.04); border: 1px solid var(--card-border); padding: 12px; border-radius: 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
@@ -115,7 +111,7 @@
                 <i class="fa-solid fa-plus-circle" style="color:#FF007A;"></i>
             </div>
             <div class="profile-btn" onclick="switchTab('profile')">
-                <span id="header-user-initial">U</span>
+                <img id="header-avatar-img" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop">
             </div>
         </div>
     </header>
@@ -138,8 +134,8 @@
     <div class="profile-container" id="profile-tab-view">
         <div class="profile-header-card">
             <div class="profile-avatar-wrapper">
-                <img id="user-profile-img" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop" class="profile-avatar-img">
-                <div class="cam-edit-icon"><i class="fa-solid fa-camera"></i></div>
+                <img id="profile-avatar-img" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop" class="profile-avatar-img">
+                <div class="cam-edit-icon" onclick="promptPhotoUpdate()"><i class="fa-solid fa-camera"></i></div>
             </div>
             <div class="user-meta">
                 <h2 id="profile-user-name">User</h2>
@@ -147,19 +143,13 @@
             </div>
         </div>
 
-        <div class="stats-banner">
-            <div><div class="stat-num">56.1K</div><div class="stat-sub">Followers</div></div>
-            <div><div class="stat-num">39</div><div class="stat-sub">Following</div></div>
-            <div><div class="stat-num">12</div><div class="stat-sub">Friends</div></div>
-        </div>
-
         <div class="wallet-banner-row">
             <div class="wallet-box" onclick="openRechargeModal()">
-                <div><div style="font-size:0.75rem; color:var(--text-muted);">Tokens</div><b style="color:var(--gold);">🪙 <span id="profile-tokens-count">0</span></b></div>
+                <div><div style="font-size:0.75rem; color:var(--text-muted);">Tokens Balance</div><b style="color:var(--gold);">🪙 <span id="profile-tokens-count">0</span></b></div>
                 <i class="fa-solid fa-chevron-right" style="font-size:0.8rem; color:var(--text-muted);"></i>
             </div>
             <div class="wallet-box">
-                <div><div style="font-size:0.75rem; color:var(--text-muted);">Earnings</div><b style="color:var(--accent-cyan);">💰 <span id="profile-earnings-count">0</span></b></div>
+                <div><div style="font-size:0.75rem; color:var(--text-muted);">Total Earnings</div><b style="color:var(--accent-cyan);">💰 <span id="profile-earnings-count">0</span></b></div>
                 <i class="fa-solid fa-chevron-right" style="font-size:0.8rem; color:var(--text-muted);"></i>
             </div>
         </div>
@@ -190,7 +180,7 @@
         <div class="nav-item" id="nav-profile" onclick="switchTab('profile')"><i class="fa-solid fa-user"></i><span>Profile</span></div>
     </nav>
 
-    <!-- FULL HOST DRAWER (OPENING WHEN USER TAP ON HOST CARD) -->
+    <!-- FULL HOST PROFILE & BOOKING DRAWER -->
     <div class="modal-overlay" id="host-booking-modal">
         <div class="modal-card">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
@@ -198,10 +188,16 @@
                 <button style="background:none; border:none; color:white; font-size:1.2rem;" onclick="closeModal('host-booking-modal')">✕</button>
             </div>
 
-            <img id="drawer-host-img" src="" style="width:100%; height:200px; object-fit:cover; border-radius:16px; margin-bottom:12px;">
+            <img id="drawer-host-img" src="" style="width:100%; height:220px; object-fit:cover; border-radius:16px; margin-bottom:12px;">
 
-            <div id="private-gift-banner" style="display:none; background:rgba(255,0,122,0.15); border:1px solid #FF007A; padding:10px; border-radius:12px; margin-bottom:12px; text-align:center;">
-                🔒 <b>Private Live Stream:</b> Send <span id="gift-req-num" style="color:var(--gold);">100</span> Tokens Gift to unlock public stream!
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <div>
+                    <h4 id="drawer-name-title" style="font-size:1.05rem;">Host Name</h4>
+                    <p id="drawer-bio" style="font-size:0.78rem; color:var(--text-muted); margin-top:2px;"></p>
+                </div>
+                <div style="background:rgba(255,215,0,0.1); border:1px solid rgba(255,215,0,0.3); padding:4px 10px; border-radius:12px; color:var(--gold); font-size:0.8rem; font-weight:700;">
+                    🪙 <span id="drawer-rate">50</span>/min
+                </div>
             </div>
 
             <div class="booking-option-card">
@@ -254,7 +250,7 @@
     <div class="modal-overlay" id="host-reg-modal">
         <div class="modal-card">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-                <h3>📹 Host Creator Center</h3>
+                <h3>📹 Creator Center / Host Registration</h3>
                 <button style="background:none; border:none; color:white;" onclick="closeModal('host-reg-modal')">✕</button>
             </div>
 
@@ -275,23 +271,32 @@
         const tg = window.Telegram?.WebApp;
         if (tg) tg.expand();
 
-        const SUPER_ADMIN_ID = 7001825467;
-        const userId = tg?.initDataUnsafe?.user?.id || SUPER_ADMIN_ID;
-        const userName = tg?.initDataUnsafe?.user?.first_name || "Priya";
+        const userId = tg?.initDataUnsafe?.user?.id || 7001825467;
+        const userName = tg?.initDataUnsafe?.user?.first_name || "Shalu";
+        const telegramPhoto = tg?.initDataUnsafe?.user?.photo_url || "";
         
         let userTokens = 0;
         let selectedAmount = 100;
         let selectedHostObj = null;
 
-        const defaultHosts = [
-            { id: "h1", name: "Anu ❤️", rate: 50, isVerified: true, img: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop" },
-            { id: "h2", name: "Neha Thakur", rate: 60, isVerified: true, img: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=600&auto=format&fit=crop" }
+        // Expanded Dummy Hosts List
+        const dummyHosts = [
+            { id: "h1", name: "Anu ❤️", rate: 50, bio: "Friendly 1v1 chats & music lovers 💖", img: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop" },
+            { id: "h2", name: "Neha Thakur", rate: 60, bio: "Late night casual talks ✨", img: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=600&auto=format&fit=crop" },
+            { id: "h3", name: "Priya Roy", rate: 40, bio: "Available for private video calls 🚀", img: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=600&auto=format&fit=crop" },
+            { id: "h4", name: "Sophia Rose", rate: 80, bio: "High quality 1v1 experience 👑", img: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=600&auto=format&fit=crop" },
+            { id: "h5", name: "Kavya Sharma", rate: 55, bio: "Let's talk and vibe together 🎶", img: "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=600&auto=format&fit=crop" }
         ];
 
         async function initData() {
-            document.getElementById('profile-user-name').innerText = `@${userName.toLowerCase()}_vynora 👑`;
+            document.getElementById('profile-user-name').innerText = `${userName} 👑`;
             document.getElementById('profile-user-id').innerText = userId;
-            document.getElementById('header-user-initial').innerText = userName.charAt(0).toUpperCase();
+
+            // Load Telegram Profile Photo if available
+            if (telegramPhoto) {
+                document.getElementById('profile-avatar-img').src = telegramPhoto;
+                document.getElementById('header-avatar-img').src = telegramPhoto;
+            }
 
             try {
                 const res = await fetch(`/api/user/${userId}`);
@@ -308,20 +313,20 @@
             try {
                 const res = await fetch('/api/hosts');
                 const data = await res.json();
-                renderHosts(data.hosts && data.hosts.length > 0 ? data.hosts : defaultHosts);
-            } catch(e) { renderHosts(defaultHosts); }
+                const combined = [...(data.hosts || []), ...dummyHosts];
+                renderHosts(combined);
+            } catch(e) { renderHosts(dummyHosts); }
         }
 
         function renderHosts(list) {
             const container = document.getElementById('hosts-container');
             container.innerHTML = list.map(h => `
-                <div class="host-card" onclick="openBookingDrawer('${h.id}', '${h.name}', '${h.img}', ${h.isPrivate}, ${h.entryGiftCost || 0})">
+                <div class="host-card" onclick="openBookingDrawer('${h.id}', '${h.name}', '${h.img}', '${h.bio || 'Online 1v1 Streamer'}', ${h.rate || 50}, ${!!h.isVerified})">
                     <img src="${h.img}" class="host-thumb">
                     <div class="badge-live">LIVE</div>
-                    ${h.isPrivate ? '<div class="badge-private">🔒 Private</div>' : ''}
                     <div class="host-info">
                         <div class="host-name">
-                            ${h.name} ${h.isVerified ? '<i class="fa-solid fa-circle-check" style="color:#00B2FF;"></i>' : ''}
+                            ${h.name} ${h.isVerified ? '<i class="fa-solid fa-circle-check" style="color:#00B2FF;"></i>' : '<i class="fa-solid fa-circle-check" style="color:#00B2FF;"></i>'}
                         </div>
                         <button class="call-btn"><i class="fa-solid fa-calendar-check"></i> Book Slot</button>
                     </div>
@@ -342,20 +347,24 @@
             }
         }
 
-        function openBookingDrawer(id, name, img, isPrivate, giftCost) {
+        function openBookingDrawer(id, name, img, bio, rate, isVerified) {
             selectedHostObj = { id, name };
-            document.getElementById('bk-host-name').innerText = `${name} Profile & Slot Booking`;
+            document.getElementById('bk-host-name').innerText = `${name} Profile`;
             document.getElementById('drawer-host-img').src = img;
-
-            const pBanner = document.getElementById('private-gift-banner');
-            if (isPrivate) {
-                pBanner.style.display = 'block';
-                document.getElementById('gift-req-num').innerText = giftCost || 100;
-            } else {
-                pBanner.style.display = 'none';
-            }
+            document.getElementById('drawer-name-title').innerHTML = `${name} ${isVerified ? '<i class="fa-solid fa-circle-check" style="color:#00B2FF;"></i>' : ''}`;
+            document.getElementById('drawer-bio').innerText = bio;
+            document.getElementById('drawer-rate').innerText = rate;
 
             document.getElementById('host-booking-modal').classList.add('active');
+        }
+
+        function promptPhotoUpdate() {
+            const newUrl = prompt("Enter new Profile Photo Direct URL:");
+            if (newUrl && newUrl.startsWith('http')) {
+                document.getElementById('profile-avatar-img').src = newUrl;
+                document.getElementById('header-avatar-img').src = newUrl;
+                alert("Profile photo updated successfully!");
+            }
         }
 
         async function confirmBooking(mins, cost) {
