@@ -12,289 +12,168 @@
             --card-bg: rgba(255, 255, 255, 0.05);
             --card-border: rgba(255, 255, 255, 0.1);
             --primary-gradient: linear-gradient(135deg, #FF007A 0%, #7928CA 100%);
-            --secondary-gradient: linear-gradient(135deg, #FF9900 0%, #FF5500 100%);
+            --banner-orange: linear-gradient(135deg, #FF9900 0%, #FF3300 100%);
             --accent-cyan: #00F5D4;
             --text-main: #FFFFFF;
             --text-muted: #A1A1AA;
             --gold: #FFD700;
         }
 
-        * {
-            box-sizing: border-box;
-            margin: 0; padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        body {
-            background-color: var(--bg-dark);
-            color: var(--text-main);
-            min-height: 100vh;
-            padding-bottom: 75px;
-            overflow-x: hidden;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        body { background-color: var(--bg-dark); color: var(--text-main); min-height: 100vh; padding-bottom: 75px; }
 
         .app-header {
-            position: sticky; top: 0; z-index: 100;
-            background: rgba(10, 7, 20, 0.9);
-            backdrop-filter: blur(12px);
-            padding: 12px 16px;
-            display: flex; justify-content: space-between; align-items: center;
+            position: sticky; top: 0; z-index: 100; background: rgba(10, 7, 20, 0.9);
+            backdrop-filter: blur(12px); padding: 12px 16px; display: flex; justify-content: space-between; align-items: center;
             border-bottom: 1px solid var(--card-border);
         }
 
-        .brand-logo {
-            font-weight: 800; font-size: 1.15rem;
-            background: var(--primary-gradient);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+        .brand-logo { font-weight: 800; font-size: 1.15rem; background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .wallet-badge { display: flex; align-items: center; gap: 6px; background: rgba(255, 215, 0, 0.12); border: 1px solid rgba(255, 215, 0, 0.3); padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 700; color: var(--gold); }
+
+        /* STREAM PROMO BANNER (EXACT AS SCREENSHOT) */
+        .promo-banner {
+            margin: 12px 16px; background: var(--banner-orange); border-radius: 16px; padding: 16px;
+            display: flex; justify-content: space-between; align-items: center; color: white; box-shadow: 0 4px 15px rgba(255, 102, 0, 0.4);
         }
+        .promo-banner h3 { font-size: 1.1rem; font-weight: 800; margin-bottom: 4px; }
+        .promo-banner p { font-size: 0.75rem; opacity: 0.9; }
+        .get-btn { background: white; color: #FF3300; font-weight: 800; border: none; padding: 6px 14px; border-radius: 14px; font-size: 0.8rem; cursor: pointer; }
 
-        .wallet-badge {
-            display: flex; align-items: center; gap: 6px;
-            background: rgba(255, 215, 0, 0.12);
-            border: 1px solid rgba(255, 215, 0, 0.3);
-            padding: 5px 12px; border-radius: 20px;
-            font-size: 0.85rem; font-weight: 700; color: var(--gold);
-        }
+        .section-header { padding: 12px 16px 8px 16px; font-size: 0.9rem; font-weight: 700; display: flex; align-items: center; gap: 6px; }
 
-        .section-header {
-            padding: 12px 16px 8px 16px; font-size: 0.9rem; font-weight: 700;
-            display: flex; align-items: center; gap: 6px;
-        }
+        .host-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; padding: 0 16px; }
+        .host-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 16px; overflow: hidden; position: relative; cursor: pointer; }
+        .host-thumb { width: 100%; height: 185px; object-fit: cover; }
 
-        .host-grid {
-            display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; padding: 0 16px;
-        }
-
-        .host-card {
-            background: var(--card-bg); border: 1px solid var(--card-border);
-            border-radius: 16px; overflow: hidden; position: relative; cursor: pointer;
-        }
-
-        .host-thumb { width: 100%; height: 180px; object-fit: cover; }
-
-        .badge-live {
-            position: absolute; top: 8px; left: 8px;
-            background: rgba(0, 0, 0, 0.65); padding: 3px 8px; border-radius: 12px;
-            font-size: 0.65rem; color: var(--accent-cyan); display: flex; align-items: center; gap: 4px;
-        }
-
-        .badge-rate {
-            position: absolute; top: 8px; right: 8px;
-            background: rgba(0, 0, 0, 0.65); padding: 3px 8px; border-radius: 12px;
-            font-size: 0.7rem; color: var(--gold); font-weight: 700;
-        }
-
+        .badge-live { position: absolute; top: 8px; left: 8px; background: rgba(0, 0, 0, 0.65); padding: 3px 8px; border-radius: 12px; font-size: 0.65rem; color: var(--accent-cyan); }
+        .badge-private { position: absolute; top: 8px; right: 8px; background: rgba(255, 0, 122, 0.8); padding: 3px 8px; border-radius: 12px; font-size: 0.65rem; color: white; font-weight: 700; }
         .host-info { padding: 10px; background: linear-gradient(180deg, rgba(10,7,20,0) 0%, rgba(10,7,20,0.95) 100%); margin-top: -45px; position: relative; }
         .host-name { font-size: 0.88rem; font-weight: 700; margin-bottom: 4px; }
 
-        .call-btn {
-            width: 100%; background: var(--primary-gradient); border: none; color: white;
-            padding: 8px; border-radius: 10px; font-weight: 700; font-size: 0.82rem;
-            display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer;
-        }
+        .call-btn { width: 100%; background: var(--primary-gradient); border: none; color: white; padding: 8px; border-radius: 10px; font-weight: 700; font-size: 0.82rem; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; }
 
-        .profile-container { display: none; padding: 16px; }
-        .profile-container.active { display: block; }
+        /* RECHARGE PLANS GRID */
+        .plan-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 12px 0; }
+        .plan-card { background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); padding: 10px 6px; border-radius: 12px; text-align: center; cursor: pointer; }
+        .plan-card.active { border-color: #FF007A; background: rgba(255,0,122,0.15); }
+        .plan-amount { font-weight: 800; font-size: 1rem; color: white; }
+        .plan-tokens { font-size: 0.75rem; color: var(--gold); }
 
-        .profile-header-card { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
-        .profile-avatar-wrapper { position: relative; }
-        .profile-avatar-img { width: 70px; height: 70px; border-radius: 50%; object-fit: cover; border: 2px solid #FF007A; }
-        .cam-edit-icon { position: absolute; bottom: 0; right: 0; background: #FF007A; color: white; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; }
+        /* QR CODE DISPLAY */
+        .qr-box { text-align: center; background: white; padding: 10px; border-radius: 12px; margin: 12px 0; }
+        .qr-box img { width: 140px; height: 140px; }
 
-        .user-meta h2 { font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 6px; }
-        .user-id-text { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; }
+        /* SLOT BOOKING CONTAINER */
+        .booking-option-card { background: rgba(255,255,255,0.04); border: 1px solid var(--card-border); padding: 12px; border-radius: 14px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
 
-        .stats-banner {
-            display: grid; grid-template-columns: repeat(3, 1fr); text-align: center;
-            background: rgba(255,255,255,0.04); border: 1px solid var(--card-border);
-            padding: 12px; border-radius: 16px; margin-bottom: 16px;
-        }
-
-        .stat-num { font-size: 1.05rem; font-weight: 800; }
-        .stat-sub { font-size: 0.7rem; color: var(--text-muted); }
-
-        .wallet-banner-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
-        .wallet-box { background: rgba(255,255,255,0.04); border: 1px solid var(--card-border); padding: 12px; border-radius: 14px; display: flex; justify-content: space-between; align-items: center; }
-
-        .action-icon-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; text-align: center; margin-bottom: 20px; }
-        .icon-card { background: rgba(255,255,255,0.04); border: 1px solid var(--card-border); padding: 12px 6px; border-radius: 14px; cursor: pointer; }
-        .icon-card i { font-size: 1.4rem; margin-bottom: 6px; }
-        .icon-card p { font-size: 0.72rem; color: var(--text-muted); }
-
-        .posts-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-        .post-img { width: 100%; height: 120px; border-radius: 12px; object-fit: cover; }
-
-        .bottom-nav {
-            position: fixed; bottom: 0; left: 0; right: 0; height: 60px;
-            background: rgba(10, 7, 20, 0.95); backdrop-filter: blur(16px);
-            border-top: 1px solid var(--card-border);
-            display: flex; justify-content: space-around; align-items: center; z-index: 150;
-        }
-
+        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background: rgba(10, 7, 20, 0.95); backdrop-filter: blur(16px); border-top: 1px solid var(--card-border); display: flex; justify-content: space-around; align-items: center; z-index: 150; }
         .nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--text-muted); font-size: 0.7rem; cursor: pointer; }
         .nav-item.active { color: #FF007A; font-weight: 700; }
         .nav-item i { font-size: 1.1rem; }
 
-        .modal-overlay {
-            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(10px);
-            z-index: 200; display: none; justify-content: center; align-items: flex-end;
-        }
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(10px); z-index: 200; display: none; justify-content: center; align-items: flex-end; }
         .modal-overlay.active { display: flex; }
-
-        .modal-card {
-            background: #130E26; border-top: 1px solid var(--card-border);
-            border-radius: 24px 24px 0 0; width: 100%; max-width: 480px; padding: 20px;
-            max-height: 88vh; overflow-y: auto;
-        }
-
-        .input-box {
-            width: 100%; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--card-border);
-            padding: 12px; border-radius: 12px; color: white; margin-bottom: 10px; outline: none;
-        }
-
-        .call-screen {
-            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-            background: #000; z-index: 300; display: none; flex-direction: column; justify-content: space-between;
-        }
-        .call-screen.active { display: flex; }
-        .remote-video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
-        .local-video { position: absolute; top: 60px; right: 16px; width: 110px; height: 160px; border-radius: 16px; border: 2px solid rgba(255,255,255,0.3); object-fit: cover; z-index: 310; }
-        .call-top { position: relative; z-index: 320; padding: 16px; display: flex; justify-content: space-between; }
-        .call-bottom { position: relative; z-index: 320; padding: 24px; display: flex; justify-content: space-around; align-items: center; background: linear-gradient(0deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%); }
-        .ctrl-btn { width: 52px; height: 52px; border-radius: 50%; border: none; background: rgba(255, 255, 255, 0.2); color: white; font-size: 1.2rem; cursor: pointer; }
-        .ctrl-btn.end { background: #FF0055; width: 64px; height: 64px; }
+        .modal-card { background: #130E26; border-top: 1px solid var(--card-border); border-radius: 24px 24px 0 0; width: 100%; max-width: 480px; padding: 20px; max-height: 88vh; overflow-y: auto; }
+        .input-box { width: 100%; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--card-border); padding: 12px; border-radius: 12px; color: white; margin-bottom: 10px; outline: none; }
     </style>
 </head>
 <body>
 
     <header class="app-header">
         <div class="brand-logo"><i class="fa-solid fa-bolt" style="color:#FF007A;"></i> Vynora Live</div>
-        <div class="wallet-badge">
+        <div class="wallet-badge" onclick="openRechargeModal()">
             <span>🪙 <span id="user-token-bal">0</span></span>
-            <i class="fa-solid fa-plus-circle" onclick="openRechargeModal()" style="cursor:pointer; color:#FF007A;"></i>
+            <i class="fa-solid fa-plus-circle" style="color:#FF007A;"></i>
         </div>
     </header>
 
-    <div id="home-tab-view">
-        <div class="section-header"><i class="fa-solid fa-star" style="color:#FFD700;"></i> 🌟 Verified Real Hosts</div>
-        <div class="host-grid" id="real-hosts-container"></div>
-
-        <div class="section-header"><i class="fa-solid fa-fire" style="color:#FF007A;"></i> 🔥 Popular Online Hosts</div>
-        <div class="host-grid" id="dummy-hosts-container"></div>
+    <!-- PROMO BANNER (MATCHING SCREENSHOT) -->
+    <div class="promo-banner">
+        <div>
+            <h3>Earn Up to 30% Commission</h3>
+            <p>Become an official host & get paid weekly!</p>
+        </div>
+        <button class="get-btn" onclick="openHostRegistrationModal()">Get Started ></button>
     </div>
 
-    <div class="profile-container" id="profile-tab-view">
-        <div class="profile-header-card">
-            <div class="profile-avatar-wrapper">
-                <img id="user-profile-img" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop" class="profile-avatar-img">
-                <div class="cam-edit-icon"><i class="fa-solid fa-camera"></i></div>
-            </div>
-            <div class="user-meta">
-                <h2 id="profile-user-name">Shalu 👑</h2>
-                <div class="user-id-text">ID: <span id="profile-user-id">98979133</span> • 🇮🇳 India</div>
-            </div>
-        </div>
+    <!-- HOST LISTING GRID -->
+    <div class="section-header"><i class="fa-solid fa-video" style="color:#FF007A;"></i> 1v1 Booking Hosts</div>
+    <div class="host-grid" id="hosts-container"></div>
 
-        <div class="stats-banner">
-            <div><div class="stat-num">56.1K</div><div class="stat-sub">Followers</div></div>
-            <div><div class="stat-num">39</div><div class="stat-sub">Following</div></div>
-            <div><div class="stat-num">12</div><div class="stat-sub">Friends</div></div>
-        </div>
-
-        <div class="wallet-banner-row">
-            <div class="wallet-box" onclick="openRechargeModal()">
-                <div><div style="font-size:0.75rem; color:var(--text-muted);">Tokens</div><b style="color:var(--gold);">🪙 <span id="profile-tokens-count">0</span></b></div>
-                <i class="fa-solid fa-chevron-right" style="font-size:0.8rem; color:var(--text-muted);"></i>
+    <!-- RECHARGE MODAL WITH QR & SELECTABLE PLANS -->
+    <div class="modal-overlay" id="recharge-modal">
+        <div class="modal-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h3>💳 Select Recharge Plan</h3>
+                <button style="background:none; border:none; color:white; font-size:1.2rem;" onclick="closeModal('recharge-modal')">✕</button>
             </div>
-            <div class="wallet-box">
-                <div><div style="font-size:0.75rem; color:var(--text-muted);">Credits</div><b style="color:var(--accent-cyan);">💰 <span id="profile-credits-count">198</span></b></div>
-                <i class="fa-solid fa-chevron-right" style="font-size:0.8rem; color:var(--text-muted);"></i>
-            </div>
-        </div>
 
-        <div class="action-icon-grid">
-            <div class="icon-card" onclick="openHostRegistrationModal()">
-                <i class="fa-solid fa-video" style="color:#FF007A;"></i>
-                <p id="creator-btn-text">Creator Center</p>
+            <div class="plan-grid">
+                <div class="plan-card active" onclick="selectPlan(100, this)"><div class="plan-amount">₹100</div><div class="plan-tokens">100 Tokens</div></div>
+                <div class="plan-card" onclick="selectPlan(200, this)"><div class="plan-amount">₹200</div><div class="plan-tokens">200 Tokens</div></div>
+                <div class="plan-card" onclick="selectPlan(300, this)"><div class="plan-amount">₹300</div><div class="plan-tokens">320 Tokens</div></div>
+                <div class="plan-card" onclick="selectPlan(400, this)"><div class="plan-amount">₹400</div><div class="plan-tokens">430 Tokens</div></div>
+                <div class="plan-card" onclick="selectPlan(500, this)"><div class="plan-amount">₹500</div><div class="plan-tokens">550 Tokens</div></div>
+                <div class="plan-card" onclick="selectPlan(1000, this)"><div class="plan-amount">₹1000</div><div class="plan-tokens">1150 Tokens</div></div>
+                <div class="plan-card" onclick="selectPlan(1500, this)"><div class="plan-amount">₹1500</div><div class="plan-tokens">1800 Tokens</div></div>
             </div>
-            <div class="icon-card"><i class="fa-solid fa-gift" style="color:var(--secondary-gradient);"></i><p>Bonus</p></div>
-            <div class="icon-card"><i class="fa-solid fa-id-card" style="color:var(--accent-cyan);"></i><p>Passcard</p></div>
-            <div class="icon-card"><i class="fa-solid fa-crown" style="color:var(--gold);"></i><p>Level</p></div>
-        </div>
 
-        <div style="font-size:0.9rem; font-weight:700; margin-bottom:10px;">Post Photos</div>
-        <div class="posts-grid">
-            <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop" class="post-img">
-            <img src="https://images.unsplash.com/photo-1517841905240-472988babdf9?w=300&auto=format&fit=crop" class="post-img">
-            <img src="https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=300&auto=format&fit=crop" class="post-img">
+            <!-- UPI QR DISPLAY -->
+            <div class="qr-box">
+                <p style="font-size:0.75rem; color:#333; font-weight:700; margin-bottom:4px;">Scan QR Code to Pay via UPI</p>
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=vynoralive@slc&pn=RajnishKumar" id="upi-qr-img">
+                <p style="font-size:0.75rem; color:#666; margin-top:4px;">UPI ID: <b>vynoralive@slc</b></p>
+            </div>
+
+            <input type="text" id="recharge-utr" class="input-box" placeholder="Enter 12-Digit UTR / Ref Number">
+            <button class="call-btn" style="padding:12px;" onclick="submitRecharge()">🚀 Submit UTR For Approval</button>
         </div>
     </div>
 
-    <nav class="bottom-nav">
-        <div class="nav-item active" id="nav-home" onclick="switchTab('home')"><i class="fa-solid fa-house"></i><span>Home</span></div>
-        <div class="nav-item" onclick="openRechargeModal()"><i class="fa-solid fa-wallet"></i><span>Recharge</span></div>
-        <div class="nav-item" onclick="openSupportLink()"><i class="fa-solid fa-headset"></i><span>Support</span></div>
-        <div class="nav-item" id="nav-profile" onclick="switchTab('profile')"><i class="fa-solid fa-user"></i><span>Profile</span></div>
-    </nav>
+    <!-- HOST BOOKING DETAIL DRAWER -->
+    <div class="modal-overlay" id="host-booking-modal">
+        <div class="modal-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h3 id="bk-host-name">Host Slot Booking</h3>
+                <button style="background:none; border:none; color:white;" onclick="closeModal('host-booking-modal')">✕</button>
+            </div>
 
+            <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:12px;">Select booking duration slot for private 1v1 video call:</p>
+
+            <div class="booking-option-card">
+                <div><b>⚡ 1 Min Direct Trial</b><p style="font-size:0.72rem; color:var(--text-muted);">First time trial call</p></div>
+                <button class="call-btn" style="width:auto; padding:8px 14px;" onclick="confirmBooking(1, 50)">🪙 50 Tokens</button>
+            </div>
+
+            <div class="booking-option-card">
+                <div><b>⏱️ 5 Mins Booking</b><p style="font-size:0.72rem; color:var(--text-muted);">Private 1v1 slot</p></div>
+                <button class="call-btn" style="width:auto; padding:8px 14px; background:var(--banner-orange);" onclick="confirmBooking(5, 300)">🪙 300 Tokens</button>
+            </div>
+
+            <div class="booking-option-card">
+                <div><b>👑 10 Mins VIP Booking</b><p style="font-size:0.72rem; color:var(--text-muted);">Dedicated extended call</p></div>
+                <button class="call-btn" style="width:auto; padding:8px 14px;" onclick="confirmBooking(10, 500)">🪙 500 Tokens</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- HOST REGISTRATION & PRIVATE LIVE CONTROL MODAL -->
     <div class="modal-overlay" id="host-reg-modal">
         <div class="modal-card">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-                <h3 id="host-modal-title">📹 Host Registration</h3>
-                <button style="background:none; border:none; color:white; font-size:1.2rem;" onclick="closeModal('host-reg-modal')">✕</button>
+                <h3>📹 Host Dashboard</h3>
+                <button style="background:none; border:none; color:white;" onclick="closeModal('host-reg-modal')">✕</button>
             </div>
 
-            <div id="host-form-container">
-                <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:12px;">Fill details to register as an Official Host. Admin will verify your profile.</p>
-                <input type="text" id="host-name-input" class="input-box" placeholder="Your Full Name">
-                <input type="number" id="host-age-input" class="input-box" placeholder="Age (e.g. 22)">
-                <input type="number" id="host-rate-input" class="input-box" placeholder="Call Rate (Tokens/min, e.g. 50)">
-                <input type="text" id="host-lang-input" class="input-box" placeholder="Languages (e.g. Hindi, English)">
-                <input type="text" id="host-loc-input" class="input-box" placeholder="Location (e.g. Mumbai 🇮🇳)">
-                <input type="text" id="host-img-input" class="input-box" placeholder="Profile Photo Direct URL">
-                <input type="text" id="host-bio-input" class="input-box" placeholder="Short Bio / Description">
-                <button class="call-btn" style="padding:12px;" onclick="submitHostRegistration()">🚀 Submit For Admin Approval</button>
+            <div id="host-approved-sec" style="text-align:center;">
+                <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:12px;">Set your live stream visibility & gift requirement:</p>
+                <div style="margin-bottom:12px;">
+                    <label style="font-size:0.85rem;"><input type="checkbox" id="private-live-check"> Enable Private Live Mode 🔒</label>
+                </div>
+                <input type="number" id="gift-cost-input" class="input-box" placeholder="Entry Gift Token Cost (e.g. 100 Tokens)">
+                <button class="call-btn" style="padding:12px;" onclick="toggleHostLiveStatus()">📹 Update Live Status</button>
             </div>
-
-            <div id="host-pending-container" style="display:none; text-align:center; padding:20px 0;">
-                <i class="fa-solid fa-clock" style="font-size:3rem; color:var(--gold); margin-bottom:12px;"></i>
-                <h3>Application Under Review ⏳</h3>
-                <p style="font-size:0.85rem; color:var(--text-muted); margin-top:6px;">Your registration card has been sent to Super Admin in Group 1. You will be notified once approved!</p>
-            </div>
-
-            <div id="host-approved-container" style="display:none; text-align:center; padding:10px 0;">
-                <i class="fa-solid fa-circle-check" style="font-size:3rem; color:var(--accent-cyan); margin-bottom:8px;"></i>
-                <h3>Verified Host Account ☑️</h3>
-                <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:16px;">Toggle your Live status below to appear in the Mini App online list!</p>
-                <button id="toggle-live-btn" class="call-btn" style="padding:14px; background:var(--secondary-gradient);" onclick="toggleHostLiveStatus()">📹 Go Live (Camera ON)</button>
-            </div>
-        </div>
-    </div>
-
-    <div class="modal-overlay" id="recharge-modal">
-        <div class="modal-card">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-                <h3>💳 Recharge Tokens</h3>
-                <button style="background:none; border:none; color:white;" onclick="closeModal('recharge-modal')">✕</button>
-            </div>
-            <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:12px;">UPI: <b style="color:#FF007A;">vynoralive@slc</b> (Slice)</p>
-            <input type="number" id="recharge-amount" class="input-box" value="100">
-            <input type="text" id="recharge-utr" class="input-box" placeholder="12-Digit UTR Number">
-            <button class="call-btn" style="padding:12px;" onclick="submitRecharge()">Submit UTR</button>
-        </div>
-    </div>
-
-    <div class="call-screen" id="call-screen">
-        <img src="" class="remote-video" id="call-remote-img">
-        <img src="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=300&auto=format&fit=crop" class="local-video">
-        <div class="call-top">
-            <div style="background:rgba(0,0,0,0.6); padding:6px 12px; border-radius:20px; font-size:0.85rem;">⏱️ <span id="call-duration">00:00</span></div>
-        </div>
-        <div class="call-bottom">
-            <button class="ctrl-btn end" onclick="endCall()"><i class="fa-solid fa-phone-slash"></i></button>
         </div>
     </div>
 
@@ -302,41 +181,23 @@
         const tg = window.Telegram?.WebApp;
         if (tg) tg.expand();
 
-        const SUPER_ADMIN_ID = 7001825467;
-        const userId = tg?.initDataUnsafe?.user?.id || SUPER_ADMIN_ID;
-        const userName = tg?.initDataUnsafe?.user?.first_name || "Shalu";
-
+        const userId = tg?.initDataUnsafe?.user?.id || 7001825467;
         let userTokens = 0;
-        let hostStatus = "none";
-        let isHostOnline = false;
+        let selectedAmount = 100;
+        let selectedHostObj = null;
 
-        const dummyHosts = [
-            { id: "dh1", name: "Sophia Rose", rate: 80, img: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=600&auto=format&fit=crop" },
-            { id: "dh2", name: "Elena Rostova", rate: 100, img: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=600&auto=format&fit=crop" }
+        const defaultHosts = [
+            { id: "h1", name: "Anu ❤️", rate: 50, img: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop" },
+            { id: "h2", name: "Neha Thakur", rate: 60, img: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=600&auto=format&fit=crop" }
         ];
 
         async function initData() {
-            document.getElementById('profile-user-name').innerText = `${userName} 👑`;
-            document.getElementById('profile-user-id').innerText = userId;
-
             try {
                 const res = await fetch(`/api/user/${userId}`);
                 const data = await res.json();
                 userTokens = data.tokens || 0;
                 document.getElementById('user-token-bal').innerText = userTokens;
-                document.getElementById('profile-tokens-count').innerText = userTokens;
             } catch(e) {}
-
-            try {
-                const hRes = await fetch(`/api/host-info/${userId}`);
-                const hData = await hRes.json();
-                hostStatus = hData.status;
-                isHostOnline = hData.isOnline;
-                if (hostStatus === 'approved') {
-                    document.getElementById('creator-btn-text').innerText = "Live Dashboard 📹";
-                }
-            } catch(e) {}
-
             fetchRealHosts();
         }
 
@@ -344,143 +205,82 @@
             try {
                 const res = await fetch('/api/hosts');
                 const data = await res.json();
-                renderHosts(data.hosts || []);
-            } catch(e) { renderHosts([]); }
+                renderHosts(data.hosts && data.hosts.length > 0 ? data.hosts : defaultHosts);
+            } catch(e) { renderHosts(defaultHosts); }
         }
 
-        function renderHosts(realHosts) {
-            const rContainer = document.getElementById('real-hosts-container');
-            const dContainer = document.getElementById('dummy-hosts-container');
-
-            rContainer.innerHTML = realHosts.length > 0 ? realHosts.map(h => `
-                <div class="host-card" onclick="startCall('${h.img}')">
+        function renderHosts(list) {
+            const container = document.getElementById('hosts-container');
+            container.innerHTML = list.map(h => `
+                <div class="host-card" onclick="openBookingDrawer('${h.id}', '${h.name}')">
                     <img src="${h.img}" class="host-thumb">
                     <div class="badge-live">LIVE</div>
-                    <div class="badge-rate">🪙 ${h.rate}/m</div>
-                    <div class="host-info">
-                        <div class="host-name">${h.name} <i class="fa-solid fa-circle-check" style="color:#00B2FF;"></i></div>
-                        <button class="call-btn"><i class="fa-solid fa-video"></i> 1v1 Call</button>
-                    </div>
-                </div>
-            `).join('') : '<div style="grid-column:span 2; font-size:0.8rem; color:var(--text-muted); text-align:center; padding:10px;">No online verified hosts right now.</div>';
-
-            dContainer.innerHTML = dummyHosts.map(h => `
-                <div class="host-card" onclick="startCall('${h.img}')">
-                    <img src="${h.img}" class="host-thumb">
-                    <div class="badge-live">LIVE</div>
-                    <div class="badge-rate">🪙 ${h.rate}/m</div>
+                    ${h.isPrivate ? '<div class="badge-private">🔒 Private</div>' : ''}
                     <div class="host-info">
                         <div class="host-name">${h.name}</div>
-                        <button class="call-btn"><i class="fa-solid fa-video"></i> 1v1 Call</button>
+                        <button class="call-btn"><i class="fa-solid fa-calendar-check"></i> Book Slot</button>
                     </div>
                 </div>
             `).join('');
         }
 
-        function switchTab(tab) {
-            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-            if (tab === 'home') {
-                document.getElementById('home-tab-view').style.display = 'block';
-                document.getElementById('profile-tab-view').classList.remove('active');
-                document.getElementById('nav-home').classList.add('active');
-            } else {
-                document.getElementById('home-tab-view').style.display = 'none';
-                document.getElementById('profile-tab-view').classList.add('active');
-                document.getElementById('nav-profile').classList.add('active');
-            }
+        function openBookingDrawer(id, name) {
+            selectedHostObj = { id, name };
+            document.getElementById('bk-host-name').innerText = `Book Slot with ${name}`;
+            document.getElementById('host-booking-modal').classList.add('active');
         }
 
-        function openHostRegistrationModal() {
-            document.getElementById('host-form-container').style.display = 'none';
-            document.getElementById('host-pending-container').style.display = 'none';
-            document.getElementById('host-approved-container').style.display = 'none';
-
-            if (hostStatus === 'none') {
-                document.getElementById('host-form-container').style.display = 'block';
-            } else if (hostStatus === 'pending') {
-                document.getElementById('host-pending-container').style.display = 'block';
-            } else if (hostStatus === 'approved') {
-                document.getElementById('host-approved-container').style.display = 'block';
-                updateLiveBtnUI();
+        async function confirmBooking(mins, cost) {
+            if (userTokens < cost) {
+                alert(`⚠️ Balance Low! You need ${cost} Tokens to book this slot.`);
+                openRechargeModal();
+                return;
             }
-            document.getElementById('host-reg-modal').classList.add('active');
-        }
-
-        async function submitHostRegistration() {
-            const name = document.getElementById('host-name-input').value.trim();
-            const age = parseInt(document.getElementById('host-age-input').value);
-            const rate = parseInt(document.getElementById('host-rate-input').value);
-            const lang = document.getElementById('host-lang-input').value.trim();
-            const loc = document.getElementById('host-loc-input').value.trim();
-            const img = document.getElementById('host-img-input').value.trim();
-            const bio = document.getElementById('host-bio-input').value.trim();
-
-            if (!name || !img || !rate) return alert("Fill Name, Rate & Photo URL!");
 
             try {
-                const res = await fetch('/api/register-host', {
+                const res = await fetch('/api/book-slot', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ user_id: userId, name, age, rate, lang, loc, img, bio })
+                    body: JSON.stringify({
+                        user_id: userId,
+                        host_id: selectedHostObj.id,
+                        host_name: selectedHostObj.name,
+                        duration_mins: mins,
+                        token_cost: cost
+                    })
                 });
                 const data = await res.json();
                 alert(data.message);
-                hostStatus = "pending";
-                openHostRegistrationModal();
-            } catch(e) { alert("Registration error"); }
+                closeModal('host-booking-modal');
+                initData();
+            } catch(e) { alert("Booking failed"); }
         }
 
-        async function toggleHostLiveStatus() {
-            try {
-                const res = await fetch('/api/host/toggle-live', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ user_id: userId })
-                });
-                const data = await res.json();
-                if (data.status === 'success') {
-                    isHostOnline = data.isOnline;
-                    updateLiveBtnUI();
-                    fetchRealHosts();
-                }
-            } catch(e) {}
+        function selectPlan(amt, el) {
+            selectedAmount = amt;
+            document.querySelectorAll('.plan-card').forEach(c => c.classList.remove('active'));
+            el.classList.add('active');
+            document.getElementById('upi-qr-img').src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=vynoralive@slc&pn=RajnishKumar&am=${amt}`;
         }
-
-        function updateLiveBtnUI() {
-            const btn = document.getElementById('toggle-live-btn');
-            if (isHostOnline) {
-                btn.innerText = "🔴 Go Offline (Camera OFF)";
-                btn.style.background = "#FF0055";
-            } else {
-                btn.innerText = "📹 Go Live (Camera ON)";
-                btn.style.background = "var(--secondary-gradient)";
-            }
-        }
-
-        function startCall(img) {
-            document.getElementById('call-remote-img').src = img;
-            document.getElementById('call-screen').classList.add('active');
-        }
-        function endCall() { document.getElementById('call-screen').classList.remove('active'); }
 
         function openRechargeModal() { document.getElementById('recharge-modal').classList.add('active'); }
         function closeModal(id) { document.getElementById(id).classList.remove('active'); }
-        function openSupportLink() { if(tg) tg.openTelegramLink('https://t.me/vynorasupport'); }
+        function openHostRegistrationModal() { document.getElementById('host-reg-modal').classList.add('active'); }
 
         async function submitRecharge() {
-            const amount = parseFloat(document.getElementById('recharge-amount').value);
             const utr = document.getElementById('recharge-utr').value.trim();
-            if (!utr) return alert("Enter UTR");
+            if (!utr) return alert("Enter UTR number!");
+
             try {
                 const res = await fetch('/api/recharge', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_id: userId, amount_inr: amount, utr_number: utr })
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ user_id: userId, amount_inr: selectedAmount, utr_number: utr })
                 });
                 const data = await res.json();
                 alert(data.message);
                 closeModal('recharge-modal');
-            } catch(e) { alert("Error submitting"); }
+            } catch(e) { alert("Connection Error"); }
         }
 
         initData();
