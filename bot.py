@@ -1,24 +1,28 @@
 import os
-import telebot
+import logging
+from aiogram import Bot, Dispatcher, types
+from aiogram.filters import Command
 from dotenv import load_dotenv
-from database import users_collection
 
 load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
 
 if not TOKEN:
-    print("CRITICAL ERROR: BOT_TOKEN is missing from environment variables!")
+    print("CRITICAL ERROR: BOT_TOKEN environment variable is missing!")
     exit(1)
 
-bot = telebot.TeleBot(TOKEN)
+bot = Bot(token=TOKEN)
+dp = Dispatcher()
 
-@bot.message_handler(commands=['start'])
-def send_welcome(message):
-    user_id = message.from_user.id
-    name = message.from_user.first_name
-    
-    bot.reply_to(message, f"Welcome, {name}! Your setup is working successfully.")
+@dp.message(Command("start"))
+async def cmd_start(message: types.Message):
+    await message.answer("Hello! Your bot is successfully connected.")
+
+async def main():
+    logging.basicConfig(level=logging.INFO)
+    print("Bot polling started...")
+    await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    print("Bot is polling...")
-    bot.infinity_polling()
+    import asyncio
+    asyncio.run(main())
