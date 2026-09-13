@@ -1,0 +1,7 @@
+body { font-family: Arial, sans-serif; background: #0f172a; color: #fff; margin: 0; padding: 15px; }
+.container { max-width: 600px; margin: auto; }
+#wallet-box { background: #1e293b; padding: 10px 15px; border-radius: 8px; margin-bottom: 15px; display: flex; justify-content: space-between; }
+.host-card { background: #1e293b; border-radius: 10px; padding: 15px; margin-bottom: 15px; display: flex; align-items: center; gap: 15px; }
+.host-card img { width: 70px; height: 70px; border-radius: 50%; object-fit: cover; }
+.pricing-tiers { margin-top: 10px; display: flex; gap: 5px; flex-wrap: wrap; }
+.pricing-tiers button { background: #3b82f6; border: none; color: white; padding: 5px 10px; border-radius: 5px; cursor: pointer; }
