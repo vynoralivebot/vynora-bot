@@ -58,6 +58,11 @@ async def generate_agora_token(data: CallTokenRequest):
     token = RtcTokenBuilder.build_token_with_uid(
         AGORA_APP_ID,
         AGORA_APP_CERTIFICATE,
+        if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8080))
+    uvicorn.run(app, host="0.0.0.0", port=port)
+
         data.channel_name,
         data.uid,
         1, 
