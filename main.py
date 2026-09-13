@@ -1,99 +1,47 @@
 import os
-import asyncio
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
-from aiogram import Bot, Dispatcher, types
-from aiogram.filters import Command
-import motor.motor_asyncio
+from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+from dotenv import load_dotenv
+from database import hosts_collection, users_collection
+from agora_token_builder import RtcTokenBuilder
+import time
 
+load_dotenv()
 app = FastAPI()
 
-# Environment Variables
-BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_BOT_TOKEN")
-MONGO_URI = os.getenv("MONGO_URI", "YOUR_MONGO_URI")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Database Connection
-client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URI)
-db = client["vynora_db"]
+AGORA_APP_ID = os.getenv("AGORA_APP_ID")
+AGORA_APP_CERTIFICATE = os.getenv("AGORA_APP_CERTIFICATE")
 
-# Telegram Bot Setup
-bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher()
+@app.get("/api/hosts")
+async def get_hosts():
+    hosts = []
+    async for host in hosts_collection.find({"status": "online"}):
+        host["_id"] = str(host["_id"])
+        hosts.append(host)
+    return hosts
 
-# Bot /start Command (Opens Mini App)
-@dp.message(Command("start"))
-async def start_cmd(message: types.Message):
-    markup = types.InlineKeyboardMarkup(inline_keyboard=[
-        [types.InlineKeyboardButton(
-            text="🚀 Open Vynora App", 
-            web_app=types.WebAppInfo(url=os.getenv("WEB_APP_URL", "https://your-render-url.onrender.com"))
-        )]
-    ])
-    await message.answer("Vynora Live Video Calling App me aapka swagat hai!", reply_markup=markup)
+class CallTokenRequest(BaseModel):
+    channel_name: str
+    uid: int
 
-# Mini App Main Route (Frontend HTML)
-@app.get("/", response_class=HTMLResponse)
-async def serve_webapp(request: Request):
-    html_content = """
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Vynora Live</title>
-        <script src="https://telegram.org/js/telegram-web-app.js"></script>
-        <script src="https://cdn.tailwindcss.com"></script>
-        <style>
-            body { background-color: #0f172a; color: #ffffff; }
-        </style>
-    </head>
-    <body class="flex flex-col h-screen justify-between p-4">
-        <!-- Top Bar -->
-        <div class="flex justify-between items-center bg-slate-800 p-3 rounded-xl">
-            <h1 class="font-bold text-lg text-blue-400">Vynora Live</h1>
-            <div class="bg-slate-700 px-3 py-1 rounded-full text-sm font-semibold text-yellow-400">
-                🪙 <span id="user-balance">0 Mins</span>
-            </div>
-        </div>
-
-        <!-- Main Content -->
-        <div class="flex-1 flex flex-col justify-center items-center text-center my-6">
-            <div class="w-20 h-20 bg-blue-600 rounded-full flex items-center justify-center text-3xl mb-4 shadow-lg shadow-blue-500/50">
-                📹
-            </div>
-            <h2 class="text-xl font-bold mb-2">Anonymous 1-on-1 Video Call</h2>
-            <p class="text-slate-400 text-sm mb-6">Connect instantly with verified hosts privately.</p>
-            <button class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-lg transition">
-                Start Random Call
-            </button>
-        </div>
-
-        <!-- Bottom Navigation -->
-        <div class="flex justify-around bg-slate-800 p-3 rounded-xl text-xs text-slate-400">
-            <button class="flex flex-col items-center text-blue-400">
-                <span>🏠</span> Home
-            </button>
-            <button class="flex flex-col items-center">
-                <span>👥</span> Hosts
-            </button>
-            <button class="flex flex-col items-center">
-                <span>💳</span> Wallet
-            </button>
-            <button class="flex flex-col items-center">
-                <span>👤</span> Profile
-            </button>
-        </div>
-
-        <script>
-            const tg = window.Telegram.WebApp;
-            tg.expand();
-        </script>
-    </body>
-    </html>
-    """
-    return HTMLResponse(content=html_content)
-
-# FastAPI Startup event for Polling
-@app.on_event("startup")
-async def on_startup():
-    asyncio.create_task(dp.start_polling(bot))
+@app.post("/api/agora/token")
+async def generate_agora_token(data: CallTokenRequest):
+    if not AGORA_APP_ID or not AGORA_APP_CERTIFICATE:
+        raise HTTPException(status_code=500, detail="Agora credentials not configured")
+    
+    expiration_time_in_seconds = 3600
+    current_timestamp = int(time.time())
+    privilege_expired_ts = current_timestamp + expiration_time_in_seconds
+    
+    token = RtcTokenBuilder.build_token_with_uid(
+        AGORA_APP_ID,
+        AGORA_APP_CERTIFICATE,
+        data.channel_name,
+        data.uid,
+        1, 
+        privilege_expired_ts
+    )
+    return {"token": token}
