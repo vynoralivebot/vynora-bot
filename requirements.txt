@@ -1,4 +1,9 @@
-pyTelegramBotAPI
-gspread
-google-auth
-requests
+fastapi
+uvicorn
+aiogram==3.15.0
+motor
+pymongo
+jinja2
+python-multipart
+httpx
+pydantic
