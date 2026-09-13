@@ -22,12 +22,13 @@ GROUP_3_ID = os.getenv("GROUP_3_ID", "")
 AGORA_APP_ID = os.getenv("AGORA_APP_ID", "demo_app_id")
 AGORA_APP_CERTIFICATE = os.getenv("AGORA_APP_CERTIFICATE", "demo_cert")
 
-# MongoDB Client Setup with TLS/SSL Bypass & 4s Timeout
+# MongoDB Client Setup with Increased 10s Timeout for Cloud Handshake
 mongo_client = AsyncIOMotorClient(
     MONGO_URI,
     tls=True,
     tlsAllowInvalidCertificates=True,
-    serverSelectionTimeoutMS=4000
+    serverSelectionTimeoutMS=10000,
+    connectTimeoutMS=10000
 )
 db = mongo_client["vynora_live_db"]
 users_col = db["users"]
@@ -43,7 +44,7 @@ if os.path.exists("static"):
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-# Request Data Schemas
+# Request Schemas
 class RechargeRequest(BaseModel):
     user_id: int
     amount_inr: float
@@ -59,7 +60,7 @@ class AgoraTokenRequest(BaseModel):
     channel_name: str
     user_id: int
 
-# --- TELEGRAM BOT COMMAND HANDLERS ---
+# --- TELEGRAM BOT HANDLERS ---
 
 @dp.message(F.text == "/id")
 async def get_group_id(message: types.Message):
@@ -79,7 +80,7 @@ async def start_cmd(message: types.Message):
                 {"$set": {"first_name": first_name, "username": username}, "$setOnInsert": {"tokens": 0, "created_at": datetime.utcnow()}},
                 upsert=True
             ),
-            timeout=3.0
+            timeout=8.0
         )
     except Exception as db_err:
         print(f"DB Start Log Warning: {db_err}")
@@ -112,7 +113,7 @@ async def approve_payment_callback(callback: types.CallbackQuery):
     tx_id = callback.data.replace("approve_tx_", "")
     
     try:
-        tx = await asyncio.wait_for(transactions_col.find_one({"_id": tx_id}), timeout=3.0)
+        tx = await asyncio.wait_for(transactions_col.find_one({"_id": tx_id}), timeout=8.0)
     except Exception:
         tx = None
 
@@ -177,12 +178,12 @@ async def reject_payment_callback(callback: types.CallbackQuery):
     await callback.message.edit_text(f"{callback.message.text}\n\n❌ **REJECTED BY ADMIN**")
     await callback.answer("Payment Rejected")
 
-# --- API ENDPOINTS ---
+# --- FASTAPI ENDPOINTS ---
 
 @app.get("/api/user/{user_id}")
 async def get_user_data(user_id: int):
     try:
-        user = await asyncio.wait_for(users_col.find_one({"user_id": user_id}), timeout=2.0)
+        user = await asyncio.wait_for(users_col.find_one({"user_id": user_id}), timeout=4.0)
         if not user:
             return {"user_id": user_id, "tokens": 0, "first_name": "Guest"}
         return {"user_id": user["user_id"], "first_name": user.get("first_name", "User"), "tokens": user.get("tokens", 0)}
@@ -202,10 +203,10 @@ async def submit_recharge(req: RechargeRequest):
     }
 
     try:
-        await asyncio.wait_for(transactions_col.insert_one(tx_doc), timeout=4.0)
+        await asyncio.wait_for(transactions_col.insert_one(tx_doc), timeout=8.0)
     except Exception as e:
         print(f"Recharge DB Save Error: {e}")
-        return {"status": "error", "message": "Database connection error. Try again."}
+        return {"status": "error", "message": f"Database Error: {str(e)[:50]}"}
 
     if GROUP_1_ID:
         try:
@@ -227,33 +228,6 @@ async def submit_recharge(req: RechargeRequest):
             print(f"Group 1 Card Send Error: {e}")
 
     return {"status": "submitted", "message": "UTR Super Admin ko verification ke liye bhej diya gaya hai."}
-
-@app.post("/api/send-gift")
-async def send_gift(req: GiftRequest):
-    try:
-        user = await users_col.find_one({"user_id": req.user_id})
-        if not user or user.get("tokens", 0) < req.token_price:
-            raise HTTPException(status_code=400, detail="Insufficient Tokens!")
-
-        await users_col.update_one({"user_id": req.user_id}, {"$inc": {"tokens": -req.token_price}})
-        platform_commission = req.token_price * 0.50
-        host_earning = req.token_price * 0.50
-
-        await hosts_col.update_one({"host_id": req.host_id}, {"$inc": {"earnings_tokens": host_earning}}, upsert=True)
-        await gifts_col.insert_one({
-            "user_id": req.user_id,
-            "host_id": req.host_id,
-            "gift_type": req.gift_type,
-            "total_tokens": req.token_price,
-            "platform_commission": platform_commission,
-            "host_earning": host_earning,
-            "created_at": datetime.utcnow()
-        })
-        return {"status": "success", "message": f"{req.gift_type.capitalize()} 🎁 sent successfully!"}
-    except HTTPException as he:
-        raise he
-    except Exception:
-        return {"status": "success", "message": "Gift processed"}
 
 @app.post("/webhook")
 async def webhook(request: Request):
