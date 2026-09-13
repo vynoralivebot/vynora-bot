@@ -3,167 +3,221 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vynora Live</title>
-    <!-- Telegram WebApp SDK -->
+    <title>Vynora Live 1v1</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <!-- Tailwind CSS & FontAwesome -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body {
-            background-color: #0b0f19;
-            color: #f8fafc;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        }
-        .glass-card {
-            background: rgba(26, 34, 53, 0.75);
-            backdrop-filter: blur(14px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-        }
-        .gradient-text {
-            background: linear-gradient(135deg, #ec4899, #8b5cf6);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-        .gradient-btn {
-            background: linear-gradient(135deg, #ec4899, #8b5cf6);
-        }
-        .no-scrollbar::-webkit-scrollbar {
-            display: none;
-        }
+        body { background-color: #0b0f19; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; }
+        .glass-card { background: rgba(26, 34, 53, 0.75); backdrop-filter: blur(14px); border: 1px solid rgba(255, 255, 255, 0.08); }
+        .gradient-text { background: linear-gradient(135deg, #ec4899, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .gradient-btn { background: linear-gradient(135deg, #ec4899, #8b5cf6); }
     </style>
 </head>
 <body class="pb-20 select-none">
 
-    <!-- Top Navigation Header -->
-    <header class="sticky top-0 z-50 glass-card px-4 py-3 flex items-center justify-between border-b border-slate-800">
-        <div class="flex items-center gap-2.5">
-            <div class="w-9 h-9 rounded-full gradient-btn flex items-center justify-center font-bold text-lg text-white shadow-md">
-                V
-            </div>
+    <!-- Header -->
+    <header class="sticky top-0 z-40 glass-card px-4 py-3 flex items-center justify-between border-b border-slate-800">
+        <div class="flex items-center gap-2">
+            <div class="w-9 h-9 rounded-full gradient-btn flex items-center justify-center font-bold text-white shadow">V</div>
             <div>
-                <h1 class="font-bold text-base leading-tight">Vynora <span class="gradient-text">Live</span></h1>
-                <p class="text-[10px] text-slate-400">1-on-1 Video Chat</p>
+                <h1 class="font-bold text-base leading-tight">Vynora <span class="gradient-text">Live 1v1</span></h1>
+                <p class="text-[10px] text-slate-400">Support: @VynoraSupport</p>
             </div>
         </div>
-        
-        <!-- Wallet / Balance Badge -->
-        <div class="flex items-center gap-2 bg-slate-900/90 px-3 py-1.5 rounded-full border border-slate-700/70 shadow-inner">
+        <div class="flex items-center gap-2 bg-slate-900 px-3 py-1.5 rounded-full border border-slate-700">
             <i class="fa-solid fa-coins text-amber-400 text-xs"></i>
-            <span id="userBalance" class="text-xs font-semibold text-amber-300">0 Coins</span>
-            <button onclick="openRecharge()" class="w-5 h-5 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center text-xs font-bold hover:bg-amber-400">
-                +
-            </button>
+            <span id="userBalance" class="text-xs font-bold text-amber-300">0 Tokens</span>
+            <button onclick="openRechargeModal()" class="w-5 h-5 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center text-xs font-bold hover:bg-amber-400">+</button>
         </div>
     </header>
 
-    <!-- Category Filters -->
-    <div class="px-4 mt-4">
-        <div class="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-            <button class="px-4 py-1.5 rounded-full gradient-btn text-xs font-medium text-white shadow-md">🔥 Hot Hosts</button>
-            <button class="px-4 py-1.5 rounded-full bg-slate-800 border border-slate-700 text-xs font-medium text-slate-300">🟢 Online Now</button>
-            <button class="px-4 py-1.5 rounded-full bg-slate-800 border border-slate-700 text-xs font-medium text-slate-300">⭐ New</button>
+    <!-- Hosts Section -->
+    <main class="px-4 mt-4">
+        <h2 class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Available Hosts
+        </h2>
+        <div id="hostsGrid" class="grid grid-cols-2 gap-3.5"></div>
+    </main>
+
+    <!-- Gifting & Call Modal -->
+    <div id="giftModal" class="fixed inset-0 bg-black/80 backdrop-blur-md hidden z-50 flex items-end justify-center">
+        <div class="glass-card w-full max-w-md rounded-t-3xl p-5 border-t border-slate-700">
+            <div class="flex justify-between items-center mb-4">
+                <h3 id="modalHostName" class="font-bold text-base text-white">Send Gift to Host</h3>
+                <button onclick="closeGiftModal()" class="text-slate-400 text-lg">&times;</button>
+            </div>
+            
+            <p class="text-xs text-slate-400 mb-3">🎁 50% split goes directly to Host Wallet!</p>
+
+            <div class="grid grid-cols-3 gap-3 mb-5">
+                <button onclick="sendGift('rose', 10)" class="bg-slate-800/80 hover:border-pink-500 border border-slate-700 p-3 rounded-2xl flex flex-col items-center">
+                    <span class="text-2xl">🌹</span>
+                    <span class="text-xs font-bold mt-1 text-pink-400">Rose</span>
+                    <span class="text-[10px] text-amber-300">10 Tokens</span>
+                </button>
+                <button onclick="sendGift('diamond', 50)" class="bg-slate-800/80 hover:border-cyan-500 border border-slate-700 p-3 rounded-2xl flex flex-col items-center">
+                    <span class="text-2xl">💎</span>
+                    <span class="text-xs font-bold mt-1 text-cyan-400">Diamond</span>
+                    <span class="text-[10px] text-amber-300">50 Tokens</span>
+                </button>
+                <button onclick="sendGift('crown', 100)" class="bg-slate-800/80 hover:border-amber-500 border border-slate-700 p-3 rounded-2xl flex flex-col items-center">
+                    <span class="text-2xl">👑</span>
+                    <span class="text-xs font-bold mt-1 text-amber-400">Crown</span>
+                    <span class="text-[10px] text-amber-300">100 Tokens</span>
+                </button>
+            </div>
+
+            <button onclick="connectVideoCall()" class="w-full py-3 rounded-xl gradient-btn font-bold text-sm shadow-lg flex items-center justify-center gap-2">
+                <i class="fa-solid fa-video"></i> Start 1v1 Video Call
+            </button>
         </div>
     </div>
 
-    <!-- Main Content Area: Hosts Grid -->
-    <main class="px-4 mt-4">
-        <div class="flex justify-between items-center mb-3">
-            <h2 class="text-xs font-semibold text-slate-400 tracking-wider uppercase flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                Available Hosts (<span id="hostCount">0</span>)
-            </h2>
-        </div>
+    <!-- UPI Recharge Modal -->
+    <div id="rechargeModal" class="fixed inset-0 bg-black/85 backdrop-blur-md hidden z-50 flex items-center justify-center p-4">
+        <div class="glass-card w-full max-w-sm rounded-3xl p-5 border border-slate-700">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="font-bold text-base text-white">Recharge Vynora Tokens</h3>
+                <button onclick="closeRechargeModal()" class="text-slate-400 text-lg">&times;</button>
+            </div>
 
-        <!-- Host Grid -->
-        <div id="hostsGrid" class="grid grid-cols-2 gap-3.5">
-            <!-- Dynamic Host Cards Will Render Here -->
-        </div>
-    </main>
+            <!-- Slice UPI Info Card -->
+            <div class="bg-slate-900/90 p-3.5 rounded-2xl border border-slate-800 mb-4 text-center">
+                <p class="text-xs text-slate-400">Pay via UPI to:</p>
+                <p class="text-sm font-bold text-pink-400 select-all">vynoralive@slc</p>
+                <p class="text-[11px] text-slate-300">Account: Rajnish Kumar (Slice)</p>
+                
+                <!-- Dynamic QR Code -->
+                <div class="mt-3 flex justify-center">
+                    <img id="upiQrImg" src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=vynoralive@slc&pn=Rajnish%20Kumar" alt="UPI QR" class="w-32 h-32 rounded-xl border border-slate-700">
+                </div>
+            </div>
 
-    <!-- Bottom Navigation Bar -->
-    <nav class="fixed bottom-0 left-0 right-0 glass-card border-t border-slate-800/80 px-6 py-2 flex justify-around items-center z-50">
-        <button class="flex flex-col items-center text-pink-500">
-            <i class="fa-solid fa-video text-base"></i>
-            <span class="text-[10px] font-medium mt-0.5">Explore</span>
-        </button>
-        <button class="flex flex-col items-center text-slate-400 hover:text-slate-200" onclick="alert('Calls history tab')">
-            <i class="fa-solid fa-phone text-base"></i>
-            <span class="text-[10px] font-medium mt-0.5">Calls</span>
-        </button>
-        <button class="flex flex-col items-center text-slate-400 hover:text-slate-200" onclick="openRecharge()">
-            <i class="fa-solid fa-wallet text-base"></i>
-            <span class="text-[10px] font-medium mt-0.5">Wallet</span>
-        </button>
-        <button class="flex flex-col items-center text-slate-400 hover:text-slate-200" onclick="alert('Profile section')">
-            <i class="fa-solid fa-user text-base"></i>
-            <span class="text-[10px] font-medium mt-0.5">Profile</span>
-        </button>
-    </nav>
+            <div class="space-y-3">
+                <div>
+                    <label class="text-[11px] text-slate-400">Amount (INR ₹)</label>
+                    <input type="number" id="rechargeAmount" value="100" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-pink-500">
+                </div>
+                <div>
+                    <label class="text-[11px] text-slate-400">UTR / UPI Ref Number (12 digits)</label>
+                    <input type="text" id="utrInput" placeholder="Enter UTR after payment" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-pink-500">
+                </div>
+                <button onclick="submitRecharge()" class="w-full py-2.5 rounded-xl gradient-btn font-bold text-xs text-white shadow-md">
+                    Submit UTR for Verification
+                </button>
+            </div>
+        </div>
+    </div>
 
     <script>
-        // Telegram WebApp Setup
         const tg = window.Telegram?.WebApp;
-        if (tg) {
-            tg.ready();
-            tg.expand();
-        }
+        let userId = tg?.initDataUnsafe?.user?.id || 7001825467; // Fallback for testing
+        let selectedHostId = null;
 
-        // Demo Hosts Data
+        if (tg) { tg.ready(); tg.expand(); }
+
         const demoHosts = [
-            { id: "h1", name: "Aanya", age: 22, rate: "20 Coins/min", isOnline: true, avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80" },
-            { id: "h2", name: "Priya", age: 24, rate: "25 Coins/min", isOnline: true, avatar: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400&auto=format&fit=crop&q=80" },
-            { id: "h3", name: "Riya", age: 21, rate: "15 Coins/min", isOnline: true, avatar: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&auto=format&fit=crop&q=80" },
-            { id: "h4", name: "Simran", age: 23, rate: "30 Coins/min", isOnline: false, avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&auto=format&fit=crop&q=80" }
+            { id: "h1", name: "Aanya", age: 22, rate: "20 Tokens/min", isOnline: true, avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400" },
+            { id: "h2", name: "Priya", age: 24, rate: "25 Tokens/min", isOnline: true, avatar: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400" },
+            { id: "h3", name: "Riya", age: 21, rate: "15 Tokens/min", isOnline: true, avatar: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400" },
+            { id: "h4", name: "Simran", age: 23, rate: "30 Tokens/min", isOnline: false, avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400" }
         ];
 
-        function renderHosts(hosts) {
+        async function fetchUserData() {
+            try {
+                const res = await fetch(`/api/user/${userId}`);
+                const data = await res.json();
+                document.getElementById('userBalance').innerText = `${data.tokens || 0} Tokens`;
+            } catch (e) { console.error(e); }
+        }
+
+        function renderHosts() {
             const grid = document.getElementById('hostsGrid');
-            document.getElementById('hostCount').innerText = hosts.length;
             grid.innerHTML = '';
-
-            hosts.forEach(host => {
-                const card = document.createElement('div');
-                card.className = "glass-card rounded-2xl overflow-hidden relative shadow-lg flex flex-col justify-between";
-                card.innerHTML = `
-                    <div class="relative h-44 overflow-hidden">
-                        <img src="${host.avatar}" alt="${host.name}" class="w-full h-full object-cover">
-                        <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent"></div>
-                        
-                        <div class="absolute top-2.5 left-2.5 flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold ${host.isOnline ? 'bg-emerald-500/90 text-white' : 'bg-slate-700/90 text-slate-300'} backdrop-blur-md shadow">
-                            <span class="w-1.5 h-1.5 rounded-full ${host.isOnline ? 'bg-white animate-pulse' : 'bg-slate-400'}"></span>
-                            ${host.isOnline ? 'Online' : 'Offline'}
+            demoHosts.forEach(host => {
+                grid.innerHTML += `
+                    <div class="glass-card rounded-2xl overflow-hidden relative shadow flex flex-col justify-between">
+                        <div class="relative h-44">
+                            <img src="${host.avatar}" class="w-full h-full object-cover">
+                            <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent"></div>
+                            <div class="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] ${host.isOnline ? 'bg-emerald-500 text-white' : 'bg-slate-700 text-slate-300'}">
+                                ${host.isOnline ? 'Online' : 'Offline'}
+                            </div>
+                            <div class="absolute bottom-2 left-2">
+                                <h3 class="font-bold text-sm text-white">${host.name}, ${host.age}</h3>
+                                <p class="text-[11px] text-amber-300 font-medium">${host.rate}</p>
+                            </div>
                         </div>
-
-                        <div class="absolute bottom-2 left-2.5 right-2.5">
-                            <h3 class="font-bold text-sm text-white drop-shadow">${host.name}, <span class="text-xs font-normal text-slate-300">${host.age}</span></h3>
-                            <p class="text-[11px] text-amber-300 font-medium">${host.rate}</p>
+                        <div class="p-2 bg-slate-900/80">
+                            <button onclick="openGiftModal('${host.id}', '${host.name}')" class="w-full py-2 rounded-xl gradient-btn text-white text-xs font-semibold">
+                                <i class="fa-solid fa-phone"></i> Call / Gift
+                            </button>
                         </div>
-                    </div>
-
-                    <div class="p-2 bg-slate-900/80">
-                        <button onclick="startCall('${host.id}', '${host.name}')" class="w-full py-2 rounded-xl gradient-btn text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition">
-                            <i class="fa-solid fa-video text-[11px]"></i> Call Now
-                        </button>
                     </div>
                 `;
-                grid.appendChild(card);
             });
         }
 
-        function startCall(hostId, hostName) {
-            if (tg?.HapticFeedback) {
-                tg.HapticFeedback.impactOccurred('medium');
-            }
-            alert(`Connecting video call with ${hostName}...`);
+        function openGiftModal(hostId, hostName) {
+            selectedHostId = hostId;
+            document.getElementById('modalHostName').innerText = `Connect with ${hostName}`;
+            document.getElementById('giftModal').classList.remove('hidden');
         }
 
-        function openRecharge() {
-            alert('Coin Recharge Modal (Razorpay / UPI Integration coming next)');
+        function closeGiftModal() { document.getElementById('giftModal').classList.add('hidden'); }
+        function openRechargeModal() { document.getElementById('rechargeModal').classList.remove('hidden'); }
+        function closeRechargeModal() { document.getElementById('rechargeModal').classList.add('hidden'); }
+
+        async function sendGift(type, price) {
+            try {
+                const res = await fetch('/api/send-gift', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: userId, host_id: selectedHostId, gift_type: type, token_price: price })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    alert(data.message);
+                    fetchUserData();
+                } else {
+                    alert(data.detail || "Error sending gift");
+                }
+            } catch (e) { alert("Network Error"); }
         }
 
-        // Render hosts on load
-        renderHosts(demoHosts);
+        async function submitRecharge() {
+            const amount = document.getElementById('rechargeAmount').value;
+            const utr = document.getElementById('utrInput').value;
+
+            if (!utr || utr.length < 6) { alert("Sahi UTR number darj karein!"); return; }
+
+            try {
+                const res = await fetch('/api/recharge', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: userId, amount_inr: parseFloat(amount), utr_number: utr })
+                });
+                const data = await res.json();
+                alert(data.message);
+                closeRechargeModal();
+            } catch (e) { alert("Recharge Error"); }
+        }
+
+        async function connectVideoCall() {
+            try {
+                const res = await fetch('/api/get-agora-token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ channel_name: `call_${selectedHostId}`, user_id: userId })
+                });
+                const data = await res.json();
+                alert(`Connecting Agora 1v1 Call...\nChannel: ${data.channel}`);
+            } catch (e) { alert("Call Connection Failed"); }
+        }
+
+        renderHosts();
+        fetchUserData();
     </script>
 </body>
 </html>
