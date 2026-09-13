@@ -2,289 +2,767 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Vynora Live 1v1</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
-        body { background-color: #090d16; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-        .glass-card { background: rgba(22, 30, 49, 0.7); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.08); }
-        .glass-modal { background: rgba(15, 23, 42, 0.92); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.12); }
-        .gradient-text { background: linear-gradient(135deg, #f43f5e, #a855f7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .gradient-btn { background: linear-gradient(135deg, #ec4899, #8b5cf6); }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
+        :root {
+            --bg-dark: #0B0813;
+            --card-bg: rgba(255, 255, 255, 0.06);
+            --card-border: rgba(255, 255, 255, 0.12);
+            --primary-gradient: linear-gradient(135deg, #FF007A 0%, #7928CA 100%);
+            --secondary-gradient: linear-gradient(135deg, #FF9900 0%, #FF5500 100%);
+            --accent-cyan: #00F5D4;
+            --text-main: #FFFFFF;
+            --text-muted: #A1A1AA;
+            --gold: #FFD700;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding-bottom: 80px;
+            overflow-x: hidden;
+        }
+
+        /* --- HEADER & USER BAR --- */
+        .app-header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(11, 8, 19, 0.85);
+            backdrop-filter: blur(12px);
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        .brand-logo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 800;
+            font-size: 1.2rem;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .user-wallet {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 215, 0, 0.12);
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--gold);
+        }
+
+        .add-token-btn {
+            background: var(--primary-gradient);
+            border: none;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(255, 0, 122, 0.5);
+        }
+
+        /* --- BANNER & DYNAMIC FILTERS --- */
+        .hero-banner {
+            margin: 14px 16px;
+            background: linear-gradient(135deg, rgba(255,0,122,0.2) 0%, rgba(121,40,202,0.2) 100%);
+            border: 1px solid rgba(255,0,122,0.3);
+            border-radius: 16px;
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .hero-text h3 {
+            font-size: 1.1rem;
+            margin-bottom: 4px;
+        }
+
+        .hero-text p {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .category-scroll {
+            display: flex;
+            gap: 10px;
+            padding: 0 16px 14px 16px;
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+
+        .chip {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            white-space: nowrap;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .chip.active {
+            background: var(--primary-gradient);
+            color: white;
+            border-color: transparent;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(255, 0, 122, 0.4);
+        }
+
+        /* --- HOST GRID --- */
+        .section-title {
+            padding: 0 16px 10px 16px;
+            font-size: 1rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .host-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            padding: 0 16px;
+        }
+
+        .host-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            overflow: hidden;
+            position: relative;
+            backdrop-filter: blur(10px);
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .host-card:active {
+            transform: scale(0.97);
+        }
+
+        .host-thumb {
+            width: 100%;
+            height: 190px;
+            object-fit: cover;
+            display: block;
+        }
+
+        .status-badge {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.65);
+            backdrop-filter: blur(6px);
+            border: 1px solid rgba(0, 245, 212, 0.4);
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--accent-cyan);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .pulse-dot {
+            width: 6px;
+            height: 6px;
+            background-color: var(--accent-cyan);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--accent-cyan);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.4; }
+            50% { opacity: 1; }
+            100% { opacity: 0.4; }
+        }
+
+        .price-tag {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.65);
+            backdrop-filter: blur(6px);
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--gold);
+        }
+
+        .host-info {
+            padding: 10px;
+            background: linear-gradient(180deg, rgba(11,8,19,0) 0%, rgba(11,8,19,0.95) 100%);
+            margin-top: -40px;
+            position: relative;
+        }
+
+        .host-name {
+            font-size: 0.95rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .host-bio {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .call-btn {
+            width: 100%;
+            background: var(--primary-gradient);
+            border: none;
+            color: white;
+            padding: 8px;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(255, 0, 122, 0.3);
+        }
+
+        .empty-msg {
+            grid-column: span 2;
+            text-align: center;
+            padding: 40px 10px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        /* --- MODALS --- */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(8px);
+            z-index: 200;
+            display: none;
+            justify-content: center;
+            align-items: flex-end;
+        }
+
+        .modal-overlay.active { display: flex; }
+
+        .modal-card {
+            background: #141024;
+            border-top: 1px solid var(--card-border);
+            border-radius: 24px 24px 0 0;
+            width: 100%;
+            max-width: 480px;
+            padding: 20px;
+            max-height: 85vh;
+            overflow-y: auto;
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .close-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .input-box {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--card-border);
+            padding: 12px 14px;
+            border-radius: 12px;
+            color: white;
+            margin-bottom: 12px;
+            font-size: 0.95rem;
+            outline: none;
+        }
+
+        .recharge-presets {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .preset-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            padding: 12px 8px;
+            border-radius: 12px;
+            text-align: center;
+            cursor: pointer;
+        }
+
+        .preset-card.selected {
+            border-color: #FF007A;
+            background: rgba(255, 0, 122, 0.15);
+        }
+
+        .preset-amount { font-weight: 700; font-size: 1rem; color: white; }
+        .preset-tokens { font-size: 0.75rem; color: var(--gold); }
+
+        /* --- 1v1 CALL OVERLAY --- */
+        .call-screen {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            background: #000;
+            z-index: 300;
+            display: none;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .call-screen.active { display: flex; }
+
+        .remote-video-container {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            object-fit: cover;
+            background: #1a162b;
+        }
+
+        .local-video-pip {
+            position: absolute;
+            top: 60px; right: 16px;
+            width: 110px; height: 160px;
+            border-radius: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            object-fit: cover;
+            z-index: 310;
+        }
+
+        .call-top-bar {
+            position: relative;
+            z-index: 320;
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%);
+        }
+
+        .call-timer-badge {
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(8px);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            border: 1px solid rgba(255,255,255,0.2);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .call-controls {
+            position: relative;
+            z-index: 320;
+            padding: 24px;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            background: linear-gradient(0deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%);
+        }
+
+        .ctrl-btn {
+            width: 52px; height: 52px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .ctrl-btn.end-call {
+            background: #FF0055;
+            box-shadow: 0 0 20px rgba(255, 0, 85, 0.6);
+            width: 64px; height: 64px;
+        }
+
+        .gift-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .gift-item {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 10px 4px;
+            text-align: center;
+            cursor: pointer;
+        }
+
+        .gift-icon { font-size: 1.8rem; margin-bottom: 4px; }
+        .gift-price { font-size: 0.75rem; color: var(--gold); font-weight: 700; }
     </style>
 </head>
-<body class="pb-24 select-none min-h-screen flex flex-col justify-between">
+<body>
 
-    <!-- Top Navigation Header -->
-    <header class="sticky top-0 z-40 glass-card px-4 py-3 flex items-center justify-between border-b border-slate-800/80 shadow-md">
-        <div class="flex items-center gap-2.5">
-            <div class="w-9 h-9 rounded-2xl gradient-btn flex items-center justify-center font-black text-white shadow-lg shadow-pink-500/20">V</div>
-            <div>
-                <h1 class="font-bold text-base leading-none">Vynora <span class="gradient-text">Live 1v1</span></h1>
-                <p class="text-[10px] text-slate-400 mt-0.5"><i class="fa-solid fa-headset text-pink-400"></i> @VynoraSupport</p>
-            </div>
+    <!-- TOP HEADER -->
+    <header class="app-header">
+        <div class="brand-logo">
+            <i class="fa-solid fa-bolt"></i> Vynora Live
         </div>
-        
-        <!-- Wallet Token Badge -->
-        <div onclick="switchTab('wallet')" class="cursor-pointer flex items-center gap-2 bg-slate-900/90 hover:bg-slate-800 px-3 py-1.5 rounded-full border border-amber-500/30 shadow-inner transition">
-            <i class="fa-solid fa-coins text-amber-400 text-xs animate-bounce"></i>
-            <span id="userBalance" class="text-xs font-black text-amber-300">0 Tokens</span>
-            <span class="w-4 h-4 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center text-[10px] font-bold">+</span>
+        <div class="user-wallet">
+            <span>🪙 <span id="user-token-bal">0</span></span>
+            <button class="add-token-btn" onclick="openRechargeModal()"><i class="fa-solid fa-plus"></i></button>
         </div>
     </header>
 
-    <!-- 1. EXPLORE TAB -->
-    <main id="tab-explore" class="tab-content active px-4 mt-4">
-        <!-- Category Chips -->
-        <div class="flex gap-2 overflow-x-auto no-scrollbar pb-3">
-            <button class="px-4 py-1.5 rounded-full gradient-btn text-xs font-semibold text-white shadow-md flex items-center gap-1">🔥 Hot</button>
-            <button class="px-4 py-1.5 rounded-full bg-slate-800/80 border border-slate-700 text-xs font-medium text-slate-300 flex items-center gap-1">🟢 Online</button>
-            <button class="px-4 py-1.5 rounded-full bg-slate-800/80 border border-slate-700 text-xs font-medium text-slate-300 flex items-center gap-1">⭐ Top Rated</button>
+    <!-- HERO BANNER -->
+    <div class="hero-banner">
+        <div class="hero-text">
+            <h3>🔥 1v1 Private Video Call</h3>
+            <p>Connect instantly with top online hosts!</p>
         </div>
+        <i class="fa-solid fa-video" style="font-size: 2rem; color: #FF007A;"></i>
+    </div>
 
-        <div class="flex justify-between items-center mb-3">
-            <h2 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Available Hosts
-            </h2>
-        </div>
+    <!-- DYNAMIC CATEGORY FILTERS -->
+    <div class="category-scroll" id="filter-chips">
+        <div class="chip active" onclick="setFilter('all', this)">🔥 All Live</div>
+        <div class="chip" onclick="setFilter('hot', this)">✨ Hot & Trending</div>
+        <div class="chip" onclick="setFilter('new', this)">🌟 New Hosts</div>
+        <div class="chip" onclick="setFilter('top', this)">👑 Top Rated</div>
+        <div class="chip" onclick="setFilter('budget', this)">🪙 Low Rate (≤50)</div>
+    </div>
 
-        <div id="hostsGrid" class="grid grid-cols-2 gap-3.5"></div>
-    </main>
+    <!-- HOSTS SECTION -->
+    <div class="section-title">
+        <span><i class="fa-solid fa-circle" style="color: var(--accent-cyan); font-size: 0.6rem;"></i> Available Hosts</span>
+        <span id="host-count" style="font-size: 0.8rem; color: var(--text-muted); font-weight: 400;">4 Hosts</span>
+    </div>
 
-    <!-- 2. WALLET TAB -->
-    <section id="tab-wallet" class="tab-content px-4 mt-4">
-        <!-- Main Wallet Banner -->
-        <div class="glass-card rounded-3xl p-5 border border-amber-500/20 bg-gradient-to-br from-slate-900 via-slate-900/90 to-purple-950/40 relative overflow-hidden shadow-xl mb-4">
-            <div class="absolute -right-6 -bottom-6 w-32 h-32 bg-pink-500/10 rounded-full blur-2xl"></div>
-            <p class="text-xs text-slate-400 font-medium">Total Balance</p>
-            <h2 class="text-3xl font-black text-amber-300 mt-1 flex items-center gap-2">
-                <i class="fa-solid fa-coins text-amber-400 text-2xl"></i>
-                <span id="walletTabBalance">0</span> <span class="text-xs text-amber-400/80 font-normal">Tokens</span>
-            </h2>
-            <button onclick="openRechargeModal()" class="mt-4 w-full py-3 rounded-2xl gradient-btn font-bold text-xs text-white shadow-lg shadow-pink-500/20 flex items-center justify-center gap-2">
-                <i class="fa-solid fa-bolt"></i> Instant UPI Top-Up
+    <div class="host-grid" id="host-grid-container"></div>
+
+    <!-- RECHARGE MODAL -->
+    <div class="modal-overlay" id="recharge-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>💳 Recharge Vynora Tokens</h3>
+                <button class="close-btn" onclick="closeModal('recharge-modal')">✕</button>
+            </div>
+            
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px;">
+                Pay via UPI: <b style="color:#FF007A;">vynoralive@slc</b> (Slice - Rajnish Kumar)
+            </p>
+
+            <div class="recharge-presets">
+                <div class="preset-card selected" onclick="selectAmount(100)">
+                    <div class="preset-amount">₹100</div>
+                    <div class="preset-tokens">100 Tokens</div>
+                </div>
+                <div class="preset-card" onclick="selectAmount(500)">
+                    <div class="preset-amount">₹500</div>
+                    <div class="preset-tokens">550 Tokens 🔥</div>
+                </div>
+                <div class="preset-card" onclick="selectAmount(1000)">
+                    <div class="preset-amount">₹1000</div>
+                    <div class="preset-tokens">1200 Tokens 👑</div>
+                </div>
+            </div>
+
+            <input type="number" id="recharge-amount" class="input-box" value="100" placeholder="Enter Amount (INR)">
+            <input type="text" id="recharge-utr" class="input-box" placeholder="Enter 12-Digit UTR Number">
+
+            <button class="call-btn" style="padding: 14px;" onclick="submitRecharge()">
+                🚀 Submit UTR For Approval
             </button>
         </div>
+    </div>
 
-        <!-- Payment Info Banner -->
-        <div class="glass-card rounded-2xl p-4 mb-4 border border-slate-800 flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-pink-500/10 text-pink-400 flex items-center justify-center text-lg font-bold">💳</div>
-            <div>
-                <h4 class="text-xs font-bold text-white">Slice UPI Verification</h4>
-                <p class="text-[10px] text-slate-400">Pay to <span class="text-pink-400 font-semibold">vynoralive@slc</span> (Rajnish Kumar) & enter UTR for 1-min credit.</p>
+    <!-- HOST DETAIL MODAL -->
+    <div class="modal-overlay" id="host-detail-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="modal-host-name">Host Profile</h3>
+                <button class="close-btn" onclick="closeModal('host-detail-modal')">✕</button>
             </div>
-        </div>
-
-        <!-- Quick TopUp Packs -->
-        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Popular Token Packs</h3>
-        <div class="grid grid-cols-3 gap-2.5 mb-4">
-            <div onclick="openRechargeModal(100)" class="glass-card p-3 rounded-2xl border border-slate-800 text-center cursor-pointer hover:border-pink-500 transition">
-                <p class="text-xs font-bold text-amber-300">100 Tokens</p>
-                <p class="text-[10px] text-slate-400 mt-0.5">₹100 INR</p>
-            </div>
-            <div onclick="openRechargeModal(250)" class="glass-card p-3 rounded-2xl border border-pink-500/50 bg-pink-500/5 text-center cursor-pointer relative overflow-hidden">
-                <span class="absolute top-0 right-0 bg-pink-500 text-[8px] px-1.5 py-0.2 font-bold rounded-bl">HOT</span>
-                <p class="text-xs font-bold text-amber-300">250 Tokens</p>
-                <p class="text-[10px] text-slate-400 mt-0.5">₹250 INR</p>
-            </div>
-            <div onclick="openRechargeModal(500)" class="glass-card p-3 rounded-2xl border border-slate-800 text-center cursor-pointer hover:border-pink-500 transition">
-                <p class="text-xs font-bold text-amber-300">500 Tokens</p>
-                <p class="text-[10px] text-slate-400 mt-0.5">₹500 INR</p>
-            </div>
-        </div>
-    </section>
-
-    <!-- 3. CALLS TAB -->
-    <section id="tab-calls" class="tab-content px-4 mt-4 text-center py-12">
-        <div class="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center mx-auto mb-3 text-slate-500 text-2xl">
-            <i class="fa-solid fa-video-slash"></i>
-        </div>
-        <h3 class="text-sm font-bold text-slate-300">No Call History Yet</h3>
-        <p class="text-xs text-slate-500 mt-1 max-w-xs mx-auto">Start a 1v1 video stream with active hosts to view your history logs here.</p>
-    </section>
-
-    <!-- 4. PROFILE TAB -->
-    <section id="tab-profile" class="tab-content px-4 mt-4">
-        <div class="glass-card rounded-3xl p-5 border border-slate-800 text-center relative mb-4">
-            <div class="w-20 h-20 rounded-full gradient-btn p-1 mx-auto shadow-xl mb-3">
-                <img id="userAvatar" src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200" class="w-full h-full object-cover rounded-full">
-            </div>
-            <h3 id="profileName" class="font-bold text-base text-white">Vynora User</h3>
-            <p id="profileUserId" class="text-xs text-slate-400 mt-0.5">ID: 7001825467</p>
+            <img id="modal-host-img" src="" style="width: 100%; height: 220px; object-fit: cover; border-radius: 16px; margin-bottom: 12px;">
             
-            <div class="mt-4 pt-4 border-t border-slate-800 flex justify-around">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                 <div>
-                    <p class="text-[10px] text-slate-400">Tokens</p>
-                    <p id="profileBalance" class="text-sm font-black text-amber-400">0</p>
+                    <span id="modal-host-rate" style="color: var(--gold); font-weight: 700; font-size: 1.1rem;">🪙 50/min</span>
+                    <p id="modal-host-bio" style="font-size: 0.85rem; color: var(--text-muted);"></p>
                 </div>
-                <div class="border-r border-slate-800"></div>
-                <div>
-                    <p class="text-[10px] text-slate-400">Account Type</p>
-                    <p class="text-sm font-bold text-pink-400">User VIP</p>
-                </div>
+                <button class="call-btn" style="width: auto; padding: 10px 20px;" onclick="startCallFromModal()">
+                    <i class="fa-solid fa-video"></i> Start Call
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 1v1 VIDEO CALL SCREEN -->
+    <div class="call-screen" id="call-screen">
+        <img src="" class="remote-video-container" id="call-remote-img">
+        <img src="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=300&auto=format&fit=crop" class="local-video-pip">
+
+        <div class="call-top-bar">
+            <div class="call-timer-badge">
+                <i class="fa-solid fa-circle" style="color: #FF0055; font-size: 0.5rem;"></i>
+                <span id="call-duration">00:00</span>
+            </div>
+            <div class="user-wallet" style="background: rgba(0,0,0,0.6);">
+                🪙 <span id="call-token-display">0</span>
             </div>
         </div>
 
-        <div class="space-y-2">
-            <a href="https://t.me/VynoraSupport" target="_blank" class="glass-card p-3.5 rounded-2xl flex items-center justify-between border border-slate-800 text-xs font-semibold text-slate-200 hover:border-pink-500 transition">
-                <span class="flex items-center gap-2.5"><i class="fa-solid fa-headset text-pink-400"></i> Customer Support (@VynoraSupport)</span>
-                <i class="fa-solid fa-chevron-right text-slate-600"></i>
-            </a>
-            <div onclick="switchTab('wallet')" class="glass-card p-3.5 rounded-2xl flex items-center justify-between border border-slate-800 text-xs font-semibold text-slate-200 cursor-pointer">
-                <span class="flex items-center gap-2.5"><i class="fa-solid fa-wallet text-amber-400"></i> Wallet & Recharges</span>
-                <i class="fa-solid fa-chevron-right text-slate-600"></i>
-            </div>
+        <div class="call-controls">
+            <button class="ctrl-btn" onclick="toggleMute()"><i class="fa-solid fa-microphone"></i></button>
+            <button class="ctrl-btn" style="background: var(--secondary-gradient);" onclick="openGiftSheet()"><i class="fa-solid fa-gift"></i></button>
+            <button class="ctrl-btn end-call" onclick="endCall()"><i class="fa-solid fa-phone-slash"></i></button>
+            <button class="ctrl-btn" onclick="toggleCam()"><i class="fa-solid fa-camera-rotate"></i></button>
         </div>
-    </section>
+    </div>
 
-    <!-- Bottom Navigation Bar -->
-    <nav class="fixed bottom-0 left-0 right-0 glass-card border-t border-slate-800/80 px-6 py-2.5 flex justify-around items-center z-40 bg-slate-950/90">
-        <button id="nav-explore" onclick="switchTab('explore')" class="flex flex-col items-center text-pink-500">
-            <i class="fa-solid fa-video text-lg"></i>
-            <span class="text-[10px] font-bold mt-0.5">Explore</span>
-        </button>
-        <button id="nav-calls" onclick="switchTab('calls')" class="flex flex-col items-center text-slate-400 hover:text-slate-200">
-            <i class="fa-solid fa-phone text-lg"></i>
-            <span class="text-[10px] font-medium mt-0.5">Calls</span>
-        </button>
-        <button id="nav-wallet" onclick="switchTab('wallet')" class="flex flex-col items-center text-slate-400 hover:text-slate-200">
-            <i class="fa-solid fa-wallet text-lg"></i>
-            <span class="text-[10px] font-medium mt-0.5">Wallet</span>
-        </button>
-        <button id="nav-profile" onclick="switchTab('profile')" class="flex flex-col items-center text-slate-400 hover:text-slate-200">
-            <i class="fa-solid fa-user text-lg"></i>
-            <span class="text-[10px] font-medium mt-0.5">Profile</span>
-        </button>
-    </nav>
-
-    <!-- Modals (Gift & Recharge) -->
-    <div id="rechargeModal" class="fixed inset-0 bg-black/80 backdrop-blur-md hidden z-50 flex items-center justify-center p-4">
-        <div class="glass-modal w-full max-w-sm rounded-3xl p-5 border border-slate-700 shadow-2xl">
-            <div class="flex justify-between items-center mb-3">
-                <h3 class="font-bold text-base text-white">Recharge Vynora Tokens</h3>
-                <button onclick="closeRechargeModal()" class="text-slate-400 text-lg hover:text-white">&times;</button>
+    <!-- GIFT SHEET MODAL -->
+    <div class="modal-overlay" id="gift-modal" style="z-index: 350;">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>🎁 Send Live Gift</h3>
+                <button class="close-btn" onclick="closeModal('gift-modal')">✕</button>
             </div>
-            <div class="bg-slate-900/90 p-3.5 rounded-2xl border border-slate-800 mb-4 text-center">
-                <p class="text-[11px] text-slate-400">Pay via UPI to:</p>
-                <p class="text-sm font-bold text-pink-400 select-all">vynoralive@slc</p>
-                <p class="text-[10px] text-slate-400">Account: Rajnish Kumar (Slice)</p>
-                <div class="mt-2.5 flex justify-center">
-                    <img id="upiQrImg" src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=vynoralive@slc&pn=Rajnish%20Kumar" class="w-32 h-32 rounded-xl border border-slate-700 shadow">
+            <div class="gift-grid">
+                <div class="gift-item" onclick="sendGift('Rose', 10)">
+                    <div class="gift-icon">🌹</div>
+                    <div class="gift-price">10 Tokens</div>
                 </div>
-            </div>
-            <div class="space-y-3">
-                <div>
-                    <label class="text-[10px] text-slate-400 font-semibold">Amount (INR ₹)</label>
-                    <input type="number" id="rechargeAmount" value="100" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-pink-500">
+                <div class="gift-item" onclick="sendGift('Heart', 50)">
+                    <div class="gift-icon">💖</div>
+                    <div class="gift-price">50 Tokens</div>
                 </div>
-                <div>
-                    <label class="text-[10px] text-slate-400 font-semibold">UTR / UPI Ref Number (12 digits)</label>
-                    <input type="text" id="utrInput" placeholder="Enter 12-digit UTR" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-pink-500">
+                <div class="gift-item" onclick="sendGift('Crown', 200)">
+                    <div class="gift-icon">👑</div>
+                    <div class="gift-price">200 Tokens</div>
                 </div>
-                <button onclick="submitRecharge()" class="w-full py-2.5 rounded-xl gradient-btn font-bold text-xs text-white shadow-lg">Submit UTR for Verification</button>
+                <div class="gift-item" onclick="sendGift('Sports Car', 500)">
+                    <div class="gift-icon">🏎️</div>
+                    <div class="gift-price">500 Tokens</div>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
         const tg = window.Telegram?.WebApp;
-        let userId = tg?.initDataUnsafe?.user?.id || 7001825467;
-        let userName = tg?.initDataUnsafe?.user?.first_name || "Vynora User";
+        if (tg) tg.expand();
 
-        if (tg) { tg.ready(); tg.expand(); }
+        const userId = tg?.initDataUnsafe?.user?.id || 1108685585;
+        let userTokens = 0;
+        let selectedHost = null;
+        let callTimer = null;
+        let secondsElapsed = 0;
+        let activeFilter = 'all';
 
-        document.getElementById('profileName').innerText = userName;
-        document.getElementById('profileUserId').innerText = `ID: ${userId}`;
-
-        const demoHosts = [
-            { id: "h1", name: "Aanya", age: 22, rate: "20 Tokens/min", isOnline: true, avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400" },
-            { id: "h2", name: "Priya", age: 24, rate: "25 Tokens/min", isOnline: true, avatar: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400" },
-            { id: "h3", name: "Riya", age: 21, rate: "15 Tokens/min", isOnline: true, avatar: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400" },
-            { id: "h4", name: "Simran", age: 23, rate: "30 Tokens/min", isOnline: false, avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400" }
+        // Categorized Hosts Dataset
+        const hosts = [
+            { id: "h1", name: "Ananya Sharma 🇮🇳", age: 22, rate: 50, category: "hot", img: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop", bio: "Friendly chats & music lovers 💖" },
+            { id: "h2", name: "Sophia Rose 🇬🇧", age: 24, rate: 80, category: "top", img: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=600&auto=format&fit=crop", bio: "Available for private video calls 🚀" },
+            { id: "h3", name: "Priya Roy 🇮🇳", age: 21, rate: 40, category: "budget", img: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=600&auto=format&fit=crop", bio: "Late night casual talks ✨" },
+            { id: "h4", name: "Elena Rostova 🇷🇺", age: 23, rate: 100, category: "new", img: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=600&auto=format&fit=crop", bio: "High quality 1v1 experience 👑" }
         ];
 
-        function switchTab(tabName) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('nav button').forEach(el => {
-                el.classList.remove('text-pink-500');
-                el.classList.add('text-slate-400');
-            });
-
-            document.getElementById(`tab-${tabName}`).classList.add('active');
-            const navBtn = document.getElementById(`nav-${tabName}`);
-            if (navBtn) {
-                navBtn.classList.remove('text-slate-400');
-                navBtn.classList.add('text-pink-500');
-            }
-        }
-
-        async function fetchUserData() {
+        // Fetch User Data
+        async function loadUserData() {
             try {
                 const res = await fetch(`/api/user/${userId}`);
                 const data = await res.json();
-                const bal = data.tokens || 0;
-                document.getElementById('userBalance').innerText = `${bal} Tokens`;
-                document.getElementById('walletTabBalance').innerText = bal;
-                document.getElementById('profileBalance').innerText = bal;
-            } catch (e) { console.error(e); }
+                userTokens = data.tokens || 0;
+                document.getElementById('user-token-bal').innerText = userTokens;
+                document.getElementById('call-token-display').innerText = userTokens;
+            } catch (e) { console.log(e); }
         }
 
+        // Filter Functionality
+        function setFilter(filterType, element) {
+            activeFilter = filterType;
+            const chips = document.querySelectorAll('.chip');
+            chips.forEach(c => c.classList.remove('active'));
+            if (element) element.classList.add('active');
+            renderHosts();
+        }
+
+        // Dynamic Render
         function renderHosts() {
-            const grid = document.getElementById('hostsGrid');
-            grid.innerHTML = '';
-            demoHosts.forEach(host => {
-                grid.innerHTML += `
-                    <div class="glass-card rounded-2xl overflow-hidden relative shadow-lg flex flex-col justify-between border border-slate-800">
-                        <div class="relative h-44">
-                            <img src="${host.avatar}" class="w-full h-full object-cover">
-                            <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent"></div>
-                            <div class="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[9px] font-semibold ${host.isOnline ? 'bg-emerald-500/90 text-white' : 'bg-slate-700/90 text-slate-300'} backdrop-blur-md">
-                                ${host.isOnline ? 'Online' : 'Offline'}
-                            </div>
-                            <div class="absolute bottom-2 left-2">
-                                <h3 class="font-bold text-xs text-white">${host.name}, ${host.age}</h3>
-                                <p class="text-[10px] text-amber-300 font-medium">${host.rate}</p>
-                            </div>
-                        </div>
-                        <div class="p-2 bg-slate-900/90">
-                            <button onclick="openRechargeModal()" class="w-full py-1.5 rounded-xl gradient-btn text-white text-[11px] font-bold shadow flex items-center justify-center gap-1">
-                                <i class="fa-solid fa-video"></i> Call Now
-                            </button>
-                        </div>
+            const container = document.getElementById('host-grid-container');
+            let filtered = hosts;
+
+            if (activeFilter === 'hot') filtered = hosts.filter(h => h.category === 'hot');
+            else if (activeFilter === 'new') filtered = hosts.filter(h => h.category === 'new');
+            else if (activeFilter === 'top') filtered = hosts.filter(h => h.category === 'top');
+            else if (activeFilter === 'budget') filtered = hosts.filter(h => h.rate <= 50);
+
+            document.getElementById('host-count').innerText = `${filtered.length} Hosts`;
+
+            if (filtered.length === 0) {
+                container.innerHTML = `<div class="empty-msg">No active hosts in this category right now.</div>`;
+                return;
+            }
+
+            container.innerHTML = filtered.map(h => `
+                <div class="host-card" onclick="openHostModal('${h.id}')">
+                    <img src="${h.img}" class="host-thumb">
+                    <div class="status-badge"><div class="pulse-dot"></div> ONLINE</div>
+                    <div class="price-tag">🪙 ${h.rate}/min</div>
+                    <div class="host-info">
+                        <div class="host-name">${h.name}</div>
+                        <div class="host-bio">${h.bio}</div>
+                        <button class="call-btn" onclick="event.stopPropagation(); startCall('${h.id}')">
+                            <i class="fa-solid fa-video"></i> 1v1 Call
+                        </button>
                     </div>
-                `;
-            });
+                </div>
+            `).join('');
         }
 
-        function openRechargeModal(amount = 100) {
-            document.getElementById('rechargeAmount').value = amount;
-            document.getElementById('rechargeModal').classList.remove('hidden');
+        // Host Modal & Calls
+        function openHostModal(hostId) {
+            selectedHost = hosts.find(h => h.id === hostId);
+            document.getElementById('modal-host-name').innerText = selectedHost.name;
+            document.getElementById('modal-host-img').src = selectedHost.img;
+            document.getElementById('modal-host-rate').innerText = `🪙 ${selectedHost.rate}/min`;
+            document.getElementById('modal-host-bio').innerText = selectedHost.bio;
+            document.getElementById('host-detail-modal').classList.add('active');
         }
-        function closeRechargeModal() { document.getElementById('rechargeModal').classList.add('hidden'); }
+
+        function startCallFromModal() {
+            closeModal('host-detail-modal');
+            startCall(selectedHost.id);
+        }
+
+        function startCall(hostId) {
+            selectedHost = hosts.find(h => h.id === hostId);
+            if (userTokens < selectedHost.rate) {
+                alert(`⚠️ Balance low hai! Minimum ${selectedHost.rate} Tokens chahiye.`);
+                openRechargeModal();
+                return;
+            }
+
+            document.getElementById('call-remote-img').src = selectedHost.img;
+            document.getElementById('call-screen').classList.add('active');
+            
+            secondsElapsed = 0;
+            callTimer = setInterval(() => {
+                secondsElapsed++;
+                const mins = String(Math.floor(secondsElapsed / 60)).padStart(2, '0');
+                const secs = String(secondsElapsed % 60).padStart(2, '0');
+                document.getElementById('call-duration').innerText = `${mins}:${secs}`;
+
+                if (secondsElapsed % 60 === 0) {
+                    userTokens -= selectedHost.rate;
+                    document.getElementById('user-token-bal').innerText = userTokens;
+                    document.getElementById('call-token-display').innerText = userTokens;
+                    if (userTokens < selectedHost.rate) {
+                        alert("⚠️ Tokens finished! Call ended.");
+                        endCall();
+                    }
+                }
+            }, 1000);
+        }
+
+        function endCall() {
+            clearInterval(callTimer);
+            document.getElementById('call-screen').classList.remove('active');
+        }
+
+        function openGiftSheet() { document.getElementById('gift-modal').classList.add('active'); }
+        async function sendGift(giftType, price) {
+            if (userTokens < price) { alert("❌ Insufficient tokens!"); return; }
+            userTokens -= price;
+            document.getElementById('user-token-bal').innerText = userTokens;
+            document.getElementById('call-token-display').innerText = userTokens;
+            closeModal('gift-modal');
+            alert(`🎁 ${giftType} sent successfully!`);
+        }
+
+        function openRechargeModal() { document.getElementById('recharge-modal').classList.add('active'); }
+        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+        function selectAmount(amt) { document.getElementById('recharge-amount').value = amt; }
 
         async function submitRecharge() {
-            const amount = document.getElementById('rechargeAmount').value;
-            const utr = document.getElementById('utrInput').value;
-            if (!utr || utr.length < 6) { alert("Please enter valid 12-digit UTR!"); return; }
+            const amount = parseFloat(document.getElementById('recharge-amount').value);
+            const utr = document.getElementById('recharge-utr').value.trim();
+
+            if (!utr || utr.length < 8) {
+                alert("⚠️ Valid UTR number enter karein!");
+                return;
+            }
 
             try {
                 const res = await fetch('/api/recharge', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_id: userId, amount_inr: parseFloat(amount), utr_number: utr })
+                    body: JSON.stringify({ user_id: userId, amount_inr: amount, utr_number: utr })
                 });
                 const data = await res.json();
                 alert(data.message);
-                closeRechargeModal();
-            } catch (e) { alert("Recharge Submission Failed"); }
+                closeModal('recharge-modal');
+            } catch (e) { alert("Connection error."); }
         }
 
+        loadUserData();
         renderHosts();
-        fetchUserData();
     </script>
 </body>
 </html>
