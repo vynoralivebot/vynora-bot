@@ -9,11 +9,10 @@
     <style>
         :root {
             --bg-dark: #0A0714;
-            --bg-card: rgba(255, 255, 255, 0.05);
+            --card-bg: rgba(255, 255, 255, 0.05);
             --card-border: rgba(255, 255, 255, 0.1);
             --primary-gradient: linear-gradient(135deg, #FF007A 0%, #7928CA 100%);
             --secondary-gradient: linear-gradient(135deg, #FF9900 0%, #FF5500 100%);
-            --admin-gold: linear-gradient(135deg, #FFE600 0%, #FF9900 100%);
             --accent-cyan: #00F5D4;
             --text-main: #FFFFFF;
             --text-muted: #A1A1AA;
@@ -35,661 +34,267 @@
             overflow-x: hidden;
         }
 
-        /* --- HEADER --- */
         .app-header {
-            position: sticky;
-            top: 0;
-            z-index: 100;
+            position: sticky; top: 0; z-index: 100;
             background: rgba(10, 7, 20, 0.9);
             backdrop-filter: blur(12px);
             padding: 12px 16px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            display: flex; justify-content: space-between; align-items: center;
             border-bottom: 1px solid var(--card-border);
         }
 
         .brand-logo {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-weight: 800;
-            font-size: 1.15rem;
+            font-weight: 800; font-size: 1.15rem;
             background: var(--primary-gradient);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
 
-        .header-right {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
         .wallet-badge {
-            display: flex;
-            align-items: center;
-            gap: 6px;
+            display: flex; align-items: center; gap: 6px;
             background: rgba(255, 215, 0, 0.12);
             border: 1px solid rgba(255, 215, 0, 0.3);
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: 700;
-            color: var(--gold);
+            padding: 5px 12px; border-radius: 20px;
+            font-size: 0.85rem; font-weight: 700; color: var(--gold);
         }
 
-        .add-btn {
-            background: var(--primary-gradient);
-            border: none;
-            color: white;
-            width: 22px;
-            height: 22px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.75rem;
-            cursor: pointer;
-        }
-
-        .user-avatar-btn {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            background: var(--primary-gradient);
-            border: 2px solid var(--card-border);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            cursor: pointer;
-            position: relative;
-        }
-
-        .crown-badge {
-            position: absolute;
-            top: -6px; right: -4px;
-            font-size: 0.85rem;
-            filter: drop-shadow(0 0 4px #FFD700);
-        }
-
-        /* --- HERO BANNER & FILTERS --- */
-        .hero-banner {
-            margin: 12px 16px;
-            background: linear-gradient(135deg, rgba(255,0,122,0.18) 0%, rgba(121,40,202,0.18) 100%);
-            border: 1px solid rgba(255,0,122,0.3);
-            border-radius: 16px;
-            padding: 14px 16px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .hero-banner h3 { font-size: 1rem; margin-bottom: 2px; }
-        .hero-banner p { font-size: 0.78rem; color: var(--text-muted); }
-
-        .filter-scroll {
-            display: flex;
-            gap: 8px;
-            padding: 0 16px 12px 16px;
-            overflow-x: auto;
-            scrollbar-width: none;
-        }
-
-        .chip {
-            background: var(--bg-card);
-            border: 1px solid var(--card-border);
-            padding: 7px 14px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            white-space: nowrap;
-            color: var(--text-muted);
-            cursor: pointer;
-        }
-
-        .chip.active {
-            background: var(--primary-gradient);
-            color: white;
-            border-color: transparent;
-            font-weight: 600;
-            box-shadow: 0 4px 12px rgba(255, 0, 122, 0.35);
-        }
-
-        /* --- HOST SECTIONS & GRID --- */
         .section-header {
-            padding: 10px 16px 8px 16px;
-            font-size: 0.9rem;
-            font-weight: 700;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            color: var(--text-main);
+            padding: 12px 16px 8px 16px; font-size: 0.9rem; font-weight: 700;
+            display: flex; align-items: center; gap: 6px;
         }
 
         .host-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-            padding: 0 16px 16px 16px;
+            display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; padding: 0 16px;
         }
 
         .host-card {
-            background: var(--bg-card);
-            border: 1px solid var(--card-border);
-            border-radius: 16px;
-            overflow: hidden;
-            position: relative;
-            cursor: pointer;
-            transition: transform 0.2s ease;
+            background: var(--card-bg); border: 1px solid var(--card-border);
+            border-radius: 16px; overflow: hidden; position: relative; cursor: pointer;
         }
 
-        .host-card:active { transform: scale(0.97); }
-
-        .host-thumb {
-            width: 100%;
-            height: 190px;
-            object-fit: cover;
-            display: block;
-        }
+        .host-thumb { width: 100%; height: 180px; object-fit: cover; }
 
         .badge-live {
-            position: absolute;
-            top: 8px; left: 8px;
-            background: rgba(0, 0, 0, 0.65);
-            backdrop-filter: blur(6px);
-            border: 1px solid rgba(0, 245, 212, 0.4);
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-size: 0.65rem;
-            font-weight: 700;
-            color: var(--accent-cyan);
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-
-        .pulse-dot {
-            width: 6px; height: 6px;
-            background: var(--accent-cyan);
-            border-radius: 50%;
-            box-shadow: 0 0 6px var(--accent-cyan);
+            position: absolute; top: 8px; left: 8px;
+            background: rgba(0, 0, 0, 0.65); padding: 3px 8px; border-radius: 12px;
+            font-size: 0.65rem; color: var(--accent-cyan); display: flex; align-items: center; gap: 4px;
         }
 
         .badge-rate {
-            position: absolute;
-            top: 8px; right: 8px;
-            background: rgba(0, 0, 0, 0.65);
-            backdrop-filter: blur(6px);
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-size: 0.7rem;
-            font-weight: 700;
-            color: var(--gold);
+            position: absolute; top: 8px; right: 8px;
+            background: rgba(0, 0, 0, 0.65); padding: 3px 8px; border-radius: 12px;
+            font-size: 0.7rem; color: var(--gold); font-weight: 700;
         }
 
-        .host-info {
-            padding: 10px;
-            background: linear-gradient(180deg, rgba(10,7,20,0) 0%, rgba(10,7,20,0.95) 100%);
-            margin-top: -45px;
-            position: relative;
-        }
-
-        .host-name {
-            font-size: 0.88rem;
-            font-weight: 700;
-            margin-bottom: 2px;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-
-        .verified-tick { color: #00B2FF; font-size: 0.8rem; }
-
-        .host-meta {
-            font-size: 0.72rem;
-            color: var(--text-muted);
-            margin-bottom: 8px;
-            display: flex;
-            gap: 8px;
-        }
+        .host-info { padding: 10px; background: linear-gradient(180deg, rgba(10,7,20,0) 0%, rgba(10,7,20,0.95) 100%); margin-top: -45px; position: relative; }
+        .host-name { font-size: 0.88rem; font-weight: 700; margin-bottom: 4px; }
 
         .call-btn {
-            width: 100%;
-            background: var(--primary-gradient);
-            border: none;
-            color: white;
-            padding: 8px;
-            border-radius: 10px;
-            font-weight: 700;
-            font-size: 0.82rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-            cursor: pointer;
-            box-shadow: 0 4px 12px rgba(255, 0, 122, 0.3);
+            width: 100%; background: var(--primary-gradient); border: none; color: white;
+            padding: 8px; border-radius: 10px; font-weight: 700; font-size: 0.82rem;
+            display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer;
         }
 
-        /* --- BOTTOM NAVIGATION BAR --- */
+        .profile-container { display: none; padding: 16px; }
+        .profile-container.active { display: block; }
+
+        .profile-header-card { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+        .profile-avatar-wrapper { position: relative; }
+        .profile-avatar-img { width: 70px; height: 70px; border-radius: 50%; object-fit: cover; border: 2px solid #FF007A; }
+        .cam-edit-icon { position: absolute; bottom: 0; right: 0; background: #FF007A; color: white; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; }
+
+        .user-meta h2 { font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+        .user-id-text { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; }
+
+        .stats-banner {
+            display: grid; grid-template-columns: repeat(3, 1fr); text-align: center;
+            background: rgba(255,255,255,0.04); border: 1px solid var(--card-border);
+            padding: 12px; border-radius: 16px; margin-bottom: 16px;
+        }
+
+        .stat-num { font-size: 1.05rem; font-weight: 800; }
+        .stat-sub { font-size: 0.7rem; color: var(--text-muted); }
+
+        .wallet-banner-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
+        .wallet-box { background: rgba(255,255,255,0.04); border: 1px solid var(--card-border); padding: 12px; border-radius: 14px; display: flex; justify-content: space-between; align-items: center; }
+
+        .action-icon-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; text-align: center; margin-bottom: 20px; }
+        .icon-card { background: rgba(255,255,255,0.04); border: 1px solid var(--card-border); padding: 12px 6px; border-radius: 14px; cursor: pointer; }
+        .icon-card i { font-size: 1.4rem; margin-bottom: 6px; }
+        .icon-card p { font-size: 0.72rem; color: var(--text-muted); }
+
+        .posts-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+        .post-img { width: 100%; height: 120px; border-radius: 12px; object-fit: cover; }
+
         .bottom-nav {
-            position: fixed;
-            bottom: 0; left: 0; right: 0;
-            height: 60px;
-            background: rgba(10, 7, 20, 0.95);
-            backdrop-filter: blur(16px);
+            position: fixed; bottom: 0; left: 0; right: 0; height: 60px;
+            background: rgba(10, 7, 20, 0.95); backdrop-filter: blur(16px);
             border-top: 1px solid var(--card-border);
-            display: flex;
-            justify-content: space-around;
-            align-items: center;
-            z-index: 150;
+            display: flex; justify-content: space-around; align-items: center; z-index: 150;
         }
 
-        .nav-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 3px;
-            color: var(--text-muted);
-            font-size: 0.7rem;
-            cursor: pointer;
-            text-decoration: none;
-        }
-
-        .nav-item.active {
-            color: #FF007A;
-            font-weight: 700;
-        }
-
+        .nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--text-muted); font-size: 0.7rem; cursor: pointer; }
+        .nav-item.active { color: #FF007A; font-weight: 700; }
         .nav-item i { font-size: 1.1rem; }
 
-        /* --- MODALS & FULL PROFILE DRAWER --- */
         .modal-overlay {
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0, 0, 0, 0.85);
-            backdrop-filter: blur(10px);
-            z-index: 200;
-            display: none;
-            justify-content: center;
-            align-items: flex-end;
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(10px);
+            z-index: 200; display: none; justify-content: center; align-items: flex-end;
         }
-
         .modal-overlay.active { display: flex; }
 
         .modal-card {
-            background: #130E26;
-            border-top: 1px solid var(--card-border);
-            border-radius: 24px 24px 0 0;
-            width: 100%;
-            max-width: 480px;
-            padding: 20px;
-            max-height: 88vh;
-            overflow-y: auto;
-            animation: slideUp 0.3s ease;
+            background: #130E26; border-top: 1px solid var(--card-border);
+            border-radius: 24px 24px 0 0; width: 100%; max-width: 480px; padding: 20px;
+            max-height: 88vh; overflow-y: auto;
         }
-
-        @keyframes slideUp {
-            from { transform: translateY(100%); }
-            to { transform: translateY(0); }
-        }
-
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 14px;
-        }
-
-        .close-btn {
-            background: rgba(255, 255, 255, 0.1);
-            border: none;
-            color: white;
-            width: 30px; height: 30px;
-            border-radius: 50%;
-            cursor: pointer;
-        }
-
-        .host-profile-banner {
-            width: 100%;
-            height: 230px;
-            border-radius: 16px;
-            object-fit: cover;
-            margin-bottom: 14px;
-        }
-
-        .stats-row {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 8px;
-            background: rgba(255,255,255,0.04);
-            border: 1px solid var(--card-border);
-            padding: 10px;
-            border-radius: 12px;
-            margin-bottom: 14px;
-            text-align: center;
-        }
-
-        .stat-val { font-weight: 700; font-size: 0.95rem; color: white; }
-        .stat-lbl { font-size: 0.7rem; color: var(--text-muted); }
-
-        .detail-tag-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 8px;
-            margin-bottom: 14px;
-        }
-
-        .detail-tag {
-            background: rgba(255,255,255,0.04);
-            border: 1px solid var(--card-border);
-            padding: 8px 10px;
-            border-radius: 10px;
-            font-size: 0.8rem;
-        }
-
-        .detail-tag span { color: var(--text-muted); display: block; font-size: 0.7rem; }
 
         .input-box {
-            width: 100%;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid var(--card-border);
-            padding: 12px;
-            border-radius: 12px;
-            color: white;
-            margin-bottom: 10px;
-            outline: none;
+            width: 100%; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--card-border);
+            padding: 12px; border-radius: 12px; color: white; margin-bottom: 10px; outline: none;
         }
 
-        .menu-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 14px;
-            background: rgba(255, 255, 255, 0.04);
-            border: 1px solid var(--card-border);
-            border-radius: 12px;
-            margin-bottom: 10px;
-            cursor: pointer;
-        }
-
-        /* --- 1v1 CALL OVERLAY --- */
         .call-screen {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100vw; height: 100vh;
-            background: #000;
-            z-index: 300;
-            display: none;
-            flex-direction: column;
-            justify-content: space-between;
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: #000; z-index: 300; display: none; flex-direction: column; justify-content: space-between;
         }
-
         .call-screen.active { display: flex; }
-
-        .remote-video {
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            object-fit: cover;
-        }
-
-        .local-video {
-            position: absolute;
-            top: 60px; right: 16px;
-            width: 110px; height: 160px;
-            border-radius: 16px;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            object-fit: cover;
-            z-index: 310;
-        }
-
-        .admin-banner {
-            position: absolute;
-            top: 90px; left: 50%;
-            transform: translateX(-50%);
-            background: var(--admin-gold);
-            color: #000;
-            padding: 8px 18px;
-            border-radius: 20px;
-            font-weight: 800;
-            font-size: 0.85rem;
-            display: none;
-            z-index: 330;
-            box-shadow: 0 0 20px #FFD700;
-        }
-
-        .call-top {
-            position: relative; z-index: 320; padding: 16px;
-            display: flex; justify-content: space-between;
-        }
-
-        .call-bottom {
-            position: relative; z-index: 320; padding: 24px;
-            display: flex; justify-content: space-around; align-items: center;
-            background: linear-gradient(0deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%);
-        }
-
-        .ctrl-btn {
-            width: 52px; height: 52px;
-            border-radius: 50%; border: none;
-            background: rgba(255, 255, 255, 0.2);
-            color: white; font-size: 1.2rem; cursor: pointer;
-        }
-
+        .remote-video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; }
+        .local-video { position: absolute; top: 60px; right: 16px; width: 110px; height: 160px; border-radius: 16px; border: 2px solid rgba(255,255,255,0.3); object-fit: cover; z-index: 310; }
+        .call-top { position: relative; z-index: 320; padding: 16px; display: flex; justify-content: space-between; }
+        .call-bottom { position: relative; z-index: 320; padding: 24px; display: flex; justify-content: space-around; align-items: center; background: linear-gradient(0deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%); }
+        .ctrl-btn { width: 52px; height: 52px; border-radius: 50%; border: none; background: rgba(255, 255, 255, 0.2); color: white; font-size: 1.2rem; cursor: pointer; }
         .ctrl-btn.end { background: #FF0055; width: 64px; height: 64px; }
     </style>
 </head>
 <body>
 
-    <!-- TOP HEADER -->
     <header class="app-header">
-        <div class="brand-logo">
-            <i class="fa-solid fa-bolt" style="color:#FF007A;"></i> Vynora Live
-        </div>
-        <div class="header-right">
-            <div class="wallet-badge">
-                <span>🪙 <span id="user-token-bal">0</span></span>
-                <button class="add-btn" onclick="openRechargeModal()"><i class="fa-solid fa-plus"></i></button>
-            </div>
-            <div class="user-avatar-btn" onclick="openUserProfileModal()">
-                <span id="user-initial">U</span>
-                <span id="admin-crown" class="crown-badge" style="display:none;">👑</span>
-            </div>
+        <div class="brand-logo"><i class="fa-solid fa-bolt" style="color:#FF007A;"></i> Vynora Live</div>
+        <div class="wallet-badge">
+            <span>🪙 <span id="user-token-bal">0</span></span>
+            <i class="fa-solid fa-plus-circle" onclick="openRechargeModal()" style="cursor:pointer; color:#FF007A;"></i>
         </div>
     </header>
 
-    <!-- HERO BANNER -->
-    <div class="hero-banner">
-        <div>
-            <h3>🔥 1v1 Private Live Call</h3>
-            <p>Connect with verified real & popular hosts</p>
+    <div id="home-tab-view">
+        <div class="section-header"><i class="fa-solid fa-star" style="color:#FFD700;"></i> 🌟 Verified Real Hosts</div>
+        <div class="host-grid" id="real-hosts-container"></div>
+
+        <div class="section-header"><i class="fa-solid fa-fire" style="color:#FF007A;"></i> 🔥 Popular Online Hosts</div>
+        <div class="host-grid" id="dummy-hosts-container"></div>
+    </div>
+
+    <div class="profile-container" id="profile-tab-view">
+        <div class="profile-header-card">
+            <div class="profile-avatar-wrapper">
+                <img id="user-profile-img" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop" class="profile-avatar-img">
+                <div class="cam-edit-icon"><i class="fa-solid fa-camera"></i></div>
+            </div>
+            <div class="user-meta">
+                <h2 id="profile-user-name">Shalu 👑</h2>
+                <div class="user-id-text">ID: <span id="profile-user-id">98979133</span> • 🇮🇳 India</div>
+            </div>
         </div>
-        <i class="fa-solid fa-video" style="font-size: 1.8rem; color: #FF007A;"></i>
+
+        <div class="stats-banner">
+            <div><div class="stat-num">56.1K</div><div class="stat-sub">Followers</div></div>
+            <div><div class="stat-num">39</div><div class="stat-sub">Following</div></div>
+            <div><div class="stat-num">12</div><div class="stat-sub">Friends</div></div>
+        </div>
+
+        <div class="wallet-banner-row">
+            <div class="wallet-box" onclick="openRechargeModal()">
+                <div><div style="font-size:0.75rem; color:var(--text-muted);">Tokens</div><b style="color:var(--gold);">🪙 <span id="profile-tokens-count">0</span></b></div>
+                <i class="fa-solid fa-chevron-right" style="font-size:0.8rem; color:var(--text-muted);"></i>
+            </div>
+            <div class="wallet-box">
+                <div><div style="font-size:0.75rem; color:var(--text-muted);">Credits</div><b style="color:var(--accent-cyan);">💰 <span id="profile-credits-count">198</span></b></div>
+                <i class="fa-solid fa-chevron-right" style="font-size:0.8rem; color:var(--text-muted);"></i>
+            </div>
+        </div>
+
+        <div class="action-icon-grid">
+            <div class="icon-card" onclick="openHostRegistrationModal()">
+                <i class="fa-solid fa-video" style="color:#FF007A;"></i>
+                <p id="creator-btn-text">Creator Center</p>
+            </div>
+            <div class="icon-card"><i class="fa-solid fa-gift" style="color:var(--secondary-gradient);"></i><p>Bonus</p></div>
+            <div class="icon-card"><i class="fa-solid fa-id-card" style="color:var(--accent-cyan);"></i><p>Passcard</p></div>
+            <div class="icon-card"><i class="fa-solid fa-crown" style="color:var(--gold);"></i><p>Level</p></div>
+        </div>
+
+        <div style="font-size:0.9rem; font-weight:700; margin-bottom:10px;">Post Photos</div>
+        <div class="posts-grid">
+            <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop" class="post-img">
+            <img src="https://images.unsplash.com/photo-1517841905240-472988babdf9?w=300&auto=format&fit=crop" class="post-img">
+            <img src="https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=300&auto=format&fit=crop" class="post-img">
+        </div>
     </div>
 
-    <!-- ADVANCED FILTERS -->
-    <div class="filter-scroll">
-        <div class="chip active" onclick="setFilter('all', this)">🔥 All Live</div>
-        <div class="chip" onclick="setFilter('real', this)">🌟 Verified Real</div>
-        <div class="chip" onclick="setFilter('hindi', this)">🇮🇳 Hindi</div>
-        <div class="chip" onclick="setFilter('english', this)">🇬🇧 English</div>
-        <div class="chip" onclick="setFilter('budget', this)">🪙 Low Rate (≤50)</div>
-    </div>
-
-    <!-- REAL HOSTS SECTION (TOP) -->
-    <div class="section-header">
-        <i class="fa-solid fa-star" style="color:#FFD700;"></i> 🌟 Verified Real Hosts
-    </div>
-    <div class="host-grid" id="real-hosts-container"></div>
-
-    <!-- DUMMY/POPULAR HOSTS SECTION (BOTTOM) -->
-    <div class="section-header">
-        <i class="fa-solid fa-fire" style="color:#FF007A;"></i> 🔥 Popular Online Hosts
-    </div>
-    <div class="host-grid" id="dummy-hosts-container"></div>
-
-    <!-- BOTTOM NAVIGATION BAR -->
     <nav class="bottom-nav">
-        <div class="nav-item active" onclick="window.scrollTo({top:0, behavior:'smooth'})">
-            <i class="fa-solid fa-house"></i>
-            <span>Home</span>
-        </div>
-        <div class="nav-item" onclick="openRechargeModal()">
-            <i class="fa-solid fa-wallet"></i>
-            <span>Recharge</span>
-        </div>
-        <div class="nav-item" onclick="openSupportLink()">
-            <i class="fa-solid fa-headset"></i>
-            <span>Support</span>
-        </div>
-        <div class="nav-item" onclick="openUserProfileModal()">
-            <i class="fa-solid fa-user"></i>
-            <span>Profile</span>
-        </div>
+        <div class="nav-item active" id="nav-home" onclick="switchTab('home')"><i class="fa-solid fa-house"></i><span>Home</span></div>
+        <div class="nav-item" onclick="openRechargeModal()"><i class="fa-solid fa-wallet"></i><span>Recharge</span></div>
+        <div class="nav-item" onclick="openSupportLink()"><i class="fa-solid fa-headset"></i><span>Support</span></div>
+        <div class="nav-item" id="nav-profile" onclick="switchTab('profile')"><i class="fa-solid fa-user"></i><span>Profile</span></div>
     </nav>
 
-    <!-- DETAILED HOST PROFILE MODAL -->
-    <div class="modal-overlay" id="host-detail-modal">
+    <div class="modal-overlay" id="host-reg-modal">
         <div class="modal-card">
-            <div class="modal-header">
-                <h3 id="modal-host-name">Host Profile</h3>
-                <button class="close-btn" onclick="closeModal('host-detail-modal')">✕</button>
-            </div>
-            
-            <img id="modal-host-img" src="" class="host-profile-banner">
-
-            <div class="stats-row">
-                <div>
-                    <div class="stat-val" id="modal-host-rating">⭐ 4.9</div>
-                    <div class="stat-lbl">Rating</div>
-                </div>
-                <div>
-                    <div class="stat-val" id="modal-host-calls">1.2k+</div>
-                    <div class="stat-lbl">1v1 Calls</div>
-                </div>
-                <div>
-                    <div class="stat-val" style="color:var(--accent-cyan);">Online</div>
-                    <div class="stat-lbl">Status</div>
-                </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                <h3 id="host-modal-title">📹 Host Registration</h3>
+                <button style="background:none; border:none; color:white; font-size:1.2rem;" onclick="closeModal('host-reg-modal')">✕</button>
             </div>
 
-            <div class="detail-tag-grid">
-                <div class="detail-tag">
-                    <span>Booking Rate</span>
-                    <b id="modal-host-rate" style="color:var(--gold);">🪙 50 / min</b>
-                </div>
-                <div class="detail-tag">
-                    <span>Age</span>
-                    <b id="modal-host-age">22 Years</b>
-                </div>
-                <div class="detail-tag">
-                    <span>Languages</span>
-                    <b id="modal-host-lang">Hindi, English</b>
-                </div>
-                <div class="detail-tag">
-                    <span>Location</span>
-                    <b id="modal-host-loc">India 🇮🇳</b>
-                </div>
+            <div id="host-form-container">
+                <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:12px;">Fill details to register as an Official Host. Admin will verify your profile.</p>
+                <input type="text" id="host-name-input" class="input-box" placeholder="Your Full Name">
+                <input type="number" id="host-age-input" class="input-box" placeholder="Age (e.g. 22)">
+                <input type="number" id="host-rate-input" class="input-box" placeholder="Call Rate (Tokens/min, e.g. 50)">
+                <input type="text" id="host-lang-input" class="input-box" placeholder="Languages (e.g. Hindi, English)">
+                <input type="text" id="host-loc-input" class="input-box" placeholder="Location (e.g. Mumbai 🇮🇳)">
+                <input type="text" id="host-img-input" class="input-box" placeholder="Profile Photo Direct URL">
+                <input type="text" id="host-bio-input" class="input-box" placeholder="Short Bio / Description">
+                <button class="call-btn" style="padding:12px;" onclick="submitHostRegistration()">🚀 Submit For Admin Approval</button>
             </div>
 
-            <div style="background:rgba(255,255,255,0.04); border:1px solid var(--card-border); padding:12px; border-radius:12px; margin-bottom:16px;">
-                <span style="font-size:0.75rem; color:var(--text-muted); display:block; margin-bottom:4px;">About Me</span>
-                <p id="modal-host-bio" style="font-size:0.85rem;"></p>
+            <div id="host-pending-container" style="display:none; text-align:center; padding:20px 0;">
+                <i class="fa-solid fa-clock" style="font-size:3rem; color:var(--gold); margin-bottom:12px;"></i>
+                <h3>Application Under Review ⏳</h3>
+                <p style="font-size:0.85rem; color:var(--text-muted); margin-top:6px;">Your registration card has been sent to Super Admin in Group 1. You will be notified once approved!</p>
             </div>
 
-            <div style="display:flex; gap:10px;">
-                <button class="call-btn" style="flex:2; padding:12px;" onclick="startCallFromModal()">
-                    <i class="fa-solid fa-video"></i> Start 1v1 Call
-                </button>
-                <button class="call-btn" style="flex:1; background:var(--secondary-gradient); padding:12px;" onclick="sendQuickGift()">
-                    🎁 Gift
-                </button>
+            <div id="host-approved-container" style="display:none; text-align:center; padding:10px 0;">
+                <i class="fa-solid fa-circle-check" style="font-size:3rem; color:var(--accent-cyan); margin-bottom:8px;"></i>
+                <h3>Verified Host Account ☑️</h3>
+                <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:16px;">Toggle your Live status below to appear in the Mini App online list!</p>
+                <button id="toggle-live-btn" class="call-btn" style="padding:14px; background:var(--secondary-gradient);" onclick="toggleHostLiveStatus()">📹 Go Live (Camera ON)</button>
             </div>
         </div>
     </div>
 
-    <!-- USER PROFILE MODAL -->
-    <div class="modal-overlay" id="user-profile-modal">
-        <div class="modal-card">
-            <div class="modal-header">
-                <h3>My Profile</h3>
-                <button class="close-btn" onclick="closeModal('user-profile-modal')">✕</button>
-            </div>
-            <div style="text-align:center; margin-bottom:16px;">
-                <div style="font-size:2.5rem; margin-bottom:4px;" id="user-modal-icon">👤</div>
-                <h3 id="user-modal-name">User</h3>
-                <p id="user-modal-role" style="font-size:0.8rem; color:var(--text-muted);">User ID: <span id="user-modal-id">0000</span></p>
-            </div>
-
-            <div class="menu-item" onclick="openRechargeModal()">
-                <span><i class="fa-solid fa-coins" style="color:var(--gold); margin-right:8px;"></i> Wallet Balance: <b id="profile-token-val">0</b> Tokens</span>
-                <i class="fa-solid fa-chevron-right" style="font-size:0.8rem;"></i>
-            </div>
-            <div class="menu-item" onclick="openRulesModal('user')">
-                <span><i class="fa-solid fa-shield-halved" style="color:#FF007A; margin-right:8px;"></i> User Terms & Guidelines</span>
-                <i class="fa-solid fa-chevron-right" style="font-size:0.8rem;"></i>
-            </div>
-            <div class="menu-item" onclick="openRulesModal('host')">
-                <span><i class="fa-solid fa-video" style="color:var(--accent-cyan); margin-right:8px;"></i> Host Registration & Rules</span>
-                <i class="fa-solid fa-chevron-right" style="font-size:0.8rem;"></i>
-            </div>
-            <div class="menu-item" onclick="openSupportLink()">
-                <span><i class="fa-solid fa-headset" style="color:#00B2FF; margin-right:8px;"></i> Help & Customer Support</span>
-                <i class="fa-solid fa-chevron-right" style="font-size:0.8rem;"></i>
-            </div>
-        </div>
-    </div>
-
-    <!-- RULES MODAL -->
-    <div class="modal-overlay" id="rules-modal">
-        <div class="modal-card">
-            <div class="modal-header">
-                <h3 id="rules-title">Platform Rules</h3>
-                <button class="close-btn" onclick="closeModal('rules-modal')">✕</button>
-            </div>
-            <div id="rules-content" style="font-size:0.85rem; line-height:1.6; color:var(--text-muted);"></div>
-        </div>
-    </div>
-
-    <!-- RECHARGE MODAL -->
     <div class="modal-overlay" id="recharge-modal">
         <div class="modal-card">
-            <div class="modal-header">
-                <h3>💳 Recharge Vynora Tokens</h3>
-                <button class="close-btn" onclick="closeModal('recharge-modal')">✕</button>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                <h3>💳 Recharge Tokens</h3>
+                <button style="background:none; border:none; color:white;" onclick="closeModal('recharge-modal')">✕</button>
             </div>
-            <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:12px;">
-                UPI ID: <b style="color:#FF007A;">vynoralive@slc</b> (Rajnish Kumar)
-            </p>
-            <input type="number" id="recharge-amount" class="input-box" value="100" placeholder="Amount (INR)">
-            <input type="text" id="recharge-utr" class="input-box" placeholder="Enter 12-Digit UTR Number">
-            <button class="call-btn" style="padding:12px;" onclick="submitRecharge()">🚀 Submit UTR For Approval</button>
+            <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:12px;">UPI: <b style="color:#FF007A;">vynoralive@slc</b> (Slice)</p>
+            <input type="number" id="recharge-amount" class="input-box" value="100">
+            <input type="text" id="recharge-utr" class="input-box" placeholder="12-Digit UTR Number">
+            <button class="call-btn" style="padding:12px;" onclick="submitRecharge()">Submit UTR</button>
         </div>
     </div>
 
-    <!-- 1v1 VIDEO CALL SCREEN -->
     <div class="call-screen" id="call-screen">
-        <div class="admin-banner" id="admin-banner">
-            👑 VIP SUPER ADMIN ENTERED THE ROOM
-        </div>
-
         <img src="" class="remote-video" id="call-remote-img">
         <img src="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=300&auto=format&fit=crop" class="local-video">
-
         <div class="call-top">
-            <div style="background:rgba(0,0,0,0.6); padding:6px 12px; border-radius:20px; font-size:0.85rem; font-weight:700;">
-                ⏱️ <span id="call-duration">00:00</span>
-            </div>
-            <div class="wallet-badge" style="background:rgba(0,0,0,0.6);">
-                🪙 <span id="call-token-val">0</span>
-            </div>
+            <div style="background:rgba(0,0,0,0.6); padding:6px 12px; border-radius:20px; font-size:0.85rem;">⏱️ <span id="call-duration">00:00</span></div>
         </div>
-
         <div class="call-bottom">
-            <button class="ctrl-btn" onclick="endCall()"><i class="fa-solid fa-microphone"></i></button>
             <button class="ctrl-btn end" onclick="endCall()"><i class="fa-solid fa-phone-slash"></i></button>
-            <button class="ctrl-btn" onclick="endCall()"><i class="fa-solid fa-camera-rotate"></i></button>
         </div>
     </div>
 
@@ -699,178 +304,168 @@
 
         const SUPER_ADMIN_ID = 7001825467;
         const userId = tg?.initDataUnsafe?.user?.id || SUPER_ADMIN_ID;
-        const userName = tg?.initDataUnsafe?.user?.first_name || "User";
+        const userName = tg?.initDataUnsafe?.user?.first_name || "Shalu";
 
         let userTokens = 0;
-        let selectedHost = null;
-        let callTimer = null;
-        let secondsElapsed = 0;
-        let activeFilter = 'all';
+        let hostStatus = "none";
+        let isHostOnline = false;
 
-        // REAL REGISTERED HOSTS (Top Section)
-        const realHosts = [
-            { id: "rh1", name: "Ananya Sharma", age: 22, rate: 50, lang: "Hindi, English", loc: "Mumbai 🇮🇳", rating: "4.9", calls: "1.5k+", isReal: true, img: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop", bio: "Verified host! Available for fun 1v1 video chats 💖" },
-            { id: "rh2", name: "Priya Roy", age: 21, rate: 40, lang: "Hindi", loc: "Delhi 🇮🇳", rating: "4.8", calls: "980+", isReal: true, img: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=600&auto=format&fit=crop", bio: "Late night friendly conversations ✨" }
-        ];
-
-        // DUMMY / POPULAR HOSTS (Bottom Section)
         const dummyHosts = [
-            { id: "dh1", name: "Sophia Rose", age: 24, rate: 80, lang: "English", loc: "London 🇬🇧", rating: "5.0", calls: "2.1k+", isReal: false, img: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=600&auto=format&fit=crop", bio: "International 1v1 private video calls 🚀" },
-            { id: "dh2", name: "Elena Rostova", age: 23, rate: 100, lang: "English, Russian", loc: "Moscow 🇷🇺", rating: "4.9", calls: "1.8k+", isReal: false, img: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=600&auto=format&fit=crop", bio: "High end VIP calling experience 👑" }
+            { id: "dh1", name: "Sophia Rose", rate: 80, img: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=600&auto=format&fit=crop" },
+            { id: "dh2", name: "Elena Rostova", rate: 100, img: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=600&auto=format&fit=crop" }
         ];
 
-        async function loadUserData() {
-            document.getElementById('user-initial').innerText = userName.charAt(0).toUpperCase();
-            document.getElementById('user-modal-name').innerText = userName;
-            document.getElementById('user-modal-id').innerText = userId;
-
-            if (userId === SUPER_ADMIN_ID) {
-                document.getElementById('admin-crown').style.display = 'block';
-                document.getElementById('user-modal-role').innerHTML = `<b style="color:#FFD700;">👑 Super Admin VIP</b> | ID: ${userId}`;
-                document.getElementById('user-modal-icon').innerText = '👑';
-            }
+        async function initData() {
+            document.getElementById('profile-user-name').innerText = `${userName} 👑`;
+            document.getElementById('profile-user-id').innerText = userId;
 
             try {
                 const res = await fetch(`/api/user/${userId}`);
                 const data = await res.json();
                 userTokens = data.tokens || 0;
                 document.getElementById('user-token-bal').innerText = userTokens;
-                document.getElementById('profile-token-val').innerText = userTokens;
-                document.getElementById('call-token-val').innerText = userTokens;
-            } catch (e) { console.log(e); }
+                document.getElementById('profile-tokens-count').innerText = userTokens;
+            } catch(e) {}
+
+            try {
+                const hRes = await fetch(`/api/host-info/${userId}`);
+                const hData = await hRes.json();
+                hostStatus = hData.status;
+                isHostOnline = hData.isOnline;
+                if (hostStatus === 'approved') {
+                    document.getElementById('creator-btn-text').innerText = "Live Dashboard 📹";
+                }
+            } catch(e) {}
+
+            fetchRealHosts();
         }
 
-        function setFilter(filterType, element) {
-            activeFilter = filterType;
-            document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-            if (element) element.classList.add('active');
-            renderHosts();
+        async function fetchRealHosts() {
+            try {
+                const res = await fetch('/api/hosts');
+                const data = await res.json();
+                renderHosts(data.hosts || []);
+            } catch(e) { renderHosts([]); }
         }
 
-        function createHostCardHtml(h) {
-            return `
-                <div class="host-card" onclick="openHostModal('${h.id}')">
+        function renderHosts(realHosts) {
+            const rContainer = document.getElementById('real-hosts-container');
+            const dContainer = document.getElementById('dummy-hosts-container');
+
+            rContainer.innerHTML = realHosts.length > 0 ? realHosts.map(h => `
+                <div class="host-card" onclick="startCall('${h.img}')">
                     <img src="${h.img}" class="host-thumb">
-                    <div class="badge-live"><div class="pulse-dot"></div> LIVE</div>
+                    <div class="badge-live">LIVE</div>
                     <div class="badge-rate">🪙 ${h.rate}/m</div>
                     <div class="host-info">
-                        <div class="host-name">
-                            ${h.name} <i class="fa-solid fa-circle-check verified-tick"></i>
-                        </div>
-                        <div class="host-meta">
-                            <span>${h.age} Yrs</span> • <span>${h.lang.split(',')[0]}</span>
-                        </div>
-                        <button class="call-btn" onclick="event.stopPropagation(); startCall('${h.id}')">
-                            <i class="fa-solid fa-video"></i> 1v1 Call
-                        </button>
+                        <div class="host-name">${h.name} <i class="fa-solid fa-circle-check" style="color:#00B2FF;"></i></div>
+                        <button class="call-btn"><i class="fa-solid fa-video"></i> 1v1 Call</button>
                     </div>
                 </div>
-            `;
+            `).join('') : '<div style="grid-column:span 2; font-size:0.8rem; color:var(--text-muted); text-align:center; padding:10px;">No online verified hosts right now.</div>';
+
+            dContainer.innerHTML = dummyHosts.map(h => `
+                <div class="host-card" onclick="startCall('${h.img}')">
+                    <img src="${h.img}" class="host-thumb">
+                    <div class="badge-live">LIVE</div>
+                    <div class="badge-rate">🪙 ${h.rate}/m</div>
+                    <div class="host-info">
+                        <div class="host-name">${h.name}</div>
+                        <button class="call-btn"><i class="fa-solid fa-video"></i> 1v1 Call</button>
+                    </div>
+                </div>
+            `).join('');
         }
 
-        function renderHosts() {
-            const realContainer = document.getElementById('real-hosts-container');
-            const dummyContainer = document.getElementById('dummy-hosts-container');
-
-            let allList = [...realHosts, ...dummyHosts];
-
-            if (activeFilter === 'real') {
-                allList = realHosts;
-            } else if (activeFilter === 'hindi') {
-                allList = allList.filter(h => h.lang.toLowerCase().includes('hindi'));
-            } else if (activeFilter === 'english') {
-                allList = allList.filter(h => h.lang.toLowerCase().includes('english'));
-            } else if (activeFilter === 'budget') {
-                allList = allList.filter(h => h.rate <= 50);
+        function switchTab(tab) {
+            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+            if (tab === 'home') {
+                document.getElementById('home-tab-view').style.display = 'block';
+                document.getElementById('profile-tab-view').classList.remove('active');
+                document.getElementById('nav-home').classList.add('active');
+            } else {
+                document.getElementById('home-tab-view').style.display = 'none';
+                document.getElementById('profile-tab-view').classList.add('active');
+                document.getElementById('nav-profile').classList.add('active');
             }
-
-            const activeReal = allList.filter(h => h.isReal);
-            const activeDummy = allList.filter(h => !h.isReal);
-
-            realContainer.innerHTML = activeReal.length > 0 ? activeReal.map(createHostCardHtml).join('') : '<div style="grid-column:span 2; font-size:0.8rem; color:var(--text-muted);">No real hosts available in this filter.</div>';
-            dummyContainer.innerHTML = activeDummy.length > 0 ? activeDummy.map(createHostCardHtml).join('') : '<div style="grid-column:span 2; font-size:0.8rem; color:var(--text-muted);">No popular hosts in this filter.</div>';
         }
 
-        function openHostModal(hostId) {
-            const all = [...realHosts, ...dummyHosts];
-            selectedHost = all.find(h => h.id === hostId);
-            
-            document.getElementById('modal-host-name').innerHTML = `${selectedHost.name} <i class="fa-solid fa-circle-check verified-tick"></i>`;
-            document.getElementById('modal-host-img').src = selectedHost.img;
-            document.getElementById('modal-host-rate').innerText = `🪙 ${selectedHost.rate} / min`;
-            document.getElementById('modal-host-age').innerText = `${selectedHost.age} Years`;
-            document.getElementById('modal-host-lang').innerText = selectedHost.lang;
-            document.getElementById('modal-host-loc').innerText = selectedHost.loc;
-            document.getElementById('modal-host-rating').innerText = `⭐ ${selectedHost.rating}`;
-            document.getElementById('modal-host-calls').innerText = selectedHost.calls;
-            document.getElementById('modal-host-bio').innerText = selectedHost.bio;
+        function openHostRegistrationModal() {
+            document.getElementById('host-form-container').style.display = 'none';
+            document.getElementById('host-pending-container').style.display = 'none';
+            document.getElementById('host-approved-container').style.display = 'none';
 
-            document.getElementById('host-detail-modal').classList.add('active');
-        }
-
-        function startCallFromModal() {
-            closeModal('host-detail-modal');
-            startCall(selectedHost.id);
-        }
-
-        function startCall(hostId) {
-            const all = [...realHosts, ...dummyHosts];
-            selectedHost = all.find(h => h.id === hostId);
-
-            if (userTokens < selectedHost.rate) {
-                alert(`⚠️ Insufficient Balance! Minimum ${selectedHost.rate} Tokens needed for 1 minute.`);
-                openRechargeModal();
-                return;
+            if (hostStatus === 'none') {
+                document.getElementById('host-form-container').style.display = 'block';
+            } else if (hostStatus === 'pending') {
+                document.getElementById('host-pending-container').style.display = 'block';
+            } else if (hostStatus === 'approved') {
+                document.getElementById('host-approved-container').style.display = 'block';
+                updateLiveBtnUI();
             }
+            document.getElementById('host-reg-modal').classList.add('active');
+        }
 
-            document.getElementById('call-remote-img').src = selectedHost.img;
+        async function submitHostRegistration() {
+            const name = document.getElementById('host-name-input').value.trim();
+            const age = parseInt(document.getElementById('host-age-input').value);
+            const rate = parseInt(document.getElementById('host-rate-input').value);
+            const lang = document.getElementById('host-lang-input').value.trim();
+            const loc = document.getElementById('host-loc-input').value.trim();
+            const img = document.getElementById('host-img-input').value.trim();
+            const bio = document.getElementById('host-bio-input').value.trim();
+
+            if (!name || !img || !rate) return alert("Fill Name, Rate & Photo URL!");
+
+            try {
+                const res = await fetch('/api/register-host', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ user_id: userId, name, age, rate, lang, loc, img, bio })
+                });
+                const data = await res.json();
+                alert(data.message);
+                hostStatus = "pending";
+                openHostRegistrationModal();
+            } catch(e) { alert("Registration error"); }
+        }
+
+        async function toggleHostLiveStatus() {
+            try {
+                const res = await fetch('/api/host/toggle-live', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ user_id: userId })
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    isHostOnline = data.isOnline;
+                    updateLiveBtnUI();
+                    fetchRealHosts();
+                }
+            } catch(e) {}
+        }
+
+        function updateLiveBtnUI() {
+            const btn = document.getElementById('toggle-live-btn');
+            if (isHostOnline) {
+                btn.innerText = "🔴 Go Offline (Camera OFF)";
+                btn.style.background = "#FF0055";
+            } else {
+                btn.innerText = "📹 Go Live (Camera ON)";
+                btn.style.background = "var(--secondary-gradient)";
+            }
+        }
+
+        function startCall(img) {
+            document.getElementById('call-remote-img').src = img;
             document.getElementById('call-screen').classList.add('active');
-
-            if (userId === SUPER_ADMIN_ID) {
-                const b = document.getElementById('admin-banner');
-                b.style.display = 'block';
-                setTimeout(() => b.style.display = 'none', 4000);
-            }
-
-            secondsElapsed = 0;
-            callTimer = setInterval(() => {
-                secondsElapsed++;
-                const mins = String(Math.floor(secondsElapsed / 60)).padStart(2, '0');
-                const secs = String(secondsElapsed % 60).padStart(2, '0');
-                document.getElementById('call-duration').innerText = `${mins}:${secs}`;
-            }, 1000);
         }
+        function endCall() { document.getElementById('call-screen').classList.remove('active'); }
 
-        function endCall() {
-            clearInterval(callTimer);
-            document.getElementById('call-screen').classList.remove('active');
-        }
-
-        function sendQuickGift() {
-            alert(`🎁 Rose Gift (10 Tokens) sent to ${selectedHost.name}!`);
-        }
-
-        function openUserProfileModal() { document.getElementById('user-profile-modal').classList.add('active'); }
         function openRechargeModal() { document.getElementById('recharge-modal').classList.add('active'); }
         function closeModal(id) { document.getElementById(id).classList.remove('active'); }
-
-        function openRulesModal(type) {
-            const t = document.getElementById('rules-title');
-            const c = document.getElementById('rules-content');
-            if (type === 'user') {
-                t.innerText = "📜 User Rules & Policy";
-                c.innerHTML = "1. Recharges are verified by Admin.<br>2. No abuse during calls.<br>3. Tokens non-refundable.<br>4. 24/7 Support available.";
-            } else {
-                t.innerText = "👑 Host Guidelines";
-                c.innerHTML = "1. Maintain professional behavior.<br>2. 50% commission per call minute.<br>3. Minimum payout threshold: 1000 Tokens.";
-            }
-            document.getElementById('rules-modal').classList.add('active');
-        }
-
-        function openSupportLink() {
-            if (tg) tg.openTelegramLink('https://t.me/vynorasupport');
-            else window.open('https://t.me/vynorasupport', '_blank');
-        }
+        function openSupportLink() { if(tg) tg.openTelegramLink('https://t.me/vynorasupport'); }
 
         async function submitRecharge() {
             const amount = parseFloat(document.getElementById('recharge-amount').value);
@@ -888,8 +483,7 @@
             } catch(e) { alert("Error submitting"); }
         }
 
-        loadUserData();
-        renderHosts();
+        initData();
     </script>
 </body>
 </html>
