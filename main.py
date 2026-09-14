@@ -1,7 +1,6 @@
 import os
 import time
 import logging
-import asyncio
 from datetime import datetime
 from typing import Optional
 
@@ -36,12 +35,13 @@ bookings_col = db.bookings
 async def startup_event():
     if bot:
         try:
+            # Purana sabhi webhook clear karke naya set karenge (No Polling)
             await bot.delete_webhook(drop_pending_updates=True)
             webhook_url = f"{RENDER_URL}/webhook"
             await bot.set_webhook(webhook_url, drop_pending_updates=True)
-            logging.info(f"🔗 Telegram Webhook Set to: {webhook_url}")
+            logging.info(f"🔗 Telegram Webhook Successfully Set to: {webhook_url}")
         except Exception as e:
-            logging.error(f"Webhook error: {e}")
+            logging.error(f"Webhook setup error: {e}")
 
 @app.post("/webhook")
 async def telegram_webhook(request: Request):
@@ -243,7 +243,7 @@ async def toggle_live(req: ToggleLiveReq):
 if os.path.exists("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Telegram Bot Callback Handlers with Dual-ID matching
+# Telegram Bot Callback Handlers
 @dp.callback_query(F.data.startswith("appr_"))
 async def approve_recharge(call: types.CallbackQuery):
     tx_id = call.data.split("_")[1]
@@ -267,7 +267,6 @@ async def reject_recharge(call: types.CallbackQuery):
 async def approve_host_cb(call: types.CallbackQuery):
     try:
         host_u_id = int(call.data.split("_")[1])
-        # Dual update for safety
         await hosts_col.update_one({"user_id": host_u_id}, {"$set": {"status": "approved", "isVerified": True}}, upsert=True)
         await hosts_col.update_one({"_id": f"host_{host_u_id}"}, {"$set": {"status": "approved", "isVerified": True}}, upsert=True)
 
