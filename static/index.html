@@ -151,12 +151,15 @@
         </div>
 
         <div class="action-icon-grid">
+            <div class="icon-card" id="go-live-card" style="display: none; background: rgba(255,0,122,0.25); border-color: #FF007A;" onclick="startMyLiveStream()">
+                <i class="fa-solid fa-tower-broadcast" style="color:#FF007A;"></i>
+                <p style="color:white; font-weight:700;">Go Live 🔴</p>
+            </div>
             <div class="icon-card" onclick="openHostRegistrationModal()">
                 <i class="fa-solid fa-video" style="color:#FF007A;"></i>
                 <p>Creator Center</p>
             </div>
             <div class="icon-card"><i class="fa-solid fa-gift" style="color:#FF5500;"></i><p>Bonus</p></div>
-            <div class="icon-card"><i class="fa-solid fa-id-card" style="color:var(--accent-cyan);"></i><p>Passcard</p></div>
             <div class="icon-card"><i class="fa-solid fa-crown" style="color:var(--gold);"></i><p>Level</p></div>
         </div>
     </div>
@@ -285,6 +288,15 @@
                 document.getElementById('profile-tokens-count').innerText = userTokens;
                 document.getElementById('profile-earnings-count').innerText = data.earnings || 0;
             } catch(e) {}
+
+            try {
+                const hostRes = await fetch(`/api/host/status/${userId}`);
+                const hostData = await hostRes.json();
+                if (hostData.is_host && hostData.status === "approved") {
+                    document.getElementById('go-live-card').style.display = 'block';
+                }
+            } catch(e) {}
+
             fetchHosts();
         }
 
@@ -360,12 +372,15 @@
                 const data = await res.json();
                 if(data.status === "success") {
                     closeModal('host-booking-modal');
-                    // Start Agora Call directly on successful booking/trial
                     startVideoCall("vynora_call_" + data.booking_id, parseInt(userId));
                 } else {
                     alert(data.message);
                 }
             } catch(e) { alert("Booking failed"); }
+        }
+
+        function startMyLiveStream() {
+            startVideoCall("host_broadcast_" + userId, parseInt(userId));
         }
 
         async function startVideoCall(channelName, uid) {
