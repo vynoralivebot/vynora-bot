@@ -43,7 +43,12 @@
         .promo-banner p { font-size: 0.75rem; opacity: 0.9; }
         .get-btn { background: white; color: #FF007A; font-weight: 800; border: none; padding: 6px 14px; border-radius: 14px; font-size: 0.8rem; cursor: pointer; }
 
-        .section-header { padding: 12px 16px 8px 16px; font-size: 0.9rem; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+        /* FILTER TABS STYLING */
+        .filter-container { display: flex; gap: 8px; padding: 0 16px 12px 16px; overflow-x: auto; }
+        .filter-pill { background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); padding: 6px 14px; border-radius: 20px; font-size: 0.78rem; color: var(--text-muted); cursor: pointer; white-space: nowrap; }
+        .filter-pill.active { background: #FF007A; color: white; border-color: #FF007A; font-weight: 700; }
+
+        .section-header { padding: 4px 16px 8px 16px; font-size: 0.9rem; font-weight: 700; display: flex; align-items: center; gap: 6px; }
 
         .host-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; padding: 0 16px; }
         .host-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 16px; overflow: hidden; position: relative; cursor: pointer; }
@@ -122,6 +127,14 @@
             <button class="get-btn" onclick="openHostRegistrationModal()">Become Host</button>
         </div>
 
+        <!-- FILTER TABS -->
+        <div class="filter-container">
+            <div class="filter-pill active" onclick="filterHosts('all', this)">🔥 All Hosts</div>
+            <div class="filter-pill" onclick="filterHosts('verified', this)">💎 Verified Only</div>
+            <div class="filter-pill" onclick="filterHosts('private', this)">👑 Private Calls</div>
+            <div class="filter-pill" onclick="filterHosts('budget', this)">⚡ Under 50🪙</div>
+        </div>
+
         <div class="section-header"><i class="fa-solid fa-video" style="color:#FF007A;"></i> 1v1 Verified Streamers</div>
         <div class="host-grid" id="hosts-container"></div>
     </div>
@@ -179,9 +192,7 @@
                 <h3 id="bk-host-name">Host Profile</h3>
                 <button style="background:none; border:none; color:white; font-size:1.2rem;" onclick="closeModal('host-booking-modal')">✕</button>
             </div>
-
             <img id="drawer-host-img" src="" style="width:100%; height:220px; object-fit:cover; border-radius:16px; margin-bottom:12px;">
-
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
                 <div>
                     <h4 id="drawer-name-title" style="font-size:1.05rem;">Host Name</h4>
@@ -191,12 +202,10 @@
                     🪙 <span id="drawer-rate">50</span>/min
                 </div>
             </div>
-
             <div class="booking-option-card">
                 <div><b>⚡ 1 Min Direct Trial</b><p style="font-size:0.72rem; color:var(--text-muted);">Instant direct call</p></div>
                 <button class="call-btn" style="width:auto; padding:8px 14px;" onclick="confirmBooking(1, 50)">🪙 50 Tokens</button>
             </div>
-
             <div class="booking-option-card">
                 <div><b>⏱️ 5 Mins Slot Booking</b><p style="font-size:0.72rem; color:var(--text-muted);">Private 1v1 reserved slot</p></div>
                 <button class="call-btn" style="width:auto; padding:8px 14px; background:var(--banner-pink);" onclick="confirmBooking(5, 250)">🪙 250 Tokens</button>
@@ -260,13 +269,14 @@
         const tg = window.Telegram?.WebApp;
         if (tg) tg.expand();
 
-        const userId = tg?.initDataUnsafe?.user?.id || 7001825467;
+        const userId = tg?.initDataUnsafe?.user?.id ? Math.abs(parseInt(tg.initDataUnsafe.user.id)) : 7001825467;
         const userName = tg?.initDataUnsafe?.user?.first_name || "Vynora Live";
         const telegramPhoto = tg?.initDataUnsafe?.user?.photo_url || "";
         
         let userTokens = 0;
         let selectedAmount = 100;
         let selectedHostObj = null;
+        let allHostsList = [];
 
         let agoraClient = null;
         let localTracks = { audioTrack: null, videoTrack: null };
@@ -275,11 +285,6 @@
             document.getElementById('profile-user-name').innerText = `${userName} 👑`;
             document.getElementById('profile-user-id').innerText = userId;
 
-            if (telegramPhoto) {
-                document.getElementById('profile-avatar-img').src = telegramPhoto;
-                document.getElementById('header-avatar-img').src = telegramPhoto;
-            }
-
             try {
                 const res = await fetch(`/api/user/${userId}`);
                 const data = await res.json();
@@ -287,6 +292,10 @@
                 document.getElementById('user-token-bal').innerText = userTokens;
                 document.getElementById('profile-tokens-count').innerText = userTokens;
                 document.getElementById('profile-earnings-count').innerText = data.earnings || 0;
+
+                const avatarImg = data.avatar || telegramPhoto || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop";
+                document.getElementById('profile-avatar-img').src = avatarImg;
+                document.getElementById('header-avatar-img').src = avatarImg;
             } catch(e) {}
 
             try {
@@ -304,7 +313,8 @@
             try {
                 const res = await fetch('/api/hosts');
                 const data = await res.json();
-                renderHosts(data.hosts || []);
+                allHostsList = data.hosts || [];
+                renderHosts(allHostsList);
             } catch(e) { renderHosts([]); }
         }
 
@@ -325,6 +335,44 @@
                     </div>
                 </div>
             `).join('');
+        }
+
+        function filterHosts(type, el) {
+            document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+            el.classList.add('active');
+
+            if (type === 'all') {
+                renderHosts(allHostsList);
+            } else if (type === 'verified') {
+                renderHosts(allHostsList.filter(h => h.isVerified));
+            } else if (type === 'private') {
+                renderHosts(allHostsList.filter(h => h.isPrivate));
+            } else if (type === 'budget') {
+                renderHosts(allHostsList.filter(h => (h.rate || 50) <= 50));
+            }
+        }
+
+        async function promptPhotoUpdate() {
+            const newUrl = prompt("Enter new Profile Photo Direct URL:");
+            if (newUrl && newUrl.startsWith('http')) {
+                try {
+                    const res = await fetch('/api/update-profile-photo', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ user_id: parseInt(userId), avatar_url: newUrl })
+                    });
+                    const data = await res.json();
+                    if(data.status === "success") {
+                        document.getElementById('profile-avatar-img').src = newUrl;
+                        document.getElementById('header-avatar-img').src = newUrl;
+                        alert("Profile photo updated & saved successfully!");
+                    } else {
+                        alert("Failed to save profile picture.");
+                    }
+                } catch(e) {
+                    alert("Connection error while saving photo.");
+                }
+            }
         }
 
         function switchTab(tab) {
@@ -372,7 +420,7 @@
                 const data = await res.json();
                 if(data.status === "success") {
                     closeModal('host-booking-modal');
-                    startVideoCall("vynora_call_" + data.booking_id, parseInt(userId));
+                    startVideoCall("vynora_call_" + data.booking_id, userId % 2147483647);
                 } else {
                     alert(data.message);
                 }
@@ -380,18 +428,23 @@
         }
 
         function startMyLiveStream() {
-            startVideoCall("host_broadcast_" + userId, parseInt(userId));
+            startVideoCall("host_broadcast_" + userId, userId % 2147483647);
         }
 
-        async function startVideoCall(channelName, uid) {
+        async function startVideoCall(channelName, safeUid) {
             document.getElementById('video-call-screen').classList.add('active');
             try {
-                const res = await fetch(`/api/agora-token?channelName=${channelName}&uid=${uid}&role=publisher`);
+                const res = await fetch(`/api/agora-token?channelName=${channelName}&uid=${safeUid}&role=publisher`);
                 const data = await res.json();
 
                 if (data.status !== "success") {
                     alert("Token error: " + data.message);
+                    document.getElementById('video-call-screen').classList.remove('active');
                     return;
+                }
+
+                if (agoraClient) {
+                    await agoraClient.leave().catch(() => {});
                 }
 
                 agoraClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
@@ -412,6 +465,7 @@
             } catch (error) {
                 console.error("Agora join failed:", error);
                 alert("Video call connection failed!");
+                document.getElementById('video-call-screen').classList.remove('active');
             }
         }
 
