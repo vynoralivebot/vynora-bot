@@ -12,7 +12,6 @@ import motor.motor_asyncio
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Update, WebAppInfo
 
-# Optional Agora Token Builder (Make sure 'agora-token-builder' is in requirements.txt)
 try:
     from agora_token_builder import RtcTokenBuilder
 except ImportError:
@@ -25,7 +24,6 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 RENDER_URL = os.getenv("RENDER_URL", "https://vynora-bot.onrender.com")
 GROUP_1_ID = int(os.getenv("GROUP_1_ID", "0"))
 
-# Agora Credentials (Add these to Render Environment Variables)
 AGORA_APP_ID = os.getenv("AGORA_APP_ID", "")
 AGORA_APP_CERTIFICATE = os.getenv("AGORA_APP_CERTIFICATE", "")
 
@@ -105,18 +103,14 @@ async def serve_home():
         return FileResponse("static/index.html")
     return JSONResponse({"status": "error", "message": "Frontend index.html not found in static folder!"}, status_code=404)
 
-# AGORA TOKEN GENERATOR API FOR 1v1 LIVE STREAMING
 @app.get("/api/agora-token")
 async def get_agora_token(channelName: str, uid: int, role: str = "publisher"):
     if not AGORA_APP_ID or not AGORA_APP_CERTIFICATE or not RtcTokenBuilder:
         return JSONResponse({"status": "error", "message": "Agora credentials or package missing on server."}, status_code=500)
     
-    # Expiration time for token (e.g., 2 hours)
     expiration_time_in_seconds = 7200
     current_timestamp = int(time.time())
     privilege_expired_ts = current_timestamp + expiration_time_in_seconds
-
-    # 1 for Publisher, 2 for Subscriber
     agora_role = 1 if role == "publisher" else 2
 
     token = RtcTokenBuilder.buildTokenWithUid(
@@ -202,7 +196,7 @@ async def book_slot(req: BookingReq):
         except Exception as e:
             logging.error(f"Booking error: {e}")
 
-    return {"status": "success", "message": f"Booking request sent for {req.host_name}!"}
+    return {"status": "success", "booking_id": booking_id, "message": f"Booking request sent for {req.host_name}!"}
 
 DUMMY_HOSTS = [
     { "id": "h1", "name": "Anu ❤️", "rate": 50, "isVerified": True, "isPrivate": False, "bio": "Friendly 1v1 chats & music lovers 💖", "img": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop" },
@@ -267,22 +261,6 @@ async def register_host(req: RegisterHostReq):
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
-@app.post("/api/host/toggle-live")
-async def toggle_live(req: ToggleLiveReq):
-    doc = await hosts_col.find_one({"user_id": req.user_id}) or await hosts_col.find_one({"_id": f"host_{req.user_id}"})
-    if doc:
-        await hosts_col.update_one(
-            {"_id": doc["_id"]},
-            {"$set": {
-                "isPrivate": req.is_private,
-                "entryGiftCost": req.entry_gift_cost,
-                "status": "approved",
-                "isVerified": True
-            }}
-        )
-        return {"status": "success", "message": "Live status updated successfully!"}
-    return {"status": "error", "message": "Host profile not found. Register first!"}
-
 if os.path.exists("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -304,3 +282,15 @@ async def reject_recharge(call: types.CallbackQuery):
     await recharges_col.update_one({"_id": tx_id}, {"$set": {"status": "rejected"}})
     if call.message and call.message.text:
         await call.message.edit_text(call.message.text + "\n\n❌ **REJECTED BY ADMIN**", parse_mode="Markdown")
+
+@dp.callback_query(F.data.startswith("apphost_"))
+async def approve_host_cb(call: types.CallbackQuery):
+    try:
+        host_u_id = int(call.data.split("_")[1])
+        await hosts_col.update_one({"user_id": host_u_id}, {"$set": {"status": "approved", "isVerified": True}}, upsert=True)
+        await hosts_col.update_one({"_id": f"host_{host_u_id}"}, {"$set": {"status": "approved", "isVerified": True}}, upsert=True)
+        if call.message and call.message.caption:
+            await call.message.edit_caption(caption=call.message.caption + "\n\n✅ **APPROVED BY ADMIN (VERIFIED HOST)**", reply_markup=None, parse_mode="Markdown")
+        await call.answer("Host Approved & Verified Successfully!", show_alert=True)
+    except Exception as e:
+        await call.answer(f"Error: {e}", show_alert=True)
