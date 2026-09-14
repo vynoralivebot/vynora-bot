@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Vynora Live 1v1</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.20.0.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
@@ -73,9 +74,6 @@
         .icon-card { background: rgba(255,255,255,0.04); border: 1px solid var(--card-border); padding: 12px 6px; border-radius: 14px; cursor: pointer; }
         .icon-card i { font-size: 1.4rem; margin-bottom: 6px; }
         .icon-card p { font-size: 0.72rem; color: var(--text-muted); }
-
-        .posts-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-        .post-img { width: 100%; height: 120px; border-radius: 12px; object-fit: cover; }
 
         .plan-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 12px 0; }
         .plan-card { background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); padding: 10px 6px; border-radius: 12px; text-align: center; cursor: pointer; }
@@ -155,18 +153,11 @@
         <div class="action-icon-grid">
             <div class="icon-card" onclick="openHostRegistrationModal()">
                 <i class="fa-solid fa-video" style="color:#FF007A;"></i>
-                <p id="creator-btn-text">Creator Center</p>
+                <p>Creator Center</p>
             </div>
             <div class="icon-card"><i class="fa-solid fa-gift" style="color:#FF5500;"></i><p>Bonus</p></div>
             <div class="icon-card"><i class="fa-solid fa-id-card" style="color:var(--accent-cyan);"></i><p>Passcard</p></div>
             <div class="icon-card"><i class="fa-solid fa-crown" style="color:var(--gold);"></i><p>Level</p></div>
-        </div>
-
-        <div style="font-size:0.9rem; font-weight:700; margin-bottom:10px;">Post Photos</div>
-        <div class="posts-grid">
-            <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop" class="post-img">
-            <img src="https://images.unsplash.com/photo-1517841905240-472988babdf9?w=300&auto=format&fit=crop" class="post-img">
-            <img src="https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=300&auto=format&fit=crop" class="post-img">
         </div>
     </div>
 
@@ -207,10 +198,18 @@
                 <div><b>⏱️ 5 Mins Slot Booking</b><p style="font-size:0.72rem; color:var(--text-muted);">Private 1v1 reserved slot</p></div>
                 <button class="call-btn" style="width:auto; padding:8px 14px; background:var(--banner-pink);" onclick="confirmBooking(5, 250)">🪙 250 Tokens</button>
             </div>
+        </div>
+    </div>
 
-            <div class="booking-option-card">
-                <div><b>👑 10 Mins VIP Booking</b><p style="font-size:0.72rem; color:var(--text-muted);">Dedicated extended call</p></div>
-                <button class="call-btn" style="width:auto; padding:8px 14px;" onclick="confirmBooking(10, 500)">🪙 500 Tokens</button>
+    <!-- AGORA 1v1 VIDEO CALL SCREEN -->
+    <div class="modal-overlay" id="video-call-screen" style="background:#0A0714; align-items:center; justify-content:center;">
+        <div style="width:100%; height:100%; display:flex; flex-direction:column; position:relative;">
+            <div id="remote-video" style="width:100%; flex:1; background:#111;"></div>
+            <div id="local-video" style="position:absolute; top:20px; right:20px; width:110px; height:150px; background:#222; border-radius:12px; overflow:hidden; border:2px solid #FF007A;"></div>
+            <div style="position:absolute; bottom:30px; left:0; right:0; display:flex; justify-content:center; gap:20px;">
+                <button onclick="leaveCall()" style="background:#FF0033; color:white; border:none; padding:12px 24px; border-radius:30px; font-weight:700; cursor:pointer;">
+                    <i class="fa-solid fa-phone-slash"></i> End Call
+                </button>
             </div>
         </div>
     </div>
@@ -222,22 +221,15 @@
                 <h3>💳 Select Recharge Plan</h3>
                 <button style="background:none; border:none; color:white; font-size:1.2rem;" onclick="closeModal('recharge-modal')">✕</button>
             </div>
-
             <div class="plan-grid">
                 <div class="plan-card active" onclick="selectPlan(100, this)"><div class="plan-amount">₹100</div><div class="plan-tokens">100 Tokens</div></div>
                 <div class="plan-card" onclick="selectPlan(200, this)"><div class="plan-amount">₹200</div><div class="plan-tokens">200 Tokens</div></div>
-                <div class="plan-card" onclick="selectPlan(300, this)"><div class="plan-amount">₹300</div><div class="plan-tokens">320 Tokens</div></div>
-                <div class="plan-card" onclick="selectPlan(400, this)"><div class="plan-amount">₹400</div><div class="plan-tokens">430 Tokens</div></div>
                 <div class="plan-card" onclick="selectPlan(500, this)"><div class="plan-amount">₹500</div><div class="plan-tokens">550 Tokens</div></div>
-                <div class="plan-card" onclick="selectPlan(1000, this)"><div class="plan-amount">₹1000</div><div class="plan-tokens">1150 Tokens</div></div>
             </div>
-
             <div class="qr-box">
-                <p style="font-size:0.75rem; color:#333; font-weight:700; margin-bottom:4px;">Scan QR Code to Pay via UPI</p>
                 <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=vynoralive@slc&pn=RajnishKumar" id="upi-qr-img">
                 <p style="font-size:0.75rem; color:#666; margin-top:4px;">UPI ID: <b>vynoralive@slc</b></p>
             </div>
-
             <input type="text" id="recharge-utr" class="input-box" placeholder="Enter 12-Digit UTR / Ref Number">
             <button class="call-btn" style="padding:12px;" onclick="submitRecharge()">🚀 Submit UTR For Approval</button>
         </div>
@@ -247,20 +239,17 @@
     <div class="modal-overlay" id="host-reg-modal">
         <div class="modal-card">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-                <h3>📹 Creator Center / Host Registration</h3>
+                <h3>📹 Host Registration</h3>
                 <button style="background:none; border:none; color:white;" onclick="closeModal('host-reg-modal')">✕</button>
             </div>
-
-            <div id="host-form-container">
-                <input type="text" id="host-name-input" class="input-box" placeholder="Your Full Name">
-                <input type="number" id="host-age-input" class="input-box" placeholder="Age (e.g. 22)">
-                <input type="number" id="host-rate-input" class="input-box" placeholder="Call Rate (Tokens/min)">
-                <input type="text" id="host-lang-input" class="input-box" placeholder="Languages (e.g. Hindi, English)">
-                <input type="text" id="host-loc-input" class="input-box" placeholder="Location">
-                <input type="text" id="host-img-input" class="input-box" placeholder="Profile Photo Direct URL">
-                <input type="text" id="host-bio-input" class="input-box" placeholder="Short Bio / Description">
-                <button class="call-btn" style="padding:12px;" onclick="submitHostRegistration()">🚀 Submit For Admin Approval</button>
-            </div>
+            <input type="text" id="host-name-input" class="input-box" placeholder="Your Full Name">
+            <input type="number" id="host-age-input" class="input-box" placeholder="Age">
+            <input type="number" id="host-rate-input" class="input-box" placeholder="Call Rate (Tokens/min)">
+            <input type="text" id="host-lang-input" class="input-box" placeholder="Languages">
+            <input type="text" id="host-loc-input" class="input-box" placeholder="Location">
+            <input type="text" id="host-img-input" class="input-box" placeholder="Profile Photo Direct URL">
+            <input type="text" id="host-bio-input" class="input-box" placeholder="Short Bio">
+            <button class="call-btn" style="padding:12px;" onclick="submitHostRegistration()">🚀 Submit For Approval</button>
         </div>
     </div>
 
@@ -275,6 +264,9 @@
         let userTokens = 0;
         let selectedAmount = 100;
         let selectedHostObj = null;
+
+        let agoraClient = null;
+        let localTracks = { audioTrack: null, videoTrack: null };
 
         async function initData() {
             document.getElementById('profile-user-name').innerText = `${userName} 👑`;
@@ -300,15 +292,14 @@
             try {
                 const res = await fetch('/api/hosts');
                 const data = await res.json();
-                const hosts = data.hosts || [];
-                renderHosts(hosts);
+                renderHosts(data.hosts || []);
             } catch(e) { renderHosts([]); }
         }
 
         function renderHosts(list) {
             const container = document.getElementById('hosts-container');
             if(list.length === 0) {
-                container.innerHTML = `<p style="grid-column: span 2; text-align:center; color:var(--text-muted); padding:20px;">No online hosts available right now.</p>`;
+                container.innerHTML = `<p style="grid-column: span 2; text-align:center; color:var(--text-muted); padding:20px;">No online hosts available.</p>`;
                 return;
             }
             container.innerHTML = list.map(h => `
@@ -317,9 +308,7 @@
                     <div class="badge-live">LIVE</div>
                     <div class="badge-rate">🪙 ${h.rate || 50}/m</div>
                     <div class="host-info">
-                        <div class="host-name">
-                            ${h.name} <i class="fa-solid fa-circle-check" style="color:#00B2FF;"></i>
-                        </div>
+                        <div class="host-name">${h.name} <i class="fa-solid fa-circle-check" style="color:#00B2FF;"></i></div>
                         <button class="call-btn"><i class="fa-solid fa-calendar-check"></i> Book Slot</button>
                     </div>
                 </div>
@@ -349,18 +338,9 @@
             document.getElementById('host-booking-modal').classList.add('active');
         }
 
-        function promptPhotoUpdate() {
-            const newUrl = prompt("Enter new Profile Photo Direct URL:");
-            if (newUrl && newUrl.startsWith('http')) {
-                document.getElementById('profile-avatar-img').src = newUrl;
-                document.getElementById('header-avatar-img').src = newUrl;
-                alert("Profile photo updated successfully!");
-            }
-        }
-
         async function confirmBooking(mins, cost) {
             if (userTokens < cost) {
-                alert(`⚠️ Balance Low! You need ${cost} Tokens to book this slot.`);
+                alert(`⚠️ Balance Low! You need ${cost} Tokens.`);
                 openRechargeModal();
                 return;
             }
@@ -378,10 +358,54 @@
                     })
                 });
                 const data = await res.json();
-                alert(data.message || "Booking request processed");
-                closeModal('host-booking-modal');
-                initData();
+                if(data.status === "success") {
+                    closeModal('host-booking-modal');
+                    // Start Agora Call directly on successful booking/trial
+                    startVideoCall("vynora_call_" + data.booking_id, parseInt(userId));
+                } else {
+                    alert(data.message);
+                }
             } catch(e) { alert("Booking failed"); }
+        }
+
+        async function startVideoCall(channelName, uid) {
+            document.getElementById('video-call-screen').classList.add('active');
+            try {
+                const res = await fetch(`/api/agora-token?channelName=${channelName}&uid=${uid}&role=publisher`);
+                const data = await res.json();
+
+                if (data.status !== "success") {
+                    alert("Token error: " + data.message);
+                    return;
+                }
+
+                agoraClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+
+                agoraClient.on("user-published", async (user, mediaType) => {
+                    await agoraClient.subscribe(user, mediaType);
+                    if (mediaType === "video") user.videoTrack.play("remote-video");
+                    if (mediaType === "audio") user.audioTrack.play();
+                });
+
+                await agoraClient.join(data.appId, data.channel, data.token, data.uid);
+
+                localTracks.audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+                localTracks.videoTrack = await AgoraRTC.createCameraVideoTrack();
+
+                localTracks.videoTrack.play("local-video");
+                await agoraClient.publish([localTracks.audioTrack, localTracks.videoTrack]);
+            } catch (error) {
+                console.error("Agora join failed:", error);
+                alert("Video call connection failed!");
+            }
+        }
+
+        async function leaveCall() {
+            if (localTracks.audioTrack) localTracks.audioTrack.close();
+            if (localTracks.videoTrack) localTracks.videoTrack.close();
+            if (agoraClient) await agoraClient.leave();
+            document.getElementById('video-call-screen').classList.remove('active');
+            initData();
         }
 
         function selectPlan(amt, el) {
@@ -413,7 +437,7 @@
                     body: JSON.stringify({ user_id: parseInt(userId), name, age, rate, lang, loc, img, bio })
                 });
                 const data = await res.json();
-                alert(data.message || "Host registered successfully!");
+                alert(data.message);
                 closeModal('host-reg-modal');
             } catch(e) { alert("Registration error"); }
         }
@@ -429,12 +453,10 @@
                     body: JSON.stringify({ user_id: parseInt(userId), amount_inr: selectedAmount, utr_number: utr })
                 });
                 const data = await res.json();
-                alert(data.message || "Recharge submitted!");
+                alert(data.message);
                 closeModal('recharge-modal');
             } catch(e) { alert("Connection Error"); }
         }
-
-        function openSupportLink() { if(tg) tg.openTelegramLink('https://t.me/vynorasupport'); }
 
         initData();
     </script>
