@@ -167,11 +167,25 @@ async def book_slot(req: BookingReq):
 
 @app.get("/api/hosts")
 async def get_online_hosts():
+    # 10 International Dummy Hosts from Different Countries
+    international_hosts = [
+        {"id": "d1", "name": "Elena Rostova", "age": 22, "rate": 80, "lang": "English, Russian", "loc": "Russia 🇷🇺", "img": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=600&auto=format&fit=crop", "bio": "Moscow nights & casual talks ❄️", "isVerified": True},
+        {"id": "d2", "name": "Sophia Miller", "age": 24, "rate": 100, "lang": "English", "loc": "USA 🇺🇸", "img": "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=600&auto=format&fit=crop", "bio": "New York vibe check ✨", "isVerified": True},
+        {"id": "d3", "name": "Isabella Santos", "age": 21, "rate": 70, "lang": "Portuguese, English", "loc": "Brazil 🇧🇷", "img": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop", "bio": "Rio de Janeiro sunshine ☀️", "isVerified": True},
+        {"id": "d4", "name": "Sakura Tanaka", "age": 23, "rate": 90, "lang": "Japanese, English", "loc": "Japan 🇯🇵", "img": "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=600&auto=format&fit=crop", "bio": "Tokyo anime & lifestyle 🌸", "isVerified": True},
+        {"id": "d5", "name": "Min-Ji Kim", "age": 22, "rate": 85, "lang": "Korean, English", "loc": "South Korea 🇰🇷", "img": "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=600&auto=format&fit=crop", "bio": "Seoul K-pop & daily chats 🎧", "isVerified": True},
+        {"id": "d6", "name": "Chloe Laurent", "age": 25, "rate": 95, "lang": "French, English", "loc": "France 🇫🇷", "img": "https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=600&auto=format&fit=crop", "bio": "Parisian art & coffee 🥐", "isVerified": True},
+        {"id": "d7", "name": "Anna Schmidt", "age": 24, "rate": 75, "lang": "German, English", "loc": "Germany 🇩🇪", "img": "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=600&auto=format&fit=crop", "bio": "Berlin music & culture 🎸", "isVerified": True},
+        {"id": "d8", "name": "Camila Gomez", "age": 23, "rate": 65, "lang": "Spanish, English", "loc": "Spain 🇪🇸", "img": "https://images.unsplash.com/photo-1524250502761-1ac6f2e30d43?w=600&auto=format&fit=crop", "bio": "Madrid sunny vibes 💃", "isVerified": True},
+        {"id": "d9", "name": "Yuki Takahashi", "age": 22, "rate": 80, "lang": "Japanese, English", "loc": "Japan 🇯🇵", "img": "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=600&auto=format&fit=crop", "bio": "Kyoto peaceful chats 🍵", "isVerified": True},
+        {"id": "d10", "name": "Jessica Taylor", "age": 26, "rate": 90, "lang": "English", "loc": "UK 🇬🇧", "img": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=600&auto=format&fit=crop", "bio": "London tea & lifestyle 🫖", "isVerified": True}
+    ]
+
     try:
         cursor = hosts_col.find({"status": "approved"})
-        hosts_list = []
+        db_hosts = []
         async for doc in cursor:
-            hosts_list.append({
+            db_hosts.append({
                 "id": str(doc.get("user_id")),
                 "user_id": doc.get("user_id"),
                 "name": doc.get("name", "Host"),
@@ -186,9 +200,11 @@ async def get_online_hosts():
                 "img": doc.get("img", ""),
                 "bio": doc.get("bio", "")
             })
-        return {"status": "success", "hosts": hosts_list}
+        # Database hosts + International dummy hosts combined
+        combined = db_hosts + international_hosts
+        return {"status": "success", "hosts": combined}
     except Exception as e:
-        return {"status": "error", "hosts": []}
+        return {"status": "success", "hosts": international_hosts}
 
 @app.post("/api/register-host")
 async def register_host(req: RegisterHostReq):
