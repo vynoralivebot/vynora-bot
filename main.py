@@ -22,7 +22,11 @@ logging.basicConfig(level=logging.INFO)
 MONGO_URI = os.getenv("MONGO_URI", "")
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 RENDER_URL = os.getenv("RENDER_URL", "https://vynora-bot.onrender.com")
+
 GROUP_1_ID = int(os.getenv("GROUP_1_ID", "0"))
+GROUP_2_ID = int(os.getenv("GROUP_2_ID", "0"))
+GROUP_3_ID = int(os.getenv("GROUP_3_ID", "0"))
+SUPER_ADMIN_ID = int(os.getenv("SUPER_ADMIN_ID", "7001825467"))
 
 AGORA_APP_ID = os.getenv("AGORA_APP_ID", "")
 AGORA_APP_CERTIFICATE = os.getenv("AGORA_APP_CERTIFICATE", "")
@@ -38,6 +42,20 @@ users_col = db.users
 recharges_col = db.recharges
 hosts_col = db.hosts
 bookings_col = db.bookings
+
+async def notify_all_groups(text, reply_markup=None, photo=None):
+    if not bot:
+        return
+    group_ids = [GROUP_1_ID, GROUP_2_ID, GROUP_3_ID]
+    for g_id in group_ids:
+        if g_id != 0:
+            try:
+                if photo:
+                    await bot.send_photo(chat_id=g_id, photo=photo, caption=text, reply_markup=reply_markup, parse_mode="Markdown")
+                else:
+                    await bot.send_message(chat_id=g_id, text=text, reply_markup=reply_markup, parse_mode="Markdown")
+            except Exception as e:
+                logging.error(f"Error sending to group {g_id}: {e}")
 
 @app.on_event("startup")
 async def startup_event():
@@ -56,7 +74,7 @@ async def telegram_webhook(request: Request):
         return {"ok": False}
     data = await request.json()
     update = Update.model_validate(data, context={"bot": bot})
-    await dp.feed_update(bot, update)
+    await dp.feed_webhook_update(bot, update)
     return {"ok": True}
 
 @dp.message(F.text == "/start")
@@ -91,11 +109,6 @@ class RegisterHostReq(BaseModel):
     loc: str
     img: str
     bio: str
-
-class ToggleLiveReq(BaseModel):
-    user_id: int
-    is_private: Optional[bool] = False
-    entry_gift_cost: Optional[int] = 0
 
 @app.get("/")
 async def serve_home():
@@ -132,6 +145,17 @@ async def get_user_profile(user_id: int):
         return {"user_id": user_id, "tokens": 0, "earnings": 0}
     return {"user_id": user_id, "tokens": user.get("tokens", 0), "earnings": user.get("earnings", 0)}
 
+@app.get("/api/host/status/{user_id}")
+async def get_host_status(user_id: int):
+    if user_id == SUPER_ADMIN_ID:
+        return {"is_host": True, "status": "approved", "isVerified": True, "role": "admin"}
+    
+    host = await hosts_col.find_one({"user_id": user_id}) or await hosts_col.find_one({"_id": f"host_{user_id}"})
+    if host and host.get("status") == "approved":
+        return {"is_host": True, "status": "approved", "isVerified": True, "role": "host"}
+    
+    return {"is_host": False, "status": host.get("status", "none") if host else "none", "role": "user"}
+
 @app.post("/api/recharge")
 async def process_recharge(req: RechargeReq):
     tx_id = f"tx_{int(time.time())}"
@@ -146,16 +170,12 @@ async def process_recharge(req: RechargeReq):
     }
     await recharges_col.insert_one(doc)
 
-    if bot and GROUP_1_ID != 0:
-        kb = InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text="✅ Approve", callback_data=f"appr_{tx_id}"),
-            InlineKeyboardButton(text="❌ Reject", callback_data=f"rejc_{tx_id}")
-        ]])
-        msg = f"💳 **NEW RECHARGE REQUEST**\n\n👤 **User ID:** `{req.user_id}`\n💵 **Amount:** ₹{req.amount_inr}\n📌 **UTR:** `{req.utr_number}`"
-        try:
-            await bot.send_message(chat_id=GROUP_1_ID, text=msg, reply_markup=kb, parse_mode="Markdown")
-        except Exception as e:
-            logging.error(f"Error notifying group: {e}")
+    kb = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="✅ Approve", callback_data=f"appr_{tx_id}"),
+        InlineKeyboardButton(text="❌ Reject", callback_data=f"rejc_{tx_id}")
+    ]])
+    msg = f"💳 **NEW RECHARGE REQUEST**\n\n👤 **User ID:** `{req.user_id}`\n💵 **Amount:** ₹{req.amount_inr}\n📌 **UTR:** `{req.utr_number}`"
+    await notify_all_groups(msg, reply_markup=kb)
 
     return {"status": "success", "message": "UTR submitted for Admin approval!"}
 
@@ -179,22 +199,18 @@ async def book_slot(req: BookingReq):
     await bookings_col.insert_one(doc)
     await users_col.update_one({"_id": req.user_id}, {"$inc": {"tokens": -req.token_cost}})
 
-    if bot and GROUP_1_ID != 0:
-        kb = InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text="✅ Accept Call", callback_data=f"accbk_{booking_id}"),
-            InlineKeyboardButton(text="❌ Decline", callback_data=f"canbk_{booking_id}")
-        ]])
-        msg = (
-            f"📅 **NEW 1v1 SLOT BOOKING**\n\n"
-            f"👤 **User ID:** `{req.user_id}`\n"
-            f"👩 **Host:** {req.host_name}\n"
-            f"⏱️ **Duration:** {req.duration_mins} Mins\n"
-            f"🪙 **Tokens Paid:** {req.token_cost}"
-        )
-        try:
-            await bot.send_message(chat_id=GROUP_1_ID, text=msg, reply_markup=kb, parse_mode="Markdown")
-        except Exception as e:
-            logging.error(f"Booking error: {e}")
+    kb = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="✅ Accept Call", callback_data=f"accbk_{booking_id}"),
+        InlineKeyboardButton(text="❌ Decline", callback_data=f"canbk_{booking_id}")
+    ]])
+    msg = (
+        f"📅 **NEW 1v1 SLOT BOOKING**\n\n"
+        f"👤 **User ID:** `{req.user_id}`\n"
+        f"👩 **Host:** {req.host_name}\n"
+        f"⏱️ **Duration:** {req.duration_mins} Mins\n"
+        f"🪙 **Tokens Paid:** {req.token_cost}"
+    )
+    await notify_all_groups(msg, reply_markup=kb)
 
     return {"status": "success", "booking_id": booking_id, "message": f"Booking request sent for {req.host_name}!"}
 
@@ -246,16 +262,12 @@ async def register_host(req: RegisterHostReq):
         }
         await hosts_col.update_one({"_id": doc["_id"]}, {"$set": doc}, upsert=True)
 
-        if bot and GROUP_1_ID != 0:
-            kb = InlineKeyboardMarkup(inline_keyboard=[[
-                InlineKeyboardButton(text="✅ Approve Host", callback_data=f"apphost_{req.user_id}"),
-                InlineKeyboardButton(text="❌ Reject", callback_data=f"rejhost_{req.user_id}")
-            ]])
-            msg = f"🟡 **HOST REGISTRATION REQUEST**\n\n👤 **User ID:** `{req.user_id}`\n📛 **Name:** {req.name}\n🪙 **Rate:** {req.rate}/min"
-            try:
-                await bot.send_photo(chat_id=GROUP_1_ID, photo=req.img, caption=msg, reply_markup=kb, parse_mode="Markdown")
-            except:
-                await bot.send_message(chat_id=GROUP_1_ID, text=msg, reply_markup=kb, parse_mode="Markdown")
+        kb = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="✅ Approve Host", callback_data=f"apphost_{req.user_id}"),
+            InlineKeyboardButton(text="❌ Reject", callback_data=f"rejhost_{req.user_id}")
+        ]])
+        msg = f"🟡 **HOST REGISTRATION REQUEST**\n\n👤 **User ID:** `{req.user_id}`\n📛 **Name:** {req.name}\n🪙 **Rate:** {req.rate}/min"
+        await notify_all_groups(msg, reply_markup=kb, photo=req.img)
 
         return {"status": "success", "message": "Submitted! Waiting for Admin Approval."}
     except Exception as e:
@@ -289,8 +301,34 @@ async def approve_host_cb(call: types.CallbackQuery):
         host_u_id = int(call.data.split("_")[1])
         await hosts_col.update_one({"user_id": host_u_id}, {"$set": {"status": "approved", "isVerified": True}}, upsert=True)
         await hosts_col.update_one({"_id": f"host_{host_u_id}"}, {"$set": {"status": "approved", "isVerified": True}}, upsert=True)
+
         if call.message and call.message.caption:
             await call.message.edit_caption(caption=call.message.caption + "\n\n✅ **APPROVED BY ADMIN (VERIFIED HOST)**", reply_markup=None, parse_mode="Markdown")
+        elif call.message and call.message.text:
+            await call.message.edit_text(text=call.message.text + "\n\n✅ **APPROVED BY ADMIN (VERIFIED HOST)**", reply_markup=None, parse_mode="Markdown")
+        
+        if bot:
+            try:
+                await bot.send_message(
+                    chat_id=host_u_id,
+                    text="🎉 **Badhaai ho!** Aapki host verification admin dwara **Approved** kar di gayi hai. Ab aap Vynora Live Mini App khol kar Live ja sakte hain!",
+                    parse_mode="Markdown"
+                )
+            except Exception as e:
+                logging.error(f"Could not send DM to host {host_u_id}: {e}")
+
         await call.answer("Host Approved & Verified Successfully!", show_alert=True)
     except Exception as e:
+        logging.error(f"Host approval error: {e}")
         await call.answer(f"Error: {e}", show_alert=True)
+
+@dp.callback_query(F.data.startswith("rejhost_"))
+async def reject_host_cb(call: types.CallbackQuery):
+    host_u_id = int(call.data.split("_")[1])
+    await hosts_col.update_one({"user_id": host_u_id}, {"$set": {"status": "rejected", "isVerified": False}})
+    await hosts_col.update_one({"_id": f"host_{host_u_id}"}, {"$set": {"status": "rejected", "isVerified": False}})
+    if call.message and call.message.caption:
+        await call.message.edit_caption(caption=call.message.caption + "\n\n❌ **REJECTED BY ADMIN**", reply_markup=None, parse_mode="Markdown")
+    elif call.message and call.message.text:
+        await call.message.edit_text(text=call.message.text + "\n\n❌ **REJECTED BY ADMIN**", reply_markup=None, parse_mode="Markdown")
+    await call.answer("Host Rejected")
