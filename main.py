@@ -1,12 +1,14 @@
 import os
 import time
 import logging
+import asyncio
 from datetime import datetime
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import motor.motor_asyncio
 from aiogram import Bot, Dispatcher, types, F
@@ -19,7 +21,16 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 SUPER_ADMIN_ID = int(os.getenv("SUPER_ADMIN_ID", "7001825467"))
 GROUP_1_ID = int(os.getenv("GROUP_1_ID", "-1001234567890"))
 
-app = FastAPI()
+app = FastAPI(title="Vynora Live Backend")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 bot = Bot(token=BOT_TOKEN) if BOT_TOKEN else None
 dp = Dispatcher()
 
@@ -30,6 +41,18 @@ users_col = db.users
 recharges_col = db.recharges
 hosts_col = db.hosts
 bookings_col = db.bookings
+
+@app.on_event("startup")
+async def startup_event():
+    if bot and BOT_TOKEN:
+        asyncio.create_task(dp.start_polling(bot))
+        logging.info("🤖 Telegram Bot polling started successfully!")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    if bot:
+        await bot.session.close()
+        logging.info("🤖 Telegram Bot session closed.")
 
 class RechargeReq(BaseModel):
     user_id: int
@@ -60,26 +83,31 @@ class ToggleLiveReq(BaseModel):
 
 @app.get("/")
 async def serve_home():
-    return FileResponse("static/index.html")
+    if os.path.exists("static/index.html"):
+        return FileResponse("static/index.html")
+    return FileResponse("index.html") if os.path.exists("index.html") else "<h3>Frontend file not found!</h3>"
 
 @app.get("/api/user/{user_id}")
 async def get_user_profile(user_id: int):
     user = await users_col.find_one({"_id": user_id})
     if not user:
-        new_user = {"_id": user_id, "tokens": 0, "earnings": 0, "role": "user", "created_at": datetime.utcnow()}
+        new_user = {"_id": user_id, "tokens": 100, "earnings": 0, "role": "user", "created_at": datetime.utcnow()}
         await users_col.insert_one(new_user)
-        return {"user_id": user_id, "tokens": 0, "earnings": 0}
+        return {"user_id": user_id, "tokens": 100, "earnings": 0}
     return {"user_id": user_id, "tokens": user.get("tokens", 0), "earnings": user.get("earnings", 0)}
 
 @app.post("/api/recharge")
 async def process_recharge(req: RechargeReq):
     tx_id = f"tx_{int(time.time())}"
+    tokens_mapping = {100: 100, 200: 200, 300: 320, 400: 430, 500: 550, 1000: 1150, 1500: 1800}
+    allocated_tokens = tokens_mapping.get(int(req.amount_inr), int(req.amount_inr))
+
     doc = {
         "_id": tx_id,
         "user_id": req.user_id,
         "amount_inr": req.amount_inr,
         "utr_number": req.utr_number,
-        "tokens": int(req.amount_inr),
+        "tokens": allocated_tokens,
         "status": "pending",
         "timestamp": datetime.utcnow()
     }
@@ -90,7 +118,7 @@ async def process_recharge(req: RechargeReq):
             InlineKeyboardButton(text="✅ Approve", callback_data=f"appr_{tx_id}"),
             InlineKeyboardButton(text="❌ Reject", callback_data=f"rejc_{tx_id}")
         ]])
-        msg = f"💳 **NEW RECHARGE REQUEST**\n\n👤 **User ID:** `{req.user_id}`\n💵 **Amount:** ₹{req.amount_inr}\n📌 **UTR:** `{req.utr_number}`"
+        msg = f"💳 **NEW RECHARGE REQUEST**\n\n👤 **User ID:** `{req.user_id}`\n💵 **Amount:** ₹{req.amount_inr}\n🪙 **Tokens:** {allocated_tokens}\n📌 **UTR:** `{req.utr_number}`"
         try:
             await bot.send_message(chat_id=GROUP_1_ID, text=msg, reply_markup=kb, parse_mode="Markdown")
         except Exception as e:
@@ -116,7 +144,6 @@ async def book_slot(req: BookingReq):
         "timestamp": datetime.utcnow()
     }
     await bookings_col.insert_one(doc)
-    
     await users_col.update_one({"_id": req.user_id}, {"$inc": {"tokens": -req.token_cost}})
 
     if bot:
@@ -136,16 +163,16 @@ async def book_slot(req: BookingReq):
         except Exception as e:
             logging.error(f"Booking error: {e}")
 
-    return {"status": "success", "message": f"Booking request sent for {req.host_name}!"}
+    return {"status": "success", "message": f"✨ Slot booked successfully with {req.host_name} for {req.duration_mins} mins!"}
 
 @app.get("/api/hosts")
 async def get_online_hosts():
     try:
-        cursor = hosts_col.find({"status": "approved", "isOnline": True})
+        cursor = hosts_col.find({"status": "approved"})
         hosts_list = []
         async for doc in cursor:
             hosts_list.append({
-                "id": str(doc["_id"]),
+                "id": str(doc.get("user_id")),
                 "user_id": doc.get("user_id"),
                 "name": doc.get("name", "Host"),
                 "age": doc.get("age", 22),
@@ -235,42 +262,58 @@ if os.path.exists("static"):
 
 @dp.callback_query(F.data.startswith("appr_"))
 async def approve_recharge(call: types.CallbackQuery):
-    if call.from_user.id != SUPER_ADMIN_ID: return
+    if call.from_user.id != SUPER_ADMIN_ID:
+        await call.answer("You are not authorized!", show_alert=True)
+        return
     tx_id = call.data.split("_")[1]
     tx = await recharges_col.find_one({"_id": tx_id})
     if tx and tx.get("status") == "pending":
         await recharges_col.update_one({"_id": tx_id}, {"$set": {"status": "approved"}})
         await users_col.update_one({"_id": tx["user_id"]}, {"$inc": {"tokens": tx["tokens"]}}, upsert=True)
-        await call.message.edit_text(call.message.text + "\n\n✅ **APPROVED BY ADMIN**", parse_mode="Markdown")
+        if call.message.caption:
+            await call.message.edit_caption(caption=call.message.caption + "\n\n✅ **APPROVED BY ADMIN**", parse_mode="Markdown")
+        else:
+            await call.message.edit_text(call.message.text + "\n\n✅ **APPROVED BY ADMIN**", parse_mode="Markdown")
+        await call.answer("Recharge Approved & Tokens Credited!")
 
 @dp.callback_query(F.data.startswith("rejc_"))
 async def reject_recharge(call: types.CallbackQuery):
-    if call.from_user.id != SUPER_ADMIN_ID: return
+    if call.from_user.id != SUPER_ADMIN_ID:
+        await call.answer("You are not authorized!", show_alert=True)
+        return
     tx_id = call.data.split("_")[1]
     await recharges_col.update_one({"_id": tx_id}, {"$set": {"status": "rejected"}})
-    await call.message.edit_text(call.message.text + "\n\n❌ **REJECTED BY ADMIN**", parse_mode="Markdown")
+    if call.message.caption:
+        await call.message.edit_caption(caption=call.message.caption + "\n\n❌ **REJECTED BY ADMIN**", parse_mode="Markdown")
+    else:
+        await call.message.edit_text(call.message.text + "\n\n❌ **REJECTED BY ADMIN**", parse_mode="Markdown")
+    await call.answer("Recharge Rejected")
 
 @dp.callback_query(F.data.startswith("apphost_"))
 async def approve_host_cb(call: types.CallbackQuery):
-    if call.from_user.id != SUPER_ADMIN_ID: return
+    if call.from_user.id != SUPER_ADMIN_ID:
+        await call.answer("You are not authorized!", show_alert=True)
+        return
     host_u_id = int(call.data.split("_")[1])
     await hosts_col.update_one(
         {"_id": f"host_{host_u_id}"},
         {"$set": {"status": "approved", "isVerified": True, "isOnline": True}}
     )
     if call.message.caption:
-        await call.message.edit_caption(caption=call.message.caption + "\n\n✅ **APPROVED BY ADMIN (VERIFIED HOST)**", reply_markup=None)
+        await call.message.edit_caption(caption=call.message.caption + "\n\n✅ **APPROVED BY ADMIN (VERIFIED HOST)**", reply_markup=None, parse_mode="Markdown")
     else:
-        await call.message.edit_text(text=call.message.text + "\n\n✅ **APPROVED BY ADMIN (VERIFIED HOST)**", reply_markup=None)
+        await call.message.edit_text(text=call.message.text + "\n\n✅ **APPROVED BY ADMIN (VERIFIED HOST)**", reply_markup=None, parse_mode="Markdown")
     await call.answer("Host Approved & Verified!")
 
 @dp.callback_query(F.data.startswith("rejhost_"))
 async def reject_host_cb(call: types.CallbackQuery):
-    if call.from_user.id != SUPER_ADMIN_ID: return
+    if call.from_user.id != SUPER_ADMIN_ID:
+        await call.answer("You are not authorized!", show_alert=True)
+        return
     host_u_id = int(call.data.split("_")[1])
     await hosts_col.update_one({"_id": f"host_{host_u_id}"}, {"$set": {"status": "rejected", "isVerified": False, "isOnline": False}})
     if call.message.caption:
-        await call.message.edit_caption(caption=call.message.caption + "\n\n❌ **REJECTED BY ADMIN**", reply_markup=None)
+        await call.message.edit_caption(caption=call.message.caption + "\n\n❌ **REJECTED BY ADMIN**", reply_markup=None, parse_mode="Markdown")
     else:
-        await call.message.edit_text(text=call.message.text + "\n\n❌ **REJECTED BY ADMIN**", reply_markup=None)
+        await call.message.edit_text(text=call.message.text + "\n\n❌ **REJECTED BY ADMIN**", reply_markup=None, parse_mode="Markdown")
     await call.answer("Host Rejected")
