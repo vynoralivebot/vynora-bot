@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import motor.motor_asyncio
 from aiogram import Bot, Dispatcher, types, F
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Update
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Update, WebAppInfo
 
 logging.basicConfig(level=logging.INFO)
 
@@ -35,7 +35,6 @@ bookings_col = db.bookings
 async def startup_event():
     if bot:
         try:
-            # Purana sabhi webhook clear karke naya set karenge (No Polling)
             await bot.delete_webhook(drop_pending_updates=True)
             webhook_url = f"{RENDER_URL}/webhook"
             await bot.set_webhook(webhook_url, drop_pending_updates=True)
@@ -51,6 +50,18 @@ async def telegram_webhook(request: Request):
     update = Update.model_validate(data, context={"bot": bot})
     await dp.feed_update(bot, update)
     return {"ok": True}
+
+# Explicit /Start Command Handler for Bot
+@dp.message(F.text == "/start")
+async def cmd_start(message: types.Message):
+    kb = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="🚀 Launch Vynora Live 1v1", web_app=WebAppInfo(url=RENDER_URL))
+    ]])
+    await message.answer(
+        "✨ **Vynora Live 1v1 me aapka swagat hai!**\n\nNeeche button par click karke Mini App launch karein:",
+        reply_markup=kb,
+        parse_mode="Markdown"
+    )
 
 class RechargeReq(BaseModel):
     user_id: int
@@ -243,9 +254,10 @@ async def toggle_live(req: ToggleLiveReq):
 if os.path.exists("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Telegram Bot Callback Handlers
+# Telegram Bot Callback Handlers with instant answer
 @dp.callback_query(F.data.startswith("appr_"))
 async def approve_recharge(call: types.CallbackQuery):
+    await call.answer("Processing...")
     tx_id = call.data.split("_")[1]
     tx = await recharges_col.find_one({"_id": tx_id})
     if tx and tx.get("status") == "pending":
@@ -253,15 +265,14 @@ async def approve_recharge(call: types.CallbackQuery):
         await users_col.update_one({"_id": tx["user_id"]}, {"$inc": {"tokens": tx["tokens"]}}, upsert=True)
         if call.message and call.message.text:
             await call.message.edit_text(call.message.text + "\n\n✅ **APPROVED BY ADMIN**", parse_mode="Markdown")
-        await call.answer("Recharge Approved!")
 
 @dp.callback_query(F.data.startswith("rejc_"))
 async def reject_recharge(call: types.CallbackQuery):
+    await call.answer("Rejected")
     tx_id = call.data.split("_")[1]
     await recharges_col.update_one({"_id": tx_id}, {"$set": {"status": "rejected"}})
     if call.message and call.message.text:
         await call.message.edit_text(call.message.text + "\n\n❌ **REJECTED BY ADMIN**", parse_mode="Markdown")
-    await call.answer("Recharge Rejected!")
 
 @dp.callback_query(F.data.startswith("apphost_"))
 async def approve_host_cb(call: types.CallbackQuery):
