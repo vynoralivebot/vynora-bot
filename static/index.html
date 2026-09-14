@@ -55,7 +55,6 @@
 
         .call-btn { width: 100%; background: var(--primary-gradient); border: none; color: white; padding: 8px; border-radius: 10px; font-weight: 700; font-size: 0.82rem; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; }
 
-        /* PROFILE VIEW (MATCHING 1000075469.jpg) */
         .profile-container { display: none; padding: 16px; }
         .profile-container.active { display: block; }
 
@@ -78,7 +77,6 @@
         .posts-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
         .post-img { width: 100%; height: 120px; border-radius: 12px; object-fit: cover; }
 
-        /* RECHARGE PLANS GRID */
         .plan-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 12px 0; }
         .plan-card { background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); padding: 10px 6px; border-radius: 12px; text-align: center; cursor: pointer; }
         .plan-card.active { border-color: #FF007A; background: rgba(255,0,122,0.15); }
@@ -88,7 +86,6 @@
         .qr-box { text-align: center; background: white; padding: 10px; border-radius: 12px; margin: 12px 0; }
         .qr-box img { width: 140px; height: 140px; }
 
-        /* HOST PROFILE DRAWER CARDS (MATCHING 1000075467.jpg) */
         .booking-option-card { background: rgba(255,255,255,0.04); border: 1px solid var(--card-border); padding: 12px; border-radius: 14px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
 
         .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background: rgba(10, 7, 20, 0.95); backdrop-filter: blur(16px); border-top: 1px solid var(--card-border); display: flex; justify-content: space-around; align-items: center; z-index: 150; }
@@ -181,11 +178,11 @@
         <div class="nav-item" id="nav-profile" onclick="switchTab('profile')"><i class="fa-solid fa-user"></i><span>Profile</span></div>
     </nav>
 
-    <!-- FULL HOST PROFILE DRAWER (MATCHING 1000075467.jpg) -->
+    <!-- HOST BOOKING DRAWER -->
     <div class="modal-overlay" id="host-booking-modal">
         <div class="modal-card">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                <h3 id="bk-host-name">Sophia Rose Profile</h3>
+                <h3 id="bk-host-name">Host Profile</h3>
                 <button style="background:none; border:none; color:white; font-size:1.2rem;" onclick="closeModal('host-booking-modal')">✕</button>
             </div>
 
@@ -193,11 +190,11 @@
 
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
                 <div>
-                    <h4 id="drawer-name-title" style="font-size:1.05rem;">Sophia Rose</h4>
+                    <h4 id="drawer-name-title" style="font-size:1.05rem;">Host Name</h4>
                     <p id="drawer-bio" style="font-size:0.78rem; color:var(--text-muted); margin-top:2px;">High quality 1v1 experience 👑</p>
                 </div>
                 <div style="background:rgba(255,215,0,0.1); border:1px solid rgba(255,215,0,0.3); padding:4px 10px; border-radius:12px; color:var(--gold); font-size:0.85rem; font-weight:700;">
-                    🪙 <span id="drawer-rate">80</span>/min
+                    🪙 <span id="drawer-rate">50</span>/min
                 </div>
             </div>
 
@@ -208,7 +205,7 @@
 
             <div class="booking-option-card">
                 <div><b>⏱️ 5 Mins Slot Booking</b><p style="font-size:0.72rem; color:var(--text-muted);">Private 1v1 reserved slot</p></div>
-                <button class="call-btn" style="width:auto; padding:8px 14px; background:var(--banner-pink);" onclick="confirmBooking(5, 300)">🪙 300 Tokens</button>
+                <button class="call-btn" style="width:auto; padding:8px 14px; background:var(--banner-pink);" onclick="confirmBooking(5, 250)">🪙 250 Tokens</button>
             </div>
 
             <div class="booking-option-card">
@@ -233,7 +230,6 @@
                 <div class="plan-card" onclick="selectPlan(400, this)"><div class="plan-amount">₹400</div><div class="plan-tokens">430 Tokens</div></div>
                 <div class="plan-card" onclick="selectPlan(500, this)"><div class="plan-amount">₹500</div><div class="plan-tokens">550 Tokens</div></div>
                 <div class="plan-card" onclick="selectPlan(1000, this)"><div class="plan-amount">₹1000</div><div class="plan-tokens">1150 Tokens</div></div>
-                <div class="plan-card" onclick="selectPlan(1500, this)"><div class="plan-amount">₹1500</div><div class="plan-tokens">1800 Tokens</div></div>
             </div>
 
             <div class="qr-box">
@@ -280,15 +276,6 @@
         let selectedAmount = 100;
         let selectedHostObj = null;
 
-        // ALL HOSTS (Real + Dummy)
-        const dummyHosts = [
-            { id: "h1", name: "Anu ❤️", rate: 50, bio: "Friendly 1v1 chats & music lovers 💖", img: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop" },
-            { id: "h2", name: "Sophia Rose", rate: 80, bio: "High quality 1v1 experience 👑", img: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=600&auto=format&fit=crop" },
-            { id: "h3", name: "Priya Roy", rate: 40, bio: "Late night casual talks ✨", img: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=600&auto=format&fit=crop" },
-            { id: "h4", name: "Elena Rostova", rate: 100, bio: "Available for private video calls 🚀", img: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=600&auto=format&fit=crop" },
-            { id: "h5", name: "Kavya Sharma", rate: 55, bio: "Let's talk and vibe together 🎶", img: "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=600&auto=format&fit=crop" }
-        ];
-
         async function initData() {
             document.getElementById('profile-user-name').innerText = `${userName} 👑`;
             document.getElementById('profile-user-id').innerText = userId;
@@ -306,20 +293,24 @@
                 document.getElementById('profile-tokens-count').innerText = userTokens;
                 document.getElementById('profile-earnings-count').innerText = data.earnings || 0;
             } catch(e) {}
-            fetchRealHosts();
+            fetchHosts();
         }
 
-        async function fetchRealHosts() {
+        async function fetchHosts() {
             try {
                 const res = await fetch('/api/hosts');
                 const data = await res.json();
-                const combined = [...(data.hosts || []), ...dummyHosts];
-                renderHosts(combined);
-            } catch(e) { renderHosts(dummyHosts); }
+                const hosts = data.hosts || [];
+                renderHosts(hosts);
+            } catch(e) { renderHosts([]); }
         }
 
         function renderHosts(list) {
             const container = document.getElementById('hosts-container');
+            if(list.length === 0) {
+                container.innerHTML = `<p style="grid-column: span 2; text-align:center; color:var(--text-muted); padding:20px;">No online hosts available right now.</p>`;
+                return;
+            }
             container.innerHTML = list.map(h => `
                 <div class="host-card" onclick="openBookingDrawer('${h.id}', '${h.name}', '${h.img}', '${h.bio || 'Online 1v1 Streamer'}', ${h.rate || 50})">
                     <img src="${h.img}" class="host-thumb">
@@ -355,7 +346,6 @@
             document.getElementById('drawer-name-title').innerText = name;
             document.getElementById('drawer-bio').innerText = bio;
             document.getElementById('drawer-rate').innerText = rate;
-
             document.getElementById('host-booking-modal').classList.add('active');
         }
 
@@ -380,7 +370,7 @@
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
-                        user_id: userId,
+                        user_id: parseInt(userId),
                         host_id: selectedHostObj.id,
                         host_name: selectedHostObj.name,
                         duration_mins: mins,
@@ -388,7 +378,7 @@
                     })
                 });
                 const data = await res.json();
-                alert(data.message);
+                alert(data.message || "Booking request processed");
                 closeModal('host-booking-modal');
                 initData();
             } catch(e) { alert("Booking failed"); }
@@ -407,10 +397,10 @@
 
         async function submitHostRegistration() {
             const name = document.getElementById('host-name-input').value.trim();
-            const age = parseInt(document.getElementById('host-age-input').value);
-            const rate = parseInt(document.getElementById('host-rate-input').value);
-            const lang = document.getElementById('host-lang-input').value.trim();
-            const loc = document.getElementById('host-loc-input').value.trim();
+            const age = parseInt(document.getElementById('host-age-input').value) || 20;
+            const rate = parseInt(document.getElementById('host-rate-input').value) || 50;
+            const lang = document.getElementById('host-lang-input').value.trim() || "Hindi";
+            const loc = document.getElementById('host-loc-input').value.trim() || "India";
             const img = document.getElementById('host-img-input').value.trim();
             const bio = document.getElementById('host-bio-input').value.trim();
 
@@ -420,10 +410,10 @@
                 const res = await fetch('/api/register-host', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ user_id: userId, name, age, rate, lang, loc, img, bio })
+                    body: JSON.stringify({ user_id: parseInt(userId), name, age, rate, lang, loc, img, bio })
                 });
                 const data = await res.json();
-                alert(data.message);
+                alert(data.message || "Host registered successfully!");
                 closeModal('host-reg-modal');
             } catch(e) { alert("Registration error"); }
         }
@@ -436,10 +426,10 @@
                 const res = await fetch('/api/recharge', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ user_id: userId, amount_inr: selectedAmount, utr_number: utr })
+                    body: JSON.stringify({ user_id: parseInt(userId), amount_inr: selectedAmount, utr_number: utr })
                 });
                 const data = await res.json();
-                alert(data.message);
+                alert(data.message || "Recharge submitted!");
                 closeModal('recharge-modal');
             } catch(e) { alert("Connection Error"); }
         }
