@@ -8,7 +8,6 @@ from typing import Optional
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import motor.motor_asyncio
 from aiogram import Bot, Dispatcher, types, F
@@ -21,19 +20,11 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 SUPER_ADMIN_ID = int(os.getenv("SUPER_ADMIN_ID", "7001825467"))
 GROUP_1_ID = int(os.getenv("GROUP_1_ID", "-1001234567890"))
 
-app = FastAPI(title="Vynora Live Backend")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
+app = FastAPI()
 bot = Bot(token=BOT_TOKEN) if BOT_TOKEN else None
 dp = Dispatcher()
 
+# MongoDB Connection
 client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URI, serverSelectionTimeoutMS=10000)
 db = client.get_database("vynora_live_db")
 
@@ -42,17 +33,12 @@ recharges_col = db.recharges
 hosts_col = db.hosts
 bookings_col = db.bookings
 
+# Startup Event to run Telegram Bot Polling in background
 @app.on_event("startup")
 async def startup_event():
-    if bot and BOT_TOKEN:
-        asyncio.create_task(dp.start_polling(bot))
-        logging.info("🤖 Telegram Bot polling started successfully!")
-
-@app.on_event("shutdown")
-async def shutdown_event():
     if bot:
-        await bot.session.close()
-        logging.info("🤖 Telegram Bot session closed.")
+        asyncio.create_task(dp.start_polling(bot))
+        logging.info("🚀 Telegram Bot Polling Started Successfully!")
 
 class RechargeReq(BaseModel):
     user_id: int
@@ -83,31 +69,26 @@ class ToggleLiveReq(BaseModel):
 
 @app.get("/")
 async def serve_home():
-    if os.path.exists("static/index.html"):
-        return FileResponse("static/index.html")
-    return FileResponse("index.html") if os.path.exists("index.html") else "<h3>Frontend file not found!</h3>"
+    return FileResponse("static/index.html")
 
 @app.get("/api/user/{user_id}")
 async def get_user_profile(user_id: int):
     user = await users_col.find_one({"_id": user_id})
     if not user:
-        new_user = {"_id": user_id, "tokens": 100, "earnings": 0, "role": "user", "created_at": datetime.utcnow()}
+        new_user = {"_id": user_id, "tokens": 0, "earnings": 0, "role": "user", "created_at": datetime.utcnow()}
         await users_col.insert_one(new_user)
-        return {"user_id": user_id, "tokens": 100, "earnings": 0}
+        return {"user_id": user_id, "tokens": 0, "earnings": 0}
     return {"user_id": user_id, "tokens": user.get("tokens", 0), "earnings": user.get("earnings", 0)}
 
 @app.post("/api/recharge")
 async def process_recharge(req: RechargeReq):
     tx_id = f"tx_{int(time.time())}"
-    tokens_mapping = {100: 100, 200: 200, 300: 320, 400: 430, 500: 550, 1000: 1150, 1500: 1800}
-    allocated_tokens = tokens_mapping.get(int(req.amount_inr), int(req.amount_inr))
-
     doc = {
         "_id": tx_id,
         "user_id": req.user_id,
         "amount_inr": req.amount_inr,
         "utr_number": req.utr_number,
-        "tokens": allocated_tokens,
+        "tokens": int(req.amount_inr),
         "status": "pending",
         "timestamp": datetime.utcnow()
     }
@@ -118,7 +99,7 @@ async def process_recharge(req: RechargeReq):
             InlineKeyboardButton(text="✅ Approve", callback_data=f"appr_{tx_id}"),
             InlineKeyboardButton(text="❌ Reject", callback_data=f"rejc_{tx_id}")
         ]])
-        msg = f"💳 **NEW RECHARGE REQUEST**\n\n👤 **User ID:** `{req.user_id}`\n💵 **Amount:** ₹{req.amount_inr}\n🪙 **Tokens:** {allocated_tokens}\n📌 **UTR:** `{req.utr_number}`"
+        msg = f"💳 **NEW RECHARGE REQUEST**\n\n👤 **User ID:** `{req.user_id}`\n💵 **Amount:** ₹{req.amount_inr}\n📌 **UTR:** `{req.utr_number}`"
         try:
             await bot.send_message(chat_id=GROUP_1_ID, text=msg, reply_markup=kb, parse_mode="Markdown")
         except Exception as e:
@@ -163,48 +144,26 @@ async def book_slot(req: BookingReq):
         except Exception as e:
             logging.error(f"Booking error: {e}")
 
-    return {"status": "success", "message": f"✨ Slot booked successfully with {req.host_name} for {req.duration_mins} mins!"}
+    return {"status": "success", "message": f"Booking request sent for {req.host_name}!"}
 
 @app.get("/api/hosts")
 async def get_online_hosts():
-    # 10 International Dummy Hosts from Different Countries
-    international_hosts = [
-        {"id": "d1", "name": "Elena Rostova", "age": 22, "rate": 80, "lang": "English, Russian", "loc": "Russia 🇷🇺", "img": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=600&auto=format&fit=crop", "bio": "Moscow nights & casual talks ❄️", "isVerified": True},
-        {"id": "d2", "name": "Sophia Miller", "age": 24, "rate": 100, "lang": "English", "loc": "USA 🇺🇸", "img": "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=600&auto=format&fit=crop", "bio": "New York vibe check ✨", "isVerified": True},
-        {"id": "d3", "name": "Isabella Santos", "age": 21, "rate": 70, "lang": "Portuguese, English", "loc": "Brazil 🇧🇷", "img": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop", "bio": "Rio de Janeiro sunshine ☀️", "isVerified": True},
-        {"id": "d4", "name": "Sakura Tanaka", "age": 23, "rate": 90, "lang": "Japanese, English", "loc": "Japan 🇯🇵", "img": "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=600&auto=format&fit=crop", "bio": "Tokyo anime & lifestyle 🌸", "isVerified": True},
-        {"id": "d5", "name": "Min-Ji Kim", "age": 22, "rate": 85, "lang": "Korean, English", "loc": "South Korea 🇰🇷", "img": "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=600&auto=format&fit=crop", "bio": "Seoul K-pop & daily chats 🎧", "isVerified": True},
-        {"id": "d6", "name": "Chloe Laurent", "age": 25, "rate": 95, "lang": "French, English", "loc": "France 🇫🇷", "img": "https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=600&auto=format&fit=crop", "bio": "Parisian art & coffee 🥐", "isVerified": True},
-        {"id": "d7", "name": "Anna Schmidt", "age": 24, "rate": 75, "lang": "German, English", "loc": "Germany 🇩🇪", "img": "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=600&auto=format&fit=crop", "bio": "Berlin music & culture 🎸", "isVerified": True},
-        {"id": "d8", "name": "Camila Gomez", "age": 23, "rate": 65, "lang": "Spanish, English", "loc": "Spain 🇪🇸", "img": "https://images.unsplash.com/photo-1524250502761-1ac6f2e30d43?w=600&auto=format&fit=crop", "bio": "Madrid sunny vibes 💃", "isVerified": True},
-        {"id": "d9", "name": "Yuki Takahashi", "age": 22, "rate": 80, "lang": "Japanese, English", "loc": "Japan 🇯🇵", "img": "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=600&auto=format&fit=crop", "bio": "Kyoto peaceful chats 🍵", "isVerified": True},
-        {"id": "d10", "name": "Jessica Taylor", "age": 26, "rate": 90, "lang": "English", "loc": "UK 🇬🇧", "img": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=600&auto=format&fit=crop", "bio": "London tea & lifestyle 🫖", "isVerified": True}
-    ]
-
     try:
         cursor = hosts_col.find({"status": "approved"})
-        db_hosts = []
+        hosts_list = []
         async for doc in cursor:
-            db_hosts.append({
-                "id": str(doc.get("user_id")),
+            hosts_list.append({
+                "id": str(doc["_id"]),
                 "user_id": doc.get("user_id"),
                 "name": doc.get("name", "Host"),
-                "age": doc.get("age", 22),
                 "rate": doc.get("rate", 50),
-                "lang": doc.get("lang", "Hindi"),
-                "loc": doc.get("loc", "India 🇮🇳"),
-                "isPrivate": doc.get("isPrivate", False),
-                "entryGiftCost": doc.get("entryGiftCost", 0),
-                "isVerified": doc.get("isVerified", True),
-                "earnings": doc.get("earnings", 0),
+                "isVerified": True,
                 "img": doc.get("img", ""),
                 "bio": doc.get("bio", "")
             })
-        # Database hosts + International dummy hosts combined
-        combined = db_hosts + international_hosts
-        return {"status": "success", "hosts": combined}
+        return {"status": "success", "hosts": hosts_list}
     except Exception as e:
-        return {"status": "success", "hosts": international_hosts}
+        return {"status": "error", "hosts": []}
 
 @app.post("/api/register-host")
 async def register_host(req: RegisterHostReq):
@@ -221,8 +180,6 @@ async def register_host(req: RegisterHostReq):
             "bio": req.bio,
             "status": "pending",
             "isVerified": False,
-            "isOnline": False,
-            "isPrivate": False,
             "earnings": 0,
             "created_at": datetime.utcnow()
         }
@@ -233,7 +190,7 @@ async def register_host(req: RegisterHostReq):
                 InlineKeyboardButton(text="✅ Approve Host", callback_data=f"apphost_{req.user_id}"),
                 InlineKeyboardButton(text="❌ Reject", callback_data=f"rejhost_{req.user_id}")
             ]])
-            msg = f"👩 **HOST REGISTRATION REQUEST**\n\n👤 **User ID:** `{req.user_id}`\n📛 **Name:** {req.name}\n🪙 **Rate:** {req.rate}/min"
+            msg = f"🟡 **HOST REGISTRATION REQUEST**\n\n👤 **User ID:** `{req.user_id}`\n📛 **Name:** {req.name}\n🪙 **Rate:** {req.rate}/min"
             try:
                 await bot.send_photo(chat_id=GROUP_1_ID, photo=req.img, caption=msg, reply_markup=kb, parse_mode="Markdown")
             except:
@@ -247,89 +204,65 @@ async def register_host(req: RegisterHostReq):
 async def get_host_info(user_id: int):
     doc = await hosts_col.find_one({"_id": f"host_{user_id}"})
     if not doc:
-        return {"status": "none", "isOnline": False, "isVerified": False, "earnings": 0}
+        return {"status": "none", "isVerified": False, "earnings": 0}
     return {
         "status": doc.get("status", "none"),
-        "isOnline": doc.get("isOnline", False),
-        "isPrivate": doc.get("isPrivate", False),
         "isVerified": doc.get("isVerified", False),
-        "entryGiftCost": doc.get("entryGiftCost", 0),
         "earnings": doc.get("earnings", 0)
     }
-
-@app.post("/api/host/toggle-live")
-async def toggle_live(req: ToggleLiveReq):
-    doc = await hosts_col.find_one({"_id": f"host_{req.user_id}"})
-    if doc and doc.get("status") == "approved":
-        new_online = not doc.get("isOnline", False)
-        await hosts_col.update_one(
-            {"_id": f"host_{req.user_id}"},
-            {"$set": {
-                "isOnline": new_online,
-                "isPrivate": req.is_private,
-                "entryGiftCost": req.entry_gift_cost
-            }}
-        )
-        return {"status": "success", "isOnline": new_online, "isPrivate": req.is_private}
-    return {"status": "error", "message": "Not an approved host"}
 
 if os.path.exists("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
+# Telegram Bot Callback Handlers
 @dp.callback_query(F.data.startswith("appr_"))
 async def approve_recharge(call: types.CallbackQuery):
     if call.from_user.id != SUPER_ADMIN_ID:
-        await call.answer("You are not authorized!", show_alert=True)
+        await call.answer("Unauthorized", show_alert=True)
         return
     tx_id = call.data.split("_")[1]
     tx = await recharges_col.find_one({"_id": tx_id})
     if tx and tx.get("status") == "pending":
         await recharges_col.update_one({"_id": tx_id}, {"$set": {"status": "approved"}})
         await users_col.update_one({"_id": tx["user_id"]}, {"$inc": {"tokens": tx["tokens"]}}, upsert=True)
-        if call.message.caption:
-            await call.message.edit_caption(caption=call.message.caption + "\n\n✅ **APPROVED BY ADMIN**", parse_mode="Markdown")
-        else:
+        if call.message.text:
             await call.message.edit_text(call.message.text + "\n\n✅ **APPROVED BY ADMIN**", parse_mode="Markdown")
-        await call.answer("Recharge Approved & Tokens Credited!")
+        await call.answer("Recharge Approved!")
 
 @dp.callback_query(F.data.startswith("rejc_"))
 async def reject_recharge(call: types.CallbackQuery):
-    if call.from_user.id != SUPER_ADMIN_ID:
-        await call.answer("You are not authorized!", show_alert=True)
-        return
+    if call.from_user.id != SUPER_ADMIN_ID: return
     tx_id = call.data.split("_")[1]
     await recharges_col.update_one({"_id": tx_id}, {"$set": {"status": "rejected"}})
-    if call.message.caption:
-        await call.message.edit_caption(caption=call.message.caption + "\n\n❌ **REJECTED BY ADMIN**", parse_mode="Markdown")
-    else:
+    if call.message.text:
         await call.message.edit_text(call.message.text + "\n\n❌ **REJECTED BY ADMIN**", parse_mode="Markdown")
-    await call.answer("Recharge Rejected")
+    await call.answer("Recharge Rejected!")
 
 @dp.callback_query(F.data.startswith("apphost_"))
 async def approve_host_cb(call: types.CallbackQuery):
     if call.from_user.id != SUPER_ADMIN_ID:
-        await call.answer("You are not authorized!", show_alert=True)
+        await call.answer("Unauthorized", show_alert=True)
         return
     host_u_id = int(call.data.split("_")[1])
     await hosts_col.update_one(
         {"_id": f"host_{host_u_id}"},
-        {"$set": {"status": "approved", "isVerified": True, "isOnline": True}}
+        {"$set": {"status": "approved", "isVerified": True}}
     )
     if call.message.caption:
         await call.message.edit_caption(caption=call.message.caption + "\n\n✅ **APPROVED BY ADMIN (VERIFIED HOST)**", reply_markup=None, parse_mode="Markdown")
-    else:
+    elif call.message.text:
         await call.message.edit_text(text=call.message.text + "\n\n✅ **APPROVED BY ADMIN (VERIFIED HOST)**", reply_markup=None, parse_mode="Markdown")
-    await call.answer("Host Approved & Verified!")
+    await call.answer("Host Approved & Verified Successfully!")
 
 @dp.callback_query(F.data.startswith("rejhost_"))
 async def reject_host_cb(call: types.CallbackQuery):
     if call.from_user.id != SUPER_ADMIN_ID:
-        await call.answer("You are not authorized!", show_alert=True)
+        await call.answer("Unauthorized", show_alert=True)
         return
     host_u_id = int(call.data.split("_")[1])
-    await hosts_col.update_one({"_id": f"host_{host_u_id}"}, {"$set": {"status": "rejected", "isVerified": False, "isOnline": False}})
+    await hosts_col.update_one({"_id": f"host_{host_u_id}"}, {"$set": {"status": "rejected", "isVerified": False}})
     if call.message.caption:
         await call.message.edit_caption(caption=call.message.caption + "\n\n❌ **REJECTED BY ADMIN**", reply_markup=None, parse_mode="Markdown")
-    else:
+    elif call.message.text:
         await call.message.edit_text(text=call.message.text + "\n\n❌ **REJECTED BY ADMIN**", reply_markup=None, parse_mode="Markdown")
     await call.answer("Host Rejected")
