@@ -6,18 +6,28 @@ from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 import motor.motor_asyncio
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Update, WebAppInfo
+
+# Optional Agora Token Builder (Make sure 'agora-token-builder' is in requirements.txt)
+try:
+    from agora_token_builder import RtcTokenBuilder
+except ImportError:
+    RtcTokenBuilder = None
 
 logging.basicConfig(level=logging.INFO)
 
 MONGO_URI = os.getenv("MONGO_URI", "")
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 RENDER_URL = os.getenv("RENDER_URL", "https://vynora-bot.onrender.com")
-GROUP_1_ID = int(os.getenv("GROUP_1_ID", "-1001234567890"))
+GROUP_1_ID = int(os.getenv("GROUP_1_ID", "0"))
+
+# Agora Credentials (Add these to Render Environment Variables)
+AGORA_APP_ID = os.getenv("AGORA_APP_ID", "")
+AGORA_APP_CERTIFICATE = os.getenv("AGORA_APP_CERTIFICATE", "")
 
 app = FastAPI()
 bot = Bot(token=BOT_TOKEN) if BOT_TOKEN else None
@@ -51,7 +61,6 @@ async def telegram_webhook(request: Request):
     await dp.feed_update(bot, update)
     return {"ok": True}
 
-# Explicit /Start Command Handler for Bot
 @dp.message(F.text == "/start")
 async def cmd_start(message: types.Message):
     kb = InlineKeyboardMarkup(inline_keyboard=[[
@@ -92,7 +101,33 @@ class ToggleLiveReq(BaseModel):
 
 @app.get("/")
 async def serve_home():
-    return FileResponse("static/index.html")
+    if os.path.exists("static/index.html"):
+        return FileResponse("static/index.html")
+    return JSONResponse({"status": "error", "message": "Frontend index.html not found in static folder!"}, status_code=404)
+
+# AGORA TOKEN GENERATOR API FOR 1v1 LIVE STREAMING
+@app.get("/api/agora-token")
+async def get_agora_token(channelName: str, uid: int, role: str = "publisher"):
+    if not AGORA_APP_ID or not AGORA_APP_CERTIFICATE or not RtcTokenBuilder:
+        return JSONResponse({"status": "error", "message": "Agora credentials or package missing on server."}, status_code=500)
+    
+    # Expiration time for token (e.g., 2 hours)
+    expiration_time_in_seconds = 7200
+    current_timestamp = int(time.time())
+    privilege_expired_ts = current_timestamp + expiration_time_in_seconds
+
+    # 1 for Publisher, 2 for Subscriber
+    agora_role = 1 if role == "publisher" else 2
+
+    token = RtcTokenBuilder.buildTokenWithUid(
+        AGORA_APP_ID,
+        AGORA_APP_CERTIFICATE,
+        channelName,
+        uid,
+        agora_role,
+        privilege_expired_ts
+    )
+    return {"status": "success", "token": token, "appId": AGORA_APP_ID, "channel": channelName, "uid": uid}
 
 @app.get("/api/user/{user_id}")
 async def get_user_profile(user_id: int):
@@ -117,7 +152,7 @@ async def process_recharge(req: RechargeReq):
     }
     await recharges_col.insert_one(doc)
 
-    if bot:
+    if bot and GROUP_1_ID != 0:
         kb = InlineKeyboardMarkup(inline_keyboard=[[
             InlineKeyboardButton(text="✅ Approve", callback_data=f"appr_{tx_id}"),
             InlineKeyboardButton(text="❌ Reject", callback_data=f"rejc_{tx_id}")
@@ -150,7 +185,7 @@ async def book_slot(req: BookingReq):
     await bookings_col.insert_one(doc)
     await users_col.update_one({"_id": req.user_id}, {"$inc": {"tokens": -req.token_cost}})
 
-    if bot:
+    if bot and GROUP_1_ID != 0:
         kb = InlineKeyboardMarkup(inline_keyboard=[[
             InlineKeyboardButton(text="✅ Accept Call", callback_data=f"accbk_{booking_id}"),
             InlineKeyboardButton(text="❌ Decline", callback_data=f"canbk_{booking_id}")
@@ -171,10 +206,7 @@ async def book_slot(req: BookingReq):
 
 DUMMY_HOSTS = [
     { "id": "h1", "name": "Anu ❤️", "rate": 50, "isVerified": True, "isPrivate": False, "bio": "Friendly 1v1 chats & music lovers 💖", "img": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop" },
-    { "id": "h2", "name": "Sophia Rose", "rate": 80, "isVerified": True, "isPrivate": True, "entryGiftCost": 100, "bio": "High quality 1v1 experience 👑", "img": "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=600&auto=format&fit=crop" },
-    { "id": "h3", "name": "Priya Roy", "rate": 40, "isVerified": True, "isPrivate": False, "bio": "Late night casual talks ✨", "img": "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=600&auto=format&fit=crop" },
-    { "id": "h4", "name": "Elena Rostova", "rate": 100, "isVerified": True, "isPrivate": True, "entryGiftCost": 150, "bio": "Available for private video calls 🚀", "img": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=600&auto=format&fit=crop" },
-    { "id": "h5", "name": "Kavya Sharma", "rate": 55, "isVerified": True, "isPrivate": False, "bio": "Let's talk and vibe together 🎶", "img": "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=600&auto=format&fit=crop" }
+    { "id": "h2", "name": "Sophia Rose", "rate": 80, "isVerified": True, "isPrivate": True, "entryGiftCost": 100, "bio": "High quality 1v1 experience 👑", "img": "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=600&auto=format&fit=crop" }
 ]
 
 @app.get("/api/hosts")
@@ -220,7 +252,7 @@ async def register_host(req: RegisterHostReq):
         }
         await hosts_col.update_one({"_id": doc["_id"]}, {"$set": doc}, upsert=True)
 
-        if bot:
+        if bot and GROUP_1_ID != 0:
             kb = InlineKeyboardMarkup(inline_keyboard=[[
                 InlineKeyboardButton(text="✅ Approve Host", callback_data=f"apphost_{req.user_id}"),
                 InlineKeyboardButton(text="❌ Reject", callback_data=f"rejhost_{req.user_id}")
@@ -254,7 +286,6 @@ async def toggle_live(req: ToggleLiveReq):
 if os.path.exists("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Telegram Bot Callback Handlers with instant answer
 @dp.callback_query(F.data.startswith("appr_"))
 async def approve_recharge(call: types.CallbackQuery):
     await call.answer("Processing...")
@@ -273,30 +304,3 @@ async def reject_recharge(call: types.CallbackQuery):
     await recharges_col.update_one({"_id": tx_id}, {"$set": {"status": "rejected"}})
     if call.message and call.message.text:
         await call.message.edit_text(call.message.text + "\n\n❌ **REJECTED BY ADMIN**", parse_mode="Markdown")
-
-@dp.callback_query(F.data.startswith("apphost_"))
-async def approve_host_cb(call: types.CallbackQuery):
-    try:
-        host_u_id = int(call.data.split("_")[1])
-        await hosts_col.update_one({"user_id": host_u_id}, {"$set": {"status": "approved", "isVerified": True}}, upsert=True)
-        await hosts_col.update_one({"_id": f"host_{host_u_id}"}, {"$set": {"status": "approved", "isVerified": True}}, upsert=True)
-
-        if call.message and call.message.caption:
-            await call.message.edit_caption(caption=call.message.caption + "\n\n✅ **APPROVED BY ADMIN (VERIFIED HOST)**", reply_markup=None, parse_mode="Markdown")
-        elif call.message and call.message.text:
-            await call.message.edit_text(text=call.message.text + "\n\n✅ **APPROVED BY ADMIN (VERIFIED HOST)**", reply_markup=None, parse_mode="Markdown")
-        await call.answer("Host Approved & Verified Successfully!", show_alert=True)
-    except Exception as e:
-        logging.error(f"Host approval error: {e}")
-        await call.answer(f"Error: {e}", show_alert=True)
-
-@dp.callback_query(F.data.startswith("rejhost_"))
-async def reject_host_cb(call: types.CallbackQuery):
-    host_u_id = int(call.data.split("_")[1])
-    await hosts_col.update_one({"user_id": host_u_id}, {"$set": {"status": "rejected", "isVerified": False}})
-    await hosts_col.update_one({"_id": f"host_{host_u_id}"}, {"$set": {"status": "rejected", "isVerified": False}})
-    if call.message and call.message.caption:
-        await call.message.edit_caption(caption=call.message.caption + "\n\n❌ **REJECTED BY ADMIN**", reply_markup=None, parse_mode="Markdown")
-    elif call.message and call.message.text:
-        await call.message.edit_text(text=call.message.text + "\n\n❌ **REJECTED BY ADMIN**", reply_markup=None, parse_mode="Markdown")
-    await call.answer("Host Rejected")
