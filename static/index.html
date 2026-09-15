@@ -195,7 +195,7 @@
             </div>
         </div>
 
-        <!-- Host Withdrawal Action Button -->
+        <!-- Withdraw Button -->
         <div style="margin-bottom: 20px;">
             <button class="call-btn" style="background: linear-gradient(135deg, #00F5D4 0%, #00B2FF 100%); color: #000;" onclick="openWithdrawModal()">
                 <i class="fa-solid fa-wallet"></i> Withdraw Earnings (UPI)
@@ -215,6 +215,11 @@
                 <i class="fa-solid fa-power-off" style="color:var(--accent-cyan);" id="live-toggle-icon"></i>
                 <p style="color:white; font-weight:700;" id="live-toggle-text">Status</p>
             </div>
+            <!-- My Bookings Button for Users -->
+            <div class="icon-card" style="background: rgba(255,215,0,0.15); border-color: var(--gold);" onclick="openUserBookingsModal()">
+                <i class="fa-solid fa-calendar-check" style="color:var(--gold);"></i>
+                <p style="color:white; font-weight:700;">My Bookings</p>
+            </div>
             <div class="icon-card" onclick="openHostRegistrationModal()">
                 <i class="fa-solid fa-video" style="color:#FF007A;"></i>
                 <p>Creator Center</p>
@@ -231,6 +236,19 @@
             </div>
             <div id="host-bookings-list" style="max-height: 300px; overflow-y: auto;">
                 <p style="text-align:center; color:var(--text-muted);">Loading bookings...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- USER BOOKINGS MODAL -->
+    <div class="modal-overlay" id="user-bookings-modal">
+        <div class="modal-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h3>📅 My Bookings & Sessions</h3>
+                <button style="background:none; border:none; color:white; font-size:1.2rem;" onclick="closeModal('user-bookings-modal')">✕</button>
+            </div>
+            <div id="user-bookings-list" style="max-height: 320px; overflow-y: auto;">
+                <p style="text-align:center; color:var(--text-muted);">Loading your bookings...</p>
             </div>
         </div>
     </div>
@@ -406,6 +424,7 @@
         let localTracks = { audioTrack: null, videoTrack: null };
         let chatInterval = null;
         let isMainViewLocal = false;
+        let callTimerInterval = null;
 
         async function initData() {
             document.getElementById('profile-user-name').innerText = `${userName} 👑`;
@@ -519,6 +538,74 @@
             } catch(e) {
                 listContainer.innerHTML = `<p style="text-align:center; color:#FF0033;">Failed to load bookings.</p>`;
             }
+        }
+
+        function openUserBookingsModal() {
+            document.getElementById('user-bookings-modal').classList.add('active');
+            loadUserBookings();
+        }
+
+        async function loadUserBookings() {
+            const container = document.getElementById('user-bookings-list');
+            container.innerHTML = `<p style="text-align:center; color:var(--text-muted);">Loading...</p>`;
+            try {
+                const res = await fetch(`/api/user/bookings/${userId}`);
+                const data = await res.json();
+                if (data.bookings && data.bookings.length > 0) {
+                    container.innerHTML = data.bookings.map(b => `
+                        <div style="background:rgba(255,255,255,0.05); padding:12px; border-radius:12px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <p style="font-size:0.9rem; font-weight:700; color:white;">Host: ${b.host_name}</p>
+                                <p style="font-size:0.75rem; color:var(--gold);">⏱️ ${b.duration_mins} Mins | 🪙 ${b.token_cost} Tokens</p>
+                                <p style="font-size:0.75rem; color:${b.status === 'approved' ? 'var(--accent-cyan)' : 'var(--text-muted)'}; font-weight:700;">Status: ${b.status.toUpperCase()}</p>
+                            </div>
+                            ${b.status === 'approved' ? `
+                                <button class="call-btn" style="width:auto; padding:6px 12px; background:var(--accent-cyan); color:#000;" onclick="joinApprovedPrivateCall('${b.host_name}', '${b.host_img}', ${b.host_user_id || 0}, ${b.duration_mins})">
+                                    🚀 Join Live
+                                </button>
+                            ` : `<span style="font-size:0.75rem; color:var(--text-muted);">Wait for approval</span>`}
+                        </div>
+                    `).join('');
+                } else {
+                    container.innerHTML = `<p style="text-align:center; color:var(--text-muted);">No bookings found.</p>`;
+                }
+            } catch(e) {
+                container.innerHTML = `<p style="text-align:center; color:#FF0033;">Failed to load bookings.</p>`;
+            }
+        }
+
+        function joinApprovedPrivateCall(hostName, hostImg, hostUserId, durationMins) {
+            closeModal('user-bookings-modal');
+            document.getElementById('live-active-name').innerText = hostName;
+            document.getElementById('live-active-img').src = hostImg || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop";
+            document.getElementById('live-host-rate').innerText = "Private";
+
+            const channelName = "private_call_" + hostUserId + "_" + userId;
+            startVideoCall(channelName, userId % 2147483647, "publisher");
+
+            let totalSeconds = durationMins * 60;
+            if (callTimerInterval) clearInterval(callTimerInterval);
+
+            let timerBadge = document.getElementById('call-timer-badge');
+            if (!timerBadge) {
+                timerBadge = document.createElement('div');
+                timerBadge.id = 'call-timer-badge';
+                timerBadge.style = "position:absolute; top:16px; left:50%; transform:translateX(-50%); background:rgba(255,0,122,0.8); padding:6px 14px; border-radius:20px; font-weight:800; font-size:0.9rem; color:white; z-index:20;";
+                document.getElementById('video-call-screen').appendChild(timerBadge);
+            }
+
+            callTimerInterval = setInterval(() => {
+                let mins = Math.floor(totalSeconds / 60);
+                let secs = totalSeconds % 60;
+                timerBadge.innerText = `⏱️ Time Left: ${mins}:${secs < 10 ? '0' : ''}${secs}`;
+
+                if (totalSeconds <= 0) {
+                    clearInterval(callTimerInterval);
+                    alert("⏰ Your booked slot time is over! Call ending automatically.");
+                    leaveCall();
+                }
+                totalSeconds--;
+            }, 1000);
         }
 
         function openWithdrawModal() {
@@ -662,6 +749,10 @@
 
         async function leaveCall() {
             if (chatInterval) clearInterval(chatInterval);
+            if (callTimerInterval) clearInterval(callTimerInterval);
+            const timerBadge = document.getElementById('call-timer-badge');
+            if (timerBadge) timerBadge.remove();
+
             if (localTracks.audioTrack) localTracks.audioTrack.close();
             if (localTracks.videoTrack) localTracks.videoTrack.close();
             if (agoraClient) await agoraClient.leave();
@@ -764,7 +855,7 @@
                 const data = await res.json();
                 if(data.status === "success") {
                     closeModal('host-booking-modal');
-                    alert("Booking request sent! Waiting for host approval.");
+                    alert("Booking request sent! Tokens deducted. Check 'My Bookings' for status.");
                     initData();
                 } else { alert(data.message); }
             } catch(e) { alert("Booking failed"); }
