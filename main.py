@@ -28,9 +28,6 @@ GROUP_2_ID = int(os.getenv("GROUP_2_ID", "0"))
 GROUP_3_ID = int(os.getenv("GROUP_3_ID", "0"))
 SUPER_ADMIN_ID = int(os.getenv("SUPER_ADMIN_ID", "7001825467"))
 
-AGORA_APP_ID = os.getenv("AGORA_APP_ID", "")
-AGORA_APP_CERTIFICATE = os.getenv("AGORA_APP_CERTIFICATE", "")
-
 app = FastAPI()
 bot = Bot(token=BOT_TOKEN) if BOT_TOKEN else None
 dp = Dispatcher()
@@ -122,14 +119,17 @@ async def serve_home():
 
 @app.get("/api/agora-token")
 async def get_agora_token(channelName: str, uid: int, role: str = "publisher"):
-    if not AGORA_APP_ID or not AGORA_APP_CERTIFICATE or not RtcTokenBuilder:
+    app_id = os.getenv("AGORA_APP_ID", "")
+    app_cert = os.getenv("AGORA_APP_CERTIFICATE", "")
+    
+    if not app_id or not app_cert or not RtcTokenBuilder:
         return JSONResponse({"status": "error", "message": "Agora credentials missing"}, status_code=500)
     
     token = RtcTokenBuilder.buildTokenWithUid(
-        AGORA_APP_ID, AGORA_APP_CERTIFICATE, channelName, uid, 
+        app_id, app_cert, channelName, uid, 
         1 if role == "publisher" else 2, int(time.time()) + 7200
     )
-    return {"status": "success", "token": token, "appId": AGORA_APP_ID, "channel": channelName, "uid": uid}
+    return {"status": "success", "token": token, "appId": app_id, "channel": channelName, "uid": uid}
 
 @app.get("/api/user/{user_id}")
 async def get_user_profile(user_id: int):
@@ -158,8 +158,16 @@ async def get_host_status(user_id: int):
 async def process_recharge(req: RechargeReq):
     tx_id = f"tx_{int(time.time())}"
     await recharges_col.insert_one({"_id": tx_id, "user_id": req.user_id, "amount_inr": req.amount_inr, "utr_number": req.utr_number, "tokens": int(req.amount_inr), "status": "pending", "timestamp": datetime.utcnow()})
+    
     kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="✅ Approve", callback_data=f"appr_{tx_id}"), InlineKeyboardButton(text="❌ Reject", callback_data=f"rejc_{tx_id}")]])
-    await notify_all_groups(f"💳 **NEW RECHARGE**\n👤 User ID: `{req.user_id}`\n💵 Amount: ₹{req.amount_inr}\n📌 UTR: `{req.utr_number}`", reply_markup=kb)
+    
+    # Send recharge request ONLY to Group 1
+    if bot and GROUP_1_ID != 0:
+        try:
+            await bot.send_message(chat_id=GROUP_1_ID, text=f"💳 **NEW RECHARGE APPROVAL**\n👤 User ID: `{req.user_id}`\n💵 Amount: ₹{req.amount_inr}\n📌 UTR: `{req.utr_number}`", reply_markup=kb, parse_mode="Markdown")
+        except Exception as e:
+            logging.error(f"Error sending recharge to group 1: {e}")
+            
     return {"status": "success", "message": "UTR submitted for approval!"}
 
 @app.post("/api/book-slot")
@@ -225,16 +233,27 @@ async def approve_recharge(call: types.CallbackQuery):
     if tx and tx.get("status") == "pending":
         await recharges_col.update_one({"_id": tx_id}, {"$set": {"status": "approved"}})
         await users_col.update_one({"_id": tx["user_id"]}, {"$inc": {"tokens": tx["tokens"]}}, upsert=True)
+        
+        # Notify user
         if bot:
             try:
                 await bot.send_message(chat_id=tx["user_id"], text=f"🎉 **Badhaai ho!** Aapka ₹{tx['amount_inr']} ka recharge approve ho gaya hai aur `{tx['tokens']} Tokens` add ho gaye hain! 🪙", parse_mode="Markdown")
             except:
                 pass
+                
+        # Update Group 1 message
         if call.message and call.message.text:
             try:
                 await call.message.edit_text(call.message.text + "\n\n✅ **APPROVED BY ADMIN**", parse_mode="Markdown")
             except:
                 pass
+                
+        # Send Approval Log to Group 3
+        if bot and GROUP_3_ID != 0:
+            try:
+                await bot.send_message(chat_id=GROUP_3_ID, text=f"✅ **RECHARGE APPROVED LOG**\n👤 User ID: `{tx['user_id']}`\n💵 Amount: ₹{tx['amount_inr']}\n📌 UTR: `{tx['utr_number']}`\n🪙 Tokens Added: {tx['tokens']}", parse_mode="Markdown")
+            except Exception as e:
+                logging.error(f"Error sending approval log to group 3: {e}")
 
 @dp.callback_query(F.data.startswith("apphost_"))
 async def approve_host_cb(call: types.CallbackQuery):
