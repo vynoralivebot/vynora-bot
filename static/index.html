@@ -113,7 +113,6 @@
         .live-host-pill img { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; }
         .live-viewer-count { background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.15); padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; color: var(--accent-cyan); font-weight: 700; }
         
-        /* Floating Chat Messages Box */
         .live-chat-messages { position: absolute; bottom: 80px; left: 16px; right: 100px; max-height: 180px; overflow-y: auto; z-index: 10; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
         .chat-bubble { background: rgba(0,0,0,0.5); backdrop-filter: blur(6px); padding: 6px 12px; border-radius: 12px; font-size: 0.8rem; color: white; width: fit-content; max-width: 100%; word-break: break-word; }
         .chat-bubble b { color: var(--accent-cyan); margin-right: 4px; }
@@ -255,7 +254,6 @@
             <div class="live-viewer-count">👁️ <span id="viewer-count">1</span> Watching</div>
         </div>
 
-        <!-- Chat Messages Container -->
         <div class="live-chat-messages" id="chat-messages-container"></div>
 
         <div class="live-bottom-bar">
@@ -431,7 +429,6 @@
             document.getElementById('live-active-img').src = selectedHostObj.img;
             document.getElementById('live-host-rate').innerText = selectedHostObj.rate;
             
-            // EXACT CHANNEL NAME MATCH (Host ke user_id se match karega)
             const channelName = "host_live_" + selectedHostObj.hostUserId;
             startVideoCall(channelName, userId % 2147483647, "subscriber");
         }
@@ -441,14 +438,13 @@
             document.getElementById('live-active-img').src = telegramPhoto || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop";
             document.getElementById('live-host-rate').innerText = "50";
             
-            // EXACT CHANNEL NAME MATCH (Apne user_id par broadcast karega)
             const channelName = "host_live_" + userId;
             startVideoCall(channelName, userId % 2147483647, "publisher");
         }
 
         async function startVideoCall(channelName, safeUid, role) {
             document.getElementById('video-call-screen').classList.add('active');
-            document.getElementById('chat-messages-container.innerHTML = ''');
+            document.getElementById('chat-messages-container').innerHTML = '';
             try {
                 const res = await fetch(`/api/agora-token?channelName=${channelName}&uid=${safeUid}&role=${role}`);
                 const data = await res.json();
@@ -499,7 +495,6 @@
             initData();
         }
 
-        // Chat SMS sending feature
         function sendChatMessage() {
             const input = document.getElementById('chat-input');
             const text = input.value.trim();
@@ -544,7 +539,6 @@
                     userTokens -= cost;
                     document.getElementById('user-token-bal').innerText = userTokens;
                     
-                    // Show gift message in chat
                     const container = document.getElementById('chat-messages-container');
                     const bubble = document.createElement('div');
                     bubble.className = 'chat-bubble';
