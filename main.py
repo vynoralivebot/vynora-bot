@@ -92,6 +92,7 @@ class GiftReq(BaseModel):
     gift_cost: int
     gift_name: str
     channel: Optional[str] = None
+    sender_name: Optional[str] = "User"
 
 class ChatReq(BaseModel):
     channel: str
@@ -138,7 +139,6 @@ async def update_profile_photo(user_id: int = Form(...), avatar: UploadFile = Fi
         
         avatar_url = f"{RENDER_URL}/static/uploads/{filename}"
         
-        # Update both users and hosts collection so main page updates instantly
         await users_col.update_one({"_id": user_id}, {"$set": {"avatar": avatar_url}}, upsert=True)
         await hosts_col.update_one({"user_id": user_id}, {"$set": {"img": avatar_url}})
         await hosts_col.update_one({"_id": f"host_{user_id}"}, {"$set": {"img": avatar_url}})
@@ -155,6 +155,24 @@ async def get_host_status(user_id: int):
     if host and host.get("status") == "approved":
         return {"is_host": True, "status": "approved", "isVerified": True, "role": "host"}
     return {"is_host": False, "status": host.get("status", "none") if host else "none", "role": "user"}
+
+@app.get("/api/host/bookings/{user_id}")
+async def get_host_bookings(user_id: int):
+    host = await hosts_col.find_one({"user_id": user_id})
+    host_id = host.get("_id") if host else f"host_{user_id}"
+    
+    cursor = bookings_col.find({"$or": [{"host_id": str(host_id)}, {"host_id": str(user_id)}]}).sort("timestamp", -1).limit(20)
+    bookings = []
+    async for doc in cursor:
+        bookings.append({
+            "id": str(doc["_id"]),
+            "user_id": doc.get("user_id"),
+            "duration_mins": doc.get("duration_mins"),
+            "token_cost": doc.get("token_cost"),
+            "status": doc.get("status", "pending"),
+            "timestamp": doc.get("timestamp").isoformat() if doc.get("timestamp") else ""
+        })
+    return {"status": "success", "bookings": bookings}
 
 @app.post("/api/recharge")
 async def process_recharge(
@@ -199,9 +217,24 @@ async def book_slot(req: BookingReq):
     user = await users_col.find_one({"_id": req.user_id})
     if not user or user.get("tokens", 0) < req.token_cost:
         return {"status": "error", "message": "Insufficient Token Balance!"}
+    
     booking_id = f"bk_{int(time.time())}"
-    await bookings_col.insert_one({"_id": booking_id, "user_id": req.user_id, "host_id": req.host_id, "host_name": req.host_name, "duration_mins": req.duration_mins, "token_cost": req.token_cost, "status": "pending", "timestamp": datetime.utcnow()})
+    await bookings_col.insert_one({
+        "_id": booking_id, "user_id": req.user_id, "host_id": req.host_id, 
+        "host_name": req.host_name, "duration_mins": req.duration_mins, 
+        "token_cost": req.token_cost, "status": "pending", "timestamp": datetime.utcnow()
+    })
     await users_col.update_one({"_id": req.user_id}, {"$inc": {"tokens": -req.token_cost}})
+    
+    # Also add earnings to host when slot is booked
+    host_doc = await hosts_col.find_one({"$or": [{"_id": req.host_id}, {"user_id": int(req.host_id) if str(req.host_id).isdigit() else None}]})
+    host_user_id = host_doc.get("user_id") if host_doc else None
+    
+    await hosts_col.update_one({"_id": req.host_id}, {"$inc": {"earnings": req.token_cost}}, upsert=True)
+    if host_user_id:
+        await hosts_col.update_one({"user_id": host_user_id}, {"$inc": {"earnings": req.token_cost}}, upsert=True)
+        await users_col.update_one({"_id": host_user_id}, {"$inc": {"earnings": req.token_cost}}, upsert=True)
+
     return {"status": "success", "booking_id": booking_id, "message": "Slot booked successfully!"}
 
 @app.post("/api/send-gift")
@@ -209,14 +242,25 @@ async def send_gift(req: GiftReq):
     user = await users_col.find_one({"_id": req.user_id})
     if not user or user.get("tokens", 0) < req.gift_cost:
         return {"status": "error", "message": "Insufficient tokens to send gift!"}
+    
+    # Deduct from user tokens
     await users_col.update_one({"_id": req.user_id}, {"$inc": {"tokens": -req.gift_cost}})
+    
+    # Find host and update earnings in hosts & users collection
+    host_doc = await hosts_col.find_one({"$or": [{"_id": req.host_id}, {"user_id": int(req.host_id) if str(req.host_id).isdigit() else None}]})
+    host_user_id = host_doc.get("user_id") if host_doc else None
+    
     await hosts_col.update_one({"_id": req.host_id}, {"$inc": {"earnings": req.gift_cost}}, upsert=True)
+    if host_user_id:
+        await hosts_col.update_one({"user_id": host_user_id}, {"$inc": {"earnings": req.gift_cost}}, upsert=True)
+        await users_col.update_one({"_id": host_user_id}, {"$inc": {"earnings": req.gift_cost}}, upsert=True)
     
     if req.channel:
+        sender_display = req.sender_name if req.sender_name else "User"
         await chats_col.insert_one({
             "channel": req.channel,
-            "sender": "Gift Alert 🎁",
-            "text": f"sent {req.gift_name}!",
+            "sender": sender_display,
+            "text": f"sent {req.gift_name} 🎁",
             "type": "gift",
             "timestamp": datetime.utcnow()
         })
@@ -320,7 +364,7 @@ async def approve_host_cb(call: types.CallbackQuery):
     try:
         host_u_id = int(call.data.split("_")[1])
         await hosts_col.update_one({"user_id": host_u_id}, {"$set": {"status": "approved", "isVerified": True}}, upsert=True)
-        await hosts_col.update_one({"_id": f"host_{host_u_id}"}, {"$set": {"status": "approved", "isVerified": True}}, upsert=True)
+        await hosts_col.update_id = await hosts_col.update_one({"_id": f"host_{host_u_id}"}, {"$set": {"status": "approved", "isVerified": True}}, upsert=True)
         if call.message:
             try:
                 if call.message.caption:
