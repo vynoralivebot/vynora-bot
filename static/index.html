@@ -211,12 +211,14 @@
                 <i class="fa-solid fa-clipboard-list" style="color:var(--accent-cyan);"></i>
                 <p style="color:white; font-weight:700;">Bookings</p>
             </div>
+            <div class="icon-card" id="toggle-live-card" style="display: none; background: rgba(0,245,212,0.15); border-color: var(--accent-cyan);" onclick="toggleHostOnlineStatus()">
+                <i class="fa-solid fa-power-off" style="color:var(--accent-cyan);" id="live-toggle-icon"></i>
+                <p style="color:white; font-weight:700;" id="live-toggle-text">Status</p>
+            </div>
             <div class="icon-card" onclick="openHostRegistrationModal()">
                 <i class="fa-solid fa-video" style="color:#FF007A;"></i>
                 <p>Creator Center</p>
             </div>
-            <div class="icon-card"><i class="fa-solid fa-gift" style="color:#FF5500;"></i><p>Bonus</p></div>
-            <div class="icon-card"><i class="fa-solid fa-crown" style="color:var(--gold);"></i><p>Level</p></div>
         </div>
     </div>
 
@@ -428,6 +430,10 @@
                 if (hostData.is_host && hostData.status === "approved") {
                     document.getElementById('go-live-card').style.display = 'block';
                     document.getElementById('host-bookings-card').style.display = 'block';
+                    document.getElementById('toggle-live-card').style.display = 'block';
+                    
+                    const isOnline = hostData.is_online;
+                    document.getElementById('live-toggle-text').innerText = isOnline ? "Online 🟢" : "Offline 🔴";
                 }
             } catch(e) {}
 
@@ -452,7 +458,7 @@
             container.innerHTML = list.map(h => `
                 <div class="host-card" onclick="openBookingDrawer('${h.id}', '${h.user_id || h.id}', '${h.name}', '${h.img}', '${h.bio || 'Live Stream'}', ${h.rate || 50})">
                     <img src="${h.img}" class="host-thumb">
-                    <div class="badge-live">LIVE 🔴</div>
+                    <div class="badge-live">${h.is_online ? 'LIVE 🔴' : 'OFFLINE ⚪'}</div>
                     <div class="badge-rate">🪙 ${h.rate || 50}/m</div>
                     <div class="host-info">
                         <div class="host-name">${h.name} <i class="fa-solid fa-circle-check" style="color:#00B2FF;"></i></div>
@@ -537,6 +543,17 @@
                 closeModal('withdraw-modal');
                 initData();
             } catch(e) { alert("Withdrawal request failed"); }
+        }
+
+        async function toggleHostOnlineStatus() {
+            try {
+                const res = await fetch(`/api/host/toggle-live/${userId}`, { method: 'POST' });
+                const data = await res.json();
+                if(data.status === "success") {
+                    alert(`Status changed to: ${data.is_online ? "Online 🟢" : "Offline 🔴"}`);
+                    initData();
+                }
+            } catch(e) { alert("Failed to change status"); }
         }
 
         function joinPublicStream() {
@@ -748,6 +765,7 @@
                 if(data.status === "success") {
                     closeModal('host-booking-modal');
                     alert("Booking request sent! Waiting for host approval.");
+                    initData();
                 } else { alert(data.message); }
             } catch(e) { alert("Booking failed"); }
         }
@@ -824,6 +842,7 @@
                 const data = await res.json();
                 alert(data.message);
                 closeModal('host-reg-modal');
+                initData();
             } catch(e) { alert("Registration error"); }
         }
 
