@@ -96,7 +96,8 @@
         .nav-item.active { color: #FF007A; font-weight: 700; }
         .nav-item i { font-size: 1.1rem; }
 
-        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(10px); z-index: 200; display: none; justify-content: center; align-items: flex-end; }
+        /* MODAL OVERLAY - Z-INDEX FIXED TO SHOW ABOVE VIDEO */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(10px); z-index: 9999 !important; display: none; justify-content: center; align-items: flex-end; }
         .modal-overlay.active { display: flex; }
         .modal-card { background: #130E26; border-top: 1px solid var(--card-border); border-radius: 24px 24px 0 0; width: 100%; max-width: 480px; padding: 20px; max-height: 88vh; overflow-y: auto; }
         .input-box { width: 100%; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--card-border); padding: 12px; border-radius: 12px; color: white; margin-bottom: 10px; outline: none; }
@@ -179,6 +180,8 @@
             <div class="profile-avatar-wrapper">
                 <img id="profile-avatar-img" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop" class="profile-avatar-img">
                 <div class="cam-edit-icon" onclick="promptPhotoUpdate()"><i class="fa-solid fa-camera"></i></div>
+                <!-- HIDDEN FILE INPUT FOR PROFILE PIC -->
+                <input type="file" id="profile-file-input" style="display: none;" accept="image/*" onchange="uploadProfilePhoto(this)">
             </div>
             <div class="user-meta">
                 <h2 id="profile-user-name">Vynora Live 👑</h2>
@@ -307,7 +310,7 @@
         </div>
     </div>
 
-    <!-- RECHARGE MODAL WITH SCREENSHOT OPTION -->
+    <!-- RECHARGE MODAL WITH FILE UPLOAD SCREENSHOT OPTION -->
     <div class="modal-overlay" id="recharge-modal">
         <div class="modal-card">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
@@ -323,7 +326,12 @@
                 <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=vynoralive@slc&pn=RajnishKumar" id="upi-qr-img">
                 <p style="font-size:0.75rem; color:#666; margin-top:4px;">UPI ID: <b>vynoralive@slc</b></p>
             </div>
-            <input type="text" id="recharge-screenshot" class="input-box" placeholder="Paste Payment Screenshot Direct URL">
+            
+            <div style="text-align: left; margin-bottom: 4px;">
+                <label style="font-size: 0.75rem; color: var(--text-muted);">Upload Payment Screenshot:</label>
+            </div>
+            <input type="file" id="recharge-screenshot" class="input-box" accept="image/*">
+            
             <input type="text" id="recharge-utr" class="input-box" placeholder="Enter 12-Digit UTR / Ref Number">
             <button class="call-btn" style="padding:12px;" onclick="submitRecharge()">🚀 Submit For Approval</button>
         </div>
@@ -512,7 +520,6 @@
                 if (role === "publisher") {
                     localTracks.audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
                     localTracks.videoTrack = await AgoraRTC.createCameraVideoTrack();
-                    // Host ke liye by default local camera main view mein aur remote PIP mein
                     localTracks.videoTrack.play("main-video-view");
                     isMainViewLocal = true;
                     await agoraClient.publish([localTracks.audioTrack, localTracks.videoTrack]);
@@ -661,22 +668,31 @@
             } catch(e) { alert("Booking failed"); }
         }
 
-        async function promptPhotoUpdate() {
-            const newUrl = prompt("Enter new Profile Photo Direct URL:");
-            if (newUrl && newUrl.startsWith('http')) {
+        // PROFILE PICTURE FILE UPLOAD HANDLERS
+        function promptPhotoUpdate() {
+            document.getElementById('profile-file-input').click();
+        }
+
+        async function uploadProfilePhoto(input) {
+            if (input.files && input.files[0]) {
+                const formData = new FormData();
+                formData.append('user_id', parseInt(userId));
+                formData.append('avatar', input.files[0]);
+
                 try {
                     const res = await fetch('/api/update-profile-photo', {
                         method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({ user_id: parseInt(userId), avatar_url: newUrl })
+                        body: formData
                     });
                     const data = await res.json();
-                    if(data.status === "success") {
-                        document.getElementById('profile-avatar-img').src = newUrl;
-                        document.getElementById('header-avatar-img').src = newUrl;
+                    if(data.status === "success" && data.avatar_url) {
+                        document.getElementById('profile-avatar-img').src = data.avatar_url;
+                        document.getElementById('header-avatar-img').src = data.avatar_url;
                         alert("Profile photo updated successfully!");
+                    } else {
+                        alert(data.message || "Error updating photo");
                     }
-                } catch(e) { alert("Error saving photo"); }
+                } catch(e) { alert("Error uploading photo"); }
             }
         }
 
@@ -727,16 +743,24 @@
             } catch(e) { alert("Registration error"); }
         }
 
+        // RECHARGE SUBMISSION WITH FILE UPLOAD
         async function submitRecharge() {
             const utr = document.getElementById('recharge-utr').value.trim();
-            const screenshot = document.getElementById('recharge-screenshot').value.trim();
+            const fileInput = document.getElementById('recharge-screenshot');
+            
             if (!utr) return alert("Enter UTR number!");
+            if (fileInput.files.length === 0) return alert("Please select payment screenshot image!");
+
+            const formData = new FormData();
+            formData.append('user_id', parseInt(userId));
+            formData.append('amount_inr', selectedAmount);
+            formData.append('utr_number', utr);
+            formData.append('screenshot', fileInput.files[0]);
 
             try {
                 const res = await fetch('/api/recharge', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ user_id: parseInt(userId), amount_inr: selectedAmount, utr_number: utr, screenshot_url: screenshot })
+                    body: formData
                 });
                 const data = await res.json();
                 alert(data.message);
