@@ -227,7 +227,18 @@ def get_chat(channel: str):
     return {"messages": messages}
 
 
-# --- Telegram Webhook for Messages & Inline Buttons ---
+# --- Telegram Webhook & Auto-Setup ---
+@app.on_event("startup")
+def set_webhook_on_startup():
+    render_url = "https://vynora-bot.onrender.com/telegram-webhook"
+    webhook_api = f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook?url={render_url}"
+    try:
+        res = requests.get(webhook_api)
+        print("Webhook Auto-Setup Response:", res.json())
+    except Exception as e:
+        print("Failed to auto-set webhook:", e)
+
+
 @app.post("/telegram-webhook")
 async def telegram_webhook(req: Request):
     body = await req.json()
