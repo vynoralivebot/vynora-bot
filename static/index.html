@@ -101,20 +101,26 @@
         .modal-card { background: #130E26; border-top: 1px solid var(--card-border); border-radius: 24px 24px 0 0; width: 100%; max-width: 480px; padding: 20px; max-height: 88vh; overflow-y: auto; }
         .input-box { width: 100%; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--card-border); padding: 12px; border-radius: 12px; color: white; margin-bottom: 10px; outline: none; }
 
+        /* VIDEO CALL & FILTERS CSS */
         #video-call-screen { position: fixed; inset: 0; background: #000; z-index: 999; display: none; flex-direction: column; }
         #video-call-screen.active { display: flex; }
-        #remote-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
-        #local-video { position: absolute; top: 70px; right: 16px; width: 100px; height: 140px; background: #111; border-radius: 14px; overflow: hidden; border: 2px solid #FF007A; z-index: 5; }
+        #main-video-view { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
+        #pip-video-view { position: absolute; top: 70px; right: 16px; width: 100px; height: 140px; background: #111; border-radius: 14px; overflow: hidden; border: 2px solid #FF007A; z-index: 5; cursor: pointer; }
         
         .live-top-bar { position: absolute; top: 16px; left: 16px; right: 16px; z-index: 10; display: flex; justify-content: space-between; align-items: center; }
         .live-host-pill { background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.15); padding: 4px 12px 4px 4px; border-radius: 30px; display: flex; align-items: center; gap: 8px; color: white; font-size: 0.85rem; font-weight: 700; }
         .live-host-pill img { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; }
         .live-viewer-count { background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.15); padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; color: var(--accent-cyan); font-weight: 700; }
         
-        .live-chat-messages { position: absolute; bottom: 80px; left: 16px; right: 100px; max-height: 180px; overflow-y: auto; z-index: 10; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+        .live-chat-messages { position: absolute; bottom: 120px; left: 16px; right: 100px; max-height: 160px; overflow-y: auto; z-index: 10; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
         .chat-bubble { background: rgba(0,0,0,0.6); backdrop-filter: blur(6px); padding: 6px 12px; border-radius: 12px; font-size: 0.8rem; color: white; width: fit-content; max-width: 100%; word-break: break-word; pointer-events: auto; }
         .chat-bubble b { color: var(--accent-cyan); margin-right: 4px; }
         .chat-bubble.gift-announcement { background: rgba(255, 0, 122, 0.4); border: 1px solid #FF007A; color: var(--gold); font-weight: 700; }
+
+        /* CAMERA FILTERS BAR */
+        .filter-bar { position: absolute; bottom: 75px; left: 16px; right: 16px; z-index: 10; display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+        .cam-filter-btn { background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 4px 10px; border-radius: 15px; font-size: 0.72rem; cursor: pointer; white-space: nowrap; font-weight: 600; }
+        .cam-filter-btn.active { background: #FF007A; border-color: #FF007A; }
 
         .live-bottom-bar { position: absolute; bottom: 20px; left: 16px; right: 16px; z-index: 10; display: flex; align-items: center; gap: 8px; }
         .live-chat-input { flex: 1; background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); padding: 10px 16px; border-radius: 30px; color: white; font-size: 0.85rem; outline: none; }
@@ -124,6 +130,13 @@
         .gifts-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 15px 0; }
         .gift-item { background: rgba(255,255,255,0.06); border: 1px solid var(--card-border); border-radius: 16px; padding: 14px; text-align: center; cursor: pointer; }
         .gift-emoji { font-size: 2rem; margin-bottom: 6px; }
+
+        /* CSS CAMERA FILTERS DEFINITIONS */
+        .filter-normal { filter: none; }
+        .filter-beauty { filter: brightness(1.15) contrast(1.05) saturate(1.1) drop-shadow(0 0 2px rgba(255,192,203,0.5)); }
+        .filter-rosy { filter: sepia(0.2) hue-rotate(330deg) saturate(1.3) brightness(1.05); }
+        .filter-cool { filter: hue-rotate(180deg) saturate(1.2) brightness(1.05); }
+        .filter-cinematic { filter: contrast(1.25) saturate(0.85) brightness(0.95); }
     </style>
 </head>
 <body>
@@ -205,7 +218,7 @@
         <div class="nav-item" id="nav-profile" onclick="switchTab('profile')"><i class="fa-solid fa-user"></i><span>Profile</span></div>
     </nav>
 
-    <!-- HOST PROFILE DRAWER WITH 1m to 30m OPTIONS & WATCH LIVE -->
+    <!-- HOST PROFILE DRAWER -->
     <div class="modal-overlay" id="host-booking-modal">
         <div class="modal-card">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
@@ -223,47 +236,27 @@
                 </div>
             </div>
 
-            <!-- WATCH PUBLIC STREAM OPTION -->
             <div class="booking-option-card" style="background:rgba(0,245,212,0.08); border-color:var(--accent-cyan);">
                 <div><b>⚡ Watch Public Stream</b><p style="font-size:0.7rem; color:var(--text-muted);">Join live stream free</p></div>
                 <button class="call-btn" style="width:auto; padding:6px 12px; background:var(--accent-cyan); color:#000;" onclick="joinPublicStream()">👀 Watch Live</button>
             </div>
 
-            <!-- 1m to 30m DYNAMIC BOOKING OPTIONS -->
             <div style="font-size:0.8rem; font-weight:700; margin: 10px 0 6px 0;">⏱️ Private Slot Booking (1m - 30m):</div>
             <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:6px; max-height:160px; overflow-y:auto; padding-right:4px;">
-                <div class="plan-card" onclick="confirmBooking(1)">
-                    <div class="plan-amount">1 Min</div>
-                    <div class="plan-tokens" id="cost-1">🪙 50</div>
-                </div>
-                <div class="plan-card" onclick="confirmBooking(5)">
-                    <div class="plan-amount">5 Mins</div>
-                    <div class="plan-tokens" id="cost-5">🪙 250</div>
-                </div>
-                <div class="plan-card" onclick="confirmBooking(10)">
-                    <div class="plan-amount">10 Mins</div>
-                    <div class="plan-tokens" id="cost-10">🪙 500</div>
-                </div>
-                <div class="plan-card" onclick="confirmBooking(15)">
-                    <div class="plan-amount">15 Mins</div>
-                    <div class="plan-tokens" id="cost-15">🪙 750</div>
-                </div>
-                <div class="plan-card" onclick="confirmBooking(20)">
-                    <div class="plan-amount">20 Mins</div>
-                    <div class="plan-tokens" id="cost-20">🪙 1000</div>
-                </div>
-                <div class="plan-card" onclick="confirmBooking(30)">
-                    <div class="plan-amount">30 Mins</div>
-                    <div class="plan-tokens" id="cost-30">🪙 1500</div>
-                </div>
+                <div class="plan-card" onclick="confirmBooking(1)"><div class="plan-amount">1 Min</div><div class="plan-tokens" id="cost-1">🪙 50</div></div>
+                <div class="plan-card" onclick="confirmBooking(5)"><div class="plan-amount">5 Mins</div><div class="plan-tokens" id="cost-5">🪙 250</div></div>
+                <div class="plan-card" onclick="confirmBooking(10)"><div class="plan-amount">10 Mins</div><div class="plan-tokens" id="cost-10">🪙 500</div></div>
+                <div class="plan-card" onclick="confirmBooking(15)"><div class="plan-amount">15 Mins</div><div class="plan-tokens" id="cost-15">🪙 750</div></div>
+                <div class="plan-card" onclick="confirmBooking(20)"><div class="plan-amount">20 Mins</div><div class="plan-tokens" id="cost-20">🪙 1000</div></div>
+                <div class="plan-card" onclick="confirmBooking(30)"><div class="plan-amount">30 Mins</div><div class="plan-tokens" id="cost-30">🪙 1500</div></div>
             </div>
         </div>
     </div>
 
-    <!-- FULL SCREEN LIVE SCREEN -->
+    <!-- VIDEO CALL SCREEN -->
     <div id="video-call-screen">
-        <div id="remote-video"></div>
-        <div id="local-video"></div>
+        <div id="main-video-view"></div>
+        <div id="pip-video-view" onclick="swapVideoLayouts()" title="Tap to Swap View"></div>
         
         <div class="live-top-bar">
             <div class="live-host-pill">
@@ -278,6 +271,15 @@
 
         <div class="live-chat-messages" id="chat-messages-container"></div>
 
+        <!-- CAMERA FILTERS BAR -->
+        <div class="filter-bar">
+            <div class="cam-filter-btn active" onclick="applyCameraFilter('filter-normal', this)">✨ Normal</div>
+            <div class="cam-filter-btn" onclick="applyCameraFilter('filter-beauty', this)">🌟 Beauty Glow</div>
+            <div class="cam-filter-btn" onclick="applyCameraFilter('filter-rosy', this)">🌸 Rosy Pink</div>
+            <div class="cam-filter-btn" onclick="applyCameraFilter('filter-cool', this)">🧊 Cool Blue</div>
+            <div class="cam-filter-btn" onclick="applyCameraFilter('filter-cinematic', this)">🕶️ Cinematic</div>
+        </div>
+
         <div class="live-bottom-bar">
             <input type="text" class="live-chat-input" placeholder="Say something nice..." id="chat-input" onkeypress="handleChatKey(event)">
             <div class="live-action-btn" onclick="sendChatMessage()" title="Send SMS"><i class="fa-solid fa-paper-plane" style="color:var(--accent-cyan);"></i></div>
@@ -286,7 +288,7 @@
         </div>
     </div>
 
-    <!-- GIFT SENDING MODAL -->
+    <!-- GIFT MODAL -->
     <div class="modal-overlay" id="gift-modal">
         <div class="modal-card">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
@@ -305,7 +307,7 @@
         </div>
     </div>
 
-    <!-- RECHARGE MODAL -->
+    <!-- RECHARGE MODAL WITH SCREENSHOT OPTION -->
     <div class="modal-overlay" id="recharge-modal">
         <div class="modal-card">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
@@ -321,8 +323,9 @@
                 <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=vynoralive@slc&pn=RajnishKumar" id="upi-qr-img">
                 <p style="font-size:0.75rem; color:#666; margin-top:4px;">UPI ID: <b>vynoralive@slc</b></p>
             </div>
+            <input type="text" id="recharge-screenshot" class="input-box" placeholder="Paste Payment Screenshot Direct URL">
             <input type="text" id="recharge-utr" class="input-box" placeholder="Enter 12-Digit UTR / Ref Number">
-            <button class="call-btn" style="padding:12px;" onclick="submitRecharge()">🚀 Submit UTR For Approval</button>
+            <button class="call-btn" style="padding:12px;" onclick="submitRecharge()">🚀 Submit For Approval</button>
         </div>
     </div>
 
@@ -360,6 +363,7 @@
         let agoraClient = null;
         let localTracks = { audioTrack: null, videoTrack: null };
         let chatInterval = null;
+        let isMainViewLocal = false;
 
         async function initData() {
             document.getElementById('profile-user-name').innerText = `${userName} 👑`;
@@ -482,12 +486,10 @@
 
                 agoraClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
 
-                // Jab koi naya user video publish kare
                 agoraClient.on("user-published", async (user, mediaType) => {
                     await agoraClient.subscribe(user, mediaType);
                     if (mediaType === "video") {
-                        // Hamesha remote video ko bade screen ("remote-video") par play karein
-                        user.videoTrack.play("remote-video");
+                        user.videoTrack.play("main-video-view");
                     }
                     if (mediaType === "audio") {
                         user.audioTrack.play();
@@ -496,11 +498,10 @@
 
                 await agoraClient.join(data.appId, data.channel, data.token, data.uid);
 
-                // Agar remote user pehle se channel mein hai toh play karein
                 for (let user of agoraClient.remoteUsers) {
                     if (user.hasVideo) {
                         await agoraClient.subscribe(user, "video");
-                        user.videoTrack.play("remote-video");
+                        user.videoTrack.play("main-video-view");
                     }
                     if (user.hasAudio) {
                         await agoraClient.subscribe(user, "audio");
@@ -509,15 +510,14 @@
                 }
 
                 if (role === "publisher") {
-                    // Host ke liye local camera chote box ("local-video") mein dikhega
-                    document.getElementById('local-video').style.display = 'block';
                     localTracks.audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
                     localTracks.videoTrack = await AgoraRTC.createCameraVideoTrack();
-                    localTracks.videoTrack.play("local-video");
+                    // Host ke liye by default local camera main view mein aur remote PIP mein
+                    localTracks.videoTrack.play("main-video-view");
+                    isMainViewLocal = true;
                     await agoraClient.publish([localTracks.audioTrack, localTracks.videoTrack]);
                 } else {
-                    // Viewer ke liye local camera hide rahega
-                    document.getElementById('local-video').style.display = 'none';
+                    document.getElementById('pip-video-view').style.display = 'none';
                 }
 
                 startChatPolling(channelName);
@@ -529,13 +529,37 @@
             }
         }
 
+        function swapVideoLayouts() {
+            isMainViewLocal = !isMainViewLocal;
+            if (localTracks.videoTrack) {
+                if (isMainViewLocal) {
+                    localTracks.videoTrack.play("main-video-view");
+                } else {
+                    localTracks.videoTrack.play("pip-video-view");
+                }
+            }
+        }
+
+        function applyCameraFilter(filterClass, el) {
+            document.querySelectorAll('.cam-filter-btn').forEach(b => b.classList.remove('active'));
+            el.classList.add('active');
+
+            const mainVideo = document.getElementById('main-video-view');
+            const pipVideo = document.getElementById('pip-video-view');
+
+            mainVideo.className = '';
+            pipVideo.className = '';
+            mainVideo.classList.add(filterClass);
+            pipVideo.classList.add(filterClass);
+        }
+
         async function leaveCall() {
             if (chatInterval) clearInterval(chatInterval);
             if (localTracks.audioTrack) localTracks.audioTrack.close();
             if (localTracks.videoTrack) localTracks.videoTrack.close();
             if (agoraClient) await agoraClient.leave();
             document.getElementById('video-call-screen').classList.remove('active');
-            document.getElementById('local-video').style.display = 'block';
+            document.getElementById('pip-video-view').style.display = 'block';
             initData();
         }
 
@@ -704,14 +728,15 @@
         }
 
         async function submitRecharge() {
-            const header = document.getElementById('recharge-utr').value.trim();
-            if (!header) return alert("Enter UTR number!");
+            const utr = document.getElementById('recharge-utr').value.trim();
+            const screenshot = document.getElementById('recharge-screenshot').value.trim();
+            if (!utr) return alert("Enter UTR number!");
 
             try {
                 const res = await fetch('/api/recharge', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ user_id: parseInt(userId), amount_inr: selectedAmount, utr_number: header })
+                    body: JSON.stringify({ user_id: parseInt(userId), amount_inr: selectedAmount, utr_number: utr, screenshot_url: screenshot })
                 });
                 const data = await res.json();
                 alert(data.message);
