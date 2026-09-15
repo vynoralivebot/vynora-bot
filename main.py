@@ -226,11 +226,35 @@ def get_chat(channel: str):
     messages = list(chats_col.find({"channel": channel}, {"_id": 0}).sort("time", 1).limit(50))
     return {"messages": messages}
 
-# --- Telegram Webhook for Buttons ---
+
+# --- Telegram Webhook for Messages & Inline Buttons ---
 @app.post("/telegram-webhook")
 async def telegram_webhook(req: Request):
     body = await req.json()
-    if "callback_query" in body:
+    
+    # Handle incoming user messages (like /start)
+    if "message" in body:
+        msg = body["message"]
+        chat_id = msg["chat"]["id"]
+        user_id = msg["from"]["id"]
+        text = msg.get("text", "")
+        
+        if text.startswith("/start"):
+            user = users_col.find_one({"user_id": user_id})
+            if not user:
+                users_col.insert_one({"user_id": user_id, "tokens": 100, "earnings": 0, "avatar": ""})
+                send_telegram_message(GROUP_2_ID, f"👤 <b>New User Started Bot!</b>\nID: <code>{user_id}</code>")
+            
+            webapp_url = "https://vynora-bot.onrender.com/static/index.html"
+            keyboard = {
+                "inline_keyboard": [
+                    [{"text": "🚀 Open Vynora Live App", "web_app": {"url": webapp_url}}]
+                ]
+            }
+            send_telegram_message(chat_id, "✨ <b>Welcome to Vynora Live 1v1!</b>\n\nConnect with verified hosts and book private slots.", reply_markup=keyboard)
+
+    # Handle host action clicks (Accept / Reject)
+    elif "callback_query" in body:
         callback = body["callback_query"]
         data_str = callback["data"]
         message_id = callback["message"]["message_id"]
@@ -241,12 +265,11 @@ async def telegram_webhook(req: Request):
             booking = bookings_col.find_one({"booking_id": booking_id})
             if booking:
                 bookings_col.update_one({"booking_id": booking_id}, {"$set": {"status": "approved"}})
-                user_id = booking["user_id"]
-                send_telegram_message(user_id, "🎉 <b>Badhai ho!</b> Host ne aapki booking request accept kar li hai. Ab aap session join kar sakte hain!")
+                send_telegram_message(booking["user_id"], "🎉 <b>Badhai ho!</b> Host ne aapki booking request accept kar li hai. Ab aap session join kar sakte hain!")
                 requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={
                     "chat_id": chat_id,
                     "message_id": message_id,
-                    "text": f"✅ Booking Approved Successfully for User {user_id}"
+                    "text": f"✅ Booking Approved Successfully"
                 })
 
         elif data_str.startswith("reject_bk_"):
@@ -254,14 +277,13 @@ async def telegram_webhook(req: Request):
             booking = bookings_col.find_one({"booking_id": booking_id})
             if booking:
                 bookings_col.update_one({"booking_id": booking_id}, {"$set": {"status": "rejected"}})
-                user_id = booking["user_id"]
                 token_cost = booking["token_cost"]
-                users_col.update_one({"user_id": user_id}, {"$inc": {"tokens": token_cost}})
-                send_telegram_message(user_id, f"❌ Aapki booking request host dwara reject kar di gayi hai. Aapke {token_cost} tokens refund kar diye gaye hain.")
+                users_col.update_one({"user_id": booking["user_id"]}, {"$inc": {"tokens": token_cost}})
+                send_telegram_message(booking["user_id"], f"❌ Aapki booking request reject kar di gayi hai. Aapke {token_cost} tokens refund kar diye gaye hain.")
                 requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={
                     "chat_id": chat_id,
                     "message_id": message_id,
-                    "text": f"❌ Booking Rejected. {token_cost} tokens refunded to user {user_id}."
+                    "text": f"❌ Booking Rejected & Refunded"
                 })
 
     return {"status": "ok"}
