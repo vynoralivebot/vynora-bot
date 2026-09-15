@@ -112,8 +112,9 @@
         .live-viewer-count { background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.15); padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; color: var(--accent-cyan); font-weight: 700; }
         
         .live-chat-messages { position: absolute; bottom: 80px; left: 16px; right: 100px; max-height: 180px; overflow-y: auto; z-index: 10; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
-        .chat-bubble { background: rgba(0,0,0,0.5); backdrop-filter: blur(6px); padding: 6px 12px; border-radius: 12px; font-size: 0.8rem; color: white; width: fit-content; max-width: 100%; word-break: break-word; }
+        .chat-bubble { background: rgba(0,0,0,0.6); backdrop-filter: blur(6px); padding: 6px 12px; border-radius: 12px; font-size: 0.8rem; color: white; width: fit-content; max-width: 100%; word-break: break-word; pointer-events: auto; }
         .chat-bubble b { color: var(--accent-cyan); margin-right: 4px; }
+        .chat-bubble.gift-announcement { background: rgba(255, 0, 122, 0.4); border: 1px solid #FF007A; color: var(--gold); font-weight: 700; }
 
         .live-bottom-bar { position: absolute; bottom: 20px; left: 16px; right: 16px; z-index: 10; display: flex; align-items: center; gap: 8px; }
         .live-chat-input { flex: 1; background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); padding: 10px 16px; border-radius: 30px; color: white; font-size: 0.85rem; outline: none; }
@@ -204,33 +205,62 @@
         <div class="nav-item" id="nav-profile" onclick="switchTab('profile')"><i class="fa-solid fa-user"></i><span>Profile</span></div>
     </nav>
 
+    <!-- HOST PROFILE DRAWER WITH 1m to 30m OPTIONS & WATCH LIVE -->
     <div class="modal-overlay" id="host-booking-modal">
         <div class="modal-card">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                 <h3 id="bk-host-name">Host Profile</h3>
                 <button style="background:none; border:none; color:white; font-size:1.2rem;" onclick="closeModal('host-booking-modal')">✕</button>
             </div>
-            <img id="drawer-host-img" src="" style="width:100%; height:220px; object-fit:cover; border-radius:16px; margin-bottom:12px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <img id="drawer-host-img" src="" style="width:100%; height:180px; object-fit:cover; border-radius:16px; margin-bottom:10px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                 <div>
-                    <h4 id="drawer-name-title" style="font-size:1.05rem;">Host Name</h4>
-                    <p id="drawer-bio" style="font-size:0.78rem; color:var(--text-muted); margin-top:2px;">High quality 1v1 experience 👑</p>
+                    <h4 id="drawer-name-title" style="font-size:1rem;">Host Name</h4>
+                    <p id="drawer-bio" style="font-size:0.75rem; color:var(--text-muted);">Verified Host 👑</p>
                 </div>
-                <div style="background:rgba(255,215,0,0.1); border:1px solid rgba(255,215,0,0.3); padding:4px 10px; border-radius:12px; color:var(--gold); font-size:0.85rem; font-weight:700;">
+                <div style="background:rgba(255,215,0,0.1); border:1px solid rgba(255,215,0,0.3); padding:4px 10px; border-radius:12px; color:var(--gold); font-size:0.8rem; font-weight:700;">
                     🪙 <span id="drawer-rate">50</span>/min
                 </div>
             </div>
-            <div class="booking-option-card">
-                <div><b>⚡ Watch Public Stream</b><p style="font-size:0.72rem; color:var(--text-muted);">Join live stream free</p></div>
-                <button class="call-btn" style="width:auto; padding:8px 14px; background:var(--accent-cyan); color:#000;" onclick="joinPublicStream()">👀 Watch Live</button>
+
+            <!-- WATCH PUBLIC STREAM OPTION -->
+            <div class="booking-option-card" style="background:rgba(0,245,212,0.08); border-color:var(--accent-cyan);">
+                <div><b>⚡ Watch Public Stream</b><p style="font-size:0.7rem; color:var(--text-muted);">Join live stream free</p></div>
+                <button class="call-btn" style="width:auto; padding:6px 12px; background:var(--accent-cyan); color:#000;" onclick="joinPublicStream()">👀 Watch Live</button>
             </div>
-            <div class="booking-option-card">
-                <div><b>⏱️ 5 Mins Slot Booking</b><p style="font-size:0.72rem; color:var(--text-muted);">Private 1v1 reserved slot</p></div>
-                <button class="call-btn" style="width:auto; padding:8px 14px; background:var(--banner-pink);" onclick="confirmBooking(5, 250)">🪙 250 Tokens</button>
+
+            <!-- 1m to 30m DYNAMIC BOOKING OPTIONS -->
+            <div style="font-size:0.8rem; font-weight:700; margin: 10px 0 6px 0;">⏱️ Private Slot Booking (1m - 30m):</div>
+            <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:6px; max-height:160px; overflow-y:auto; padding-right:4px;">
+                <div class="plan-card" onclick="confirmBooking(1)">
+                    <div class="plan-amount">1 Min</div>
+                    <div class="plan-tokens" id="cost-1">🪙 50</div>
+                </div>
+                <div class="plan-card" onclick="confirmBooking(5)">
+                    <div class="plan-amount">5 Mins</div>
+                    <div class="plan-tokens" id="cost-5">🪙 250</div>
+                </div>
+                <div class="plan-card" onclick="confirmBooking(10)">
+                    <div class="plan-amount">10 Mins</div>
+                    <div class="plan-tokens" id="cost-10">🪙 500</div>
+                </div>
+                <div class="plan-card" onclick="confirmBooking(15)">
+                    <div class="plan-amount">15 Mins</div>
+                    <div class="plan-tokens" id="cost-15">🪙 750</div>
+                </div>
+                <div class="plan-card" onclick="confirmBooking(20)">
+                    <div class="plan-amount">20 Mins</div>
+                    <div class="plan-tokens" id="cost-20">🪙 1000</div>
+                </div>
+                <div class="plan-card" onclick="confirmBooking(30)">
+                    <div class="plan-amount">30 Mins</div>
+                    <div class="plan-tokens" id="cost-30">🪙 1500</div>
+                </div>
             </div>
         </div>
     </div>
 
+    <!-- FULL SCREEN LIVE SCREEN -->
     <div id="video-call-screen">
         <div id="remote-video"></div>
         <div id="local-video"></div>
@@ -256,6 +286,7 @@
         </div>
     </div>
 
+    <!-- GIFT SENDING MODAL -->
     <div class="modal-overlay" id="gift-modal">
         <div class="modal-card">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
@@ -274,6 +305,7 @@
         </div>
     </div>
 
+    <!-- RECHARGE MODAL -->
     <div class="modal-overlay" id="recharge-modal">
         <div class="modal-card">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
@@ -294,6 +326,7 @@
         </div>
     </div>
 
+    <!-- HOST REGISTRATION MODAL -->
     <div class="modal-overlay" id="host-reg-modal">
         <div class="modal-card">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
@@ -326,6 +359,7 @@
 
         let agoraClient = null;
         let localTracks = { audioTrack: null, videoTrack: null };
+        let chatInterval = null;
 
         async function initData() {
             document.getElementById('profile-user-name').innerText = `${userName} 👑`;
@@ -400,6 +434,15 @@
             document.getElementById('drawer-name-title').innerText = name;
             document.getElementById('drawer-bio').innerText = bio;
             document.getElementById('drawer-rate').innerText = rate;
+
+            // Update slot prices dynamically based on rate
+            document.getElementById('cost-1').innerText = `🪙 ${rate * 1}`;
+            document.getElementById('cost-5').innerText = `🪙 ${rate * 5}`;
+            document.getElementById('cost-10').innerText = `🪙 ${rate * 10}`;
+            document.getElementById('cost-15').innerText = `🪙 ${rate * 15}`;
+            document.getElementById('cost-20').innerText = `🪙 ${rate * 20}`;
+            document.getElementById('cost-30').innerText = `🪙 ${rate * 30}`;
+
             document.getElementById('host-booking-modal').classList.add('active');
         }
 
@@ -472,6 +515,10 @@
                 } else {
                     document.getElementById('local-video').style.display = 'none';
                 }
+
+                // Start fetching live chat messages using Agora Data Stream or polling mechanism
+                startChatPolling(channelName);
+
             } catch (error) {
                 console.error("Agora join failed:", error);
                 alert("Agora Error: " + error.message);
@@ -480,6 +527,7 @@
         }
 
         async function leaveCall() {
+            if (chatInterval) clearInterval(chatInterval);
             if (localTracks.audioTrack) localTracks.audioTrack.close();
             if (localTracks.videoTrack) localTracks.videoTrack.close();
             if (agoraClient) await agoraClient.leave();
@@ -488,18 +536,40 @@
             initData();
         }
 
-        function sendChatMessage() {
+        // Real-time Chat & Gifts Sync via Backend
+        function startChatPolling(channelName) {
+            if (chatInterval) clearInterval(chatInterval);
+            chatInterval = setInterval(async () => {
+                try {
+                    const res = await fetch(`/api/get-chat/${channelName}`);
+                    const data = await res.json();
+                    if (data.messages) {
+                        const container = document.getElementById('chat-messages-container');
+                        container.innerHTML = data.messages.map(m => `
+                            <div class="chat-bubble ${m.type === 'gift' ? 'gift-announcement' : ''}">
+                                <b>${m.sender}:</b> ${m.text}
+                            </div>
+                        `).join('');
+                        container.scrollTop = container.scrollHeight;
+                    }
+                } catch(e) {}
+            }, 2000);
+        }
+
+        async function sendChatMessage() {
             const input = document.getElementById('chat-input');
             const text = input.value.trim();
             if(!text) return;
 
-            const container = document.getElementById('chat-messages-container');
-            const bubble = document.createElement('div');
-            bubble.className = 'chat-bubble';
-            bubble.innerHTML = `<b>${userName}:</b> ${text}`;
-            container.appendChild(bubble);
-            container.scrollTop = container.scrollHeight;
-            input.value = '';
+            const channelName = selectedHostObj ? "host_live_" + selectedHostObj.hostUserId : "host_live_" + userId;
+            try {
+                await fetch('/api/send-chat', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ channel: channelName, sender: userName, text: text, type: 'chat' })
+                });
+                input.value = '';
+            } catch(e) { alert("Failed to send message"); }
         }
 
         function handleChatKey(e) {
@@ -522,23 +592,17 @@
             }
             try {
                 const hostId = selectedHostObj ? selectedHostObj.id : "h1";
+                const channelName = selectedHostObj ? "host_live_" + selectedHostObj.hostUserId : "host_live_" + userId;
+                
                 const res = await fetch('/api/send-gift', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ user_id: parseInt(userId), host_id: hostId, gift_cost: cost, gift_name: giftName })
+                    body: JSON.stringify({ user_id: parseInt(userId), host_id: hostId, gift_cost: cost, gift_name: giftName, channel: channelName })
                 });
                 const data = await res.json();
                 if (data.status === "success") {
                     userTokens -= cost;
                     document.getElementById('user-token-bal').innerText = userTokens;
-                    
-                    const container = document.getElementById('chat-messages-container');
-                    const bubble = document.createElement('div');
-                    bubble.className = 'chat-bubble';
-                    bubble.innerHTML = `🎁 <b>${userName}</b> sent <b>${giftName}</b>!`;
-                    container.appendChild(bubble);
-                    container.scrollTop = container.scrollHeight;
-
                     alert(`🎁 You sent ${giftName} successfully!`);
                     closeModal('gift-modal');
                 } else {
@@ -547,9 +611,10 @@
             } catch(e) { alert("Failed to send gift"); }
         }
 
-        async function confirmBooking(mins, cost) {
+        async function confirmBooking(mins) {
+            const cost = selectedHostObj.rate * mins;
             if (userTokens < cost) {
-                alert(`⚠️ Balance Low! You need ${cost} Tokens.`);
+                alert(`⚠️ Balance Low! You need ${cost} Tokens for ${mins} mins.`);
                 openRechargeModal();
                 return;
             }
