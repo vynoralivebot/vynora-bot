@@ -33,3 +33,9 @@ function bookHost(hostId, minutes, price) {
 }
 
 fetchHosts();
+function openGiftModal(hostId) {
+    const modal = document.getElementById('gift-modal-id'); 
+    if (modal) {
+        modal.style.display = 'block'; 
+    }
+}
