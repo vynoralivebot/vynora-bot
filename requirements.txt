@@ -5,3 +5,4 @@ aiogram>=3.7.0
 pydantic
 python-dotenv
 agora-token-builder
+python-multipart
