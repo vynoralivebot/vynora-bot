@@ -1,6 +1,6 @@
 import os
 import time
-from fastapi import FastAPI, UploadFile, File, Form, Request
+from fastapi import FastAPI, UploadFile, File, Form, Request, HTTPException
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import requests
@@ -31,6 +31,16 @@ def send_telegram_message(chat_id, text, reply_markup=None):
         requests.post(f"{TELEGRAM_API_URL}/sendMessage", json=payload)
     except Exception as e:
         print("Telegram Error:", e)
+
+# --- Automatic Webhook Setup on Startup ---
+@app.on_event("startup")
+def set_webhook_on_startup():
+    render_url = "https://vynora-bot.onrender.com/telegram-webhook"
+    webhook_api = f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook?url={render_url}"
+    try:
+        requests.get(webhook_api)
+    except Exception as e:
+        print("Webhook setup error:", e)
 
 # --- Pydantic Models ---
 class HostRegisterModel(BaseModel):
@@ -85,11 +95,22 @@ def get_user(user_id: int):
 def get_host_status(user_id: int):
     host = hosts_col.find_one({"user_id": user_id})
     if host:
-        return {"is_host": True, "status": host.get("status", "pending")}
-    return {"is_host": False, "status": "none"}
+        return {"is_host": True, "status": host.get("status", "pending"), "is_online": host.get("is_online", False)}
+    return {"is_host": False, "status": "none", "is_online": False}
+
+@app.post("/api/host/toggle-live/{user_id}")
+def toggle_host_live(user_id: int):
+    host = hosts_col.find_one({"user_id": user_id})
+    if not host:
+        return {"status": "error", "message": "Host not found"}
+    current_status = host.get("is_online", False)
+    new_status = not current_status
+    hosts_col.update_one({"user_id": user_id}, {"$set": {"is_online": new_status}})
+    return {"status": "success", "is_online": new_status}
 
 @app.get("/api/hosts")
 def get_hosts():
+    # Returns approved hosts (can filter by online status if needed)
     hosts = list(hosts_col.find({"status": "approved"}, {"_id": 0}))
     return {"hosts": hosts}
 
@@ -106,8 +127,9 @@ def get_agora_token(channelName: str, uid: int, role: str):
 def book_slot(data: BookingModel):
     user = users_col.find_one({"user_id": data.user_id})
     if not user or user.get("tokens", 0) < data.token_cost:
-        return {"status": "error", "message": "Insufficient tokens!"}
+        return {"status": "error", "message": f"Insufficient tokens! You need {data.token_cost} tokens."}
 
+    # Deduct tokens immediately on booking request
     users_col.update_one({"user_id": data.user_id}, {"$inc": {"tokens": -data.token_cost}})
 
     booking_id = str(int(time.time()))
@@ -122,6 +144,7 @@ def book_slot(data: BookingModel):
     }
     bookings_col.insert_one(booking_doc)
 
+    # Notify Host with Accept/Reject buttons
     host = hosts_col.find_one({"id": data.host_id})
     if host and "user_id" in host:
         host_telegram_id = host["user_id"]
@@ -133,7 +156,7 @@ def book_slot(data: BookingModel):
                 ]
             ]
         }
-        msg = f"🔔 <b>New Private Booking Request!</b>\n\n👤 User ID: <code>{data.user_id}</code>\n⏱️ Duration: {data.duration_mins} Mins\n🪙 Cost: {data.token_cost} Tokens"
+        msg = f"🔔 <b>New Private Slot Booking Request!</b>\n\n👤 User ID: <code>{data.user_id}</code>\n⏱️ Duration: {data.duration_mins} Mins\n🪙 Cost: {data.token_cost} Tokens"
         send_telegram_message(host_telegram_id, msg, reply_markup=keyboard)
         send_telegram_message(GROUP_1_ID, f"📋 <b>Booking Created</b>\nHost: {data.host_name}\nUser: {data.user_id}\nCost: {data.token_cost} Tokens")
 
@@ -152,6 +175,7 @@ def register_host(data: HostRegisterModel):
     host_data = data.dict()
     host_data["status"] = "approved"
     host_data["id"] = f"h_{data.user_id}"
+    host_data["is_online"] = True
     hosts_col.update_one({"user_id": data.user_id}, {"$set": host_data}, upsert=True)
     
     send_telegram_message(GROUP_1_ID, f"📹 <b>New Host Registered!</b>\nName: {data.name}\nRate: {data.rate} Tokens/min\nID: <code>{data.user_id}</code>")
@@ -159,18 +183,35 @@ def register_host(data: HostRegisterModel):
 
 @app.post("/api/recharge")
 async def recharge(user_id: int = Form(...), amount_inr: int = Form(...), utr_number: str = Form(...), screenshot: UploadFile = File(...)):
+    # FIXED: Do NOT add tokens automatically. Keep status pending until approved in Group 1.
+    tokens_expected = amount_inr if amount_inr < 500 else amount_inr + 50
+    recharge_id = str(int(time.time()))
+    
     recharges_col.insert_one({
+        "recharge_id": recharge_id,
         "user_id": user_id,
         "amount_inr": amount_inr,
+        "tokens_expected": tokens_expected,
         "utr_number": utr_number,
         "status": "pending"
     })
-    
-    tokens_to_add = amount_inr if amount_inr < 500 else amount_inr + 50
-    users_col.update_one({"user_id": user_id}, {"$inc": {"tokens": tokens_to_add}}, upsert=True)
 
-    send_telegram_message(GROUP_1_ID, f"💳 <b>New Recharge Request!</b>\nUser ID: <code>{user_id}</code>\nAmount: ₹{amount_inr}\nUTR: <code>{utr_number}</code>\n✅ Added {tokens_to_add} Tokens automatically.")
-    return {"status": "success", "message": f"Recharge submitted! {tokens_to_add} tokens added."}
+    # Send Notification to Group 1 with Admin Approval Buttons
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {"text": f"✅ Approve (+{tokens_expected} Tokens)", "callback_data": f"approve_rc_{recharge_id}"},
+                {"text": "❌ Reject", "callback_data": f"reject_rc_{recharge_id}"}
+            ]
+        ]
+    }
+    send_telegram_message(
+        GROUP_1_ID, 
+        f"💳 <b>New Recharge Request (Pending Approval)!</b>\nUser ID: <code>{user_id}</code>\nAmount: ₹{amount_inr}\nUTR: <code>{utr_number}</code>", 
+        reply_markup=keyboard
+    )
+    
+    return {"status": "success", "message": "Recharge submitted successfully! Waiting for admin approval."}
 
 @app.post("/api/withdraw")
 def withdraw_earnings(data: WithdrawModel):
@@ -188,6 +229,14 @@ def withdraw_earnings(data: WithdrawModel):
 
     send_telegram_message(GROUP_3_ID, f"💸 <b>New Withdrawal Request!</b>\n\n👤 Host ID: <code>{data.user_id}</code>\n🪙 Tokens: {data.tokens}\n📱 UPI ID: <code>{data.upi_id}</code>")
     return {"status": "success", "message": "Withdrawal request sent to team successfully!"}
+
+@app.post("/api/update-profile-photo")
+async def update_profile_photo(user_id: int = Form(...), avatar: UploadFile = File(...)):
+    # Simple direct handling: save file URL or simulate avatar update
+    avatar_url = f"https://vynora-bot.onrender.com/static/uploads/{avatar.filename}"
+    users_col.update_one({"user_id": user_id}, {"$set": {"avatar": avatar_url}}, upsert=True)
+    hosts_col.update_one({"user_id": user_id}, {"$set": {"img": avatar_url}}, upsert=True)
+    return {"status": "success", "avatar_url": avatar_url}
 
 @app.post("/api/send-gift")
 def send_gift(data: GiftModel):
@@ -227,23 +276,11 @@ def get_chat(channel: str):
     return {"messages": messages}
 
 
-# --- Telegram Webhook & Auto-Setup ---
-@app.on_event("startup")
-def set_webhook_on_startup():
-    render_url = "https://vynora-bot.onrender.com/telegram-webhook"
-    webhook_api = f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook?url={render_url}"
-    try:
-        res = requests.get(webhook_api)
-        print("Webhook Auto-Setup Response:", res.json())
-    except Exception as e:
-        print("Failed to auto-set webhook:", e)
-
-
+# --- Telegram Webhook for Actions & Approvals ---
 @app.post("/telegram-webhook")
 async def telegram_webhook(req: Request):
     body = await req.json()
     
-    # Handle incoming user messages (like /start)
     if "message" in body:
         msg = body["message"]
         chat_id = msg["chat"]["id"]
@@ -264,23 +301,47 @@ async def telegram_webhook(req: Request):
             }
             send_telegram_message(chat_id, "✨ <b>Welcome to Vynora Live 1v1!</b>\n\nConnect with verified hosts and book private slots.", reply_markup=keyboard)
 
-    # Handle host action clicks (Accept / Reject)
     elif "callback_query" in body:
         callback = body["callback_query"]
         data_str = callback["data"]
         message_id = callback["message"]["message_id"]
         chat_id = callback["message"]["chat"]["id"]
 
-        if data_str.startswith("accept_bk_"):
+        # 1. Recharge Approvals in Group 1
+        if data_str.startswith("approve_rc_"):
+            recharge_id = data_str.replace("approve_rc_", "")
+            rc = recharges_col.find_one({"recharge_id": recharge_id})
+            if rc and rc["status"] == "pending":
+                recharges_col.update_one({"recharge_id": recharge_id}, {"$set": {"status": "approved"}})
+                u_id = rc["user_id"]
+                tokens = rc["tokens_expected"]
+                users_col.update_one({"user_id": u_id}, {"$inc": {"tokens": tokens}}, upsert=True)
+                send_telegram_message(u_id, f"🎉 <b>Recharge Approved!</b> Aapke account me {tokens} tokens add kar diye gaye hain.")
+                requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={
+                    "chat_id": chat_id, "message_id": message_id, "text": f"✅ Recharge Approved. Added {tokens} tokens to user {u_id}."
+                })
+
+        elif data_str.startswith("reject_rc_"):
+            recharge_id = data_str.replace("reject_rc_", "")
+            recharges_col.update_one({"recharge_id": recharge_id}, {"$set": {"status": "rejected"}})
+            requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={
+                "chat_id": chat_id, "message_id": message_id, "text": f"❌ Recharge Request Rejected."
+            })
+
+        # 2. Host Booking Approvals
+        elif data_str.startswith("accept_bk_"):
             booking_id = data_str.replace("accept_bk_", "")
             booking = bookings_col.find_one({"booking_id": booking_id})
             if booking:
                 bookings_col.update_one({"booking_id": booking_id}, {"$set": {"status": "approved"}})
+                # Add earnings to host
+                host = hosts_col.find_one({"id": booking["host_id"]})
+                if host and "user_id" in host:
+                    users_col.update_one({"user_id": host["user_id"]}, {"$inc": {"earnings": booking["token_cost"]}}, upsert=True)
+                
                 send_telegram_message(booking["user_id"], "🎉 <b>Badhai ho!</b> Host ne aapki booking request accept kar li hai. Ab aap session join kar sakte hain!")
-                requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={
-                    "chat_id": chat_id,
-                    "message_id": message_id,
-                    "text": f"✅ Booking Approved Successfully"
+                requests.post(f"{TELEGRAM_API_URL}, editMessageText", json={
+                    "chat_id": chat_id, "message_id": message_id, "text": f"✅ Booking Approved Successfully"
                 })
 
         elif data_str.startswith("reject_bk_"):
@@ -289,12 +350,11 @@ async def telegram_webhook(req: Request):
             if booking:
                 bookings_col.update_one({"booking_id": booking_id}, {"$set": {"status": "rejected"}})
                 token_cost = booking["token_cost"]
+                # Refund tokens to user
                 users_col.update_one({"user_id": booking["user_id"]}, {"$inc": {"tokens": token_cost}})
                 send_telegram_message(booking["user_id"], f"❌ Aapki booking request reject kar di gayi hai. Aapke {token_cost} tokens refund kar diye gaye hain.")
                 requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={
-                    "chat_id": chat_id,
-                    "message_id": message_id,
-                    "text": f"❌ Booking Rejected & Refunded"
+                    "chat_id": chat_id, "message_id": message_id, "text": f"❌ Booking Rejected & Tokens Refunded"
                 })
 
     return {"status": "ok"}
