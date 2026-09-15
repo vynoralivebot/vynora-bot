@@ -41,19 +41,6 @@ hosts_col = db.hosts
 bookings_col = db.bookings
 chats_col = db.chats
 
-async def notify_all_groups(text, reply_markup=None, photo=None):
-    if not bot:
-        return
-    for g_id in [GROUP_1_ID, GROUP_2_ID, GROUP_3_ID]:
-        if g_id != 0:
-            try:
-                if photo:
-                    await bot.send_photo(chat_id=g_id, photo=photo, caption=text, reply_markup=reply_markup, parse_mode="Markdown")
-                else:
-                    await bot.send_message(chat_id=g_id, text=text, reply_markup=reply_markup, parse_mode="Markdown")
-            except Exception as e:
-                logging.error(f"Error sending to group {g_id}: {e}")
-
 @app.on_event("startup")
 async def startup_event():
     if bot:
@@ -84,6 +71,7 @@ class RechargeReq(BaseModel):
     user_id: int
     amount_inr: float
     utr_number: str
+    screenshot_url: Optional[str] = ""
 
 class BookingReq(BaseModel):
     user_id: int
@@ -165,17 +153,29 @@ async def get_host_status(user_id: int):
 @app.post("/api/recharge")
 async def process_recharge(req: RechargeReq):
     tx_id = f"tx_{int(time.time())}"
-    await recharges_col.insert_one({"_id": tx_id, "user_id": req.user_id, "amount_inr": req.amount_inr, "utr_number": req.utr_number, "tokens": int(req.amount_inr), "status": "pending", "timestamp": datetime.utcnow()})
+    await recharges_col.insert_one({
+        "_id": tx_id, "user_id": req.user_id, "amount_inr": req.amount_inr, 
+        "utr_number": req.utr_number, "screenshot_url": req.screenshot_url,
+        "tokens": int(req.amount_inr), "status": "pending", "timestamp": datetime.utcnow()
+    })
     
-    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="✅ Approve", callback_data=f"appr_{tx_id}"), InlineKeyboardButton(text="❌ Reject", callback_data=f"rejc_{tx_id}")]])
+    kb = InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="✅ Approve", callback_data=f"appr_{tx_id}"), 
+        InlineKeyboardButton(text="❌ Reject", callback_data=f"rejc_{tx_id}")
+    ]])
     
+    # Send Recharge Request ONLY to Group 1
     if bot and GROUP_1_ID != 0:
         try:
-            await bot.send_message(chat_id=GROUP_1_ID, text=f"💳 **NEW RECHARGE APPROVAL**\n👤 User ID: `{req.user_id}`\n💵 Amount: ₹{req.amount_inr}\n📌 UTR: `{req.utr_number}`", reply_markup=kb, parse_mode="Markdown")
+            caption = f"💳 **NEW RECHARGE APPROVAL**\n👤 User ID: `{req.user_id}`\n💵 Amount: ₹{req.amount_inr}\n📌 UTR: `{req.utr_number}`"
+            if req.screenshot_url and req.screenshot_url.startswith("http"):
+                await bot.send_photo(chat_id=GROUP_1_ID, photo=req.screenshot_url, caption=caption, reply_markup=kb, parse_mode="Markdown")
+            else:
+                await bot.send_message(chat_id=GROUP_1_ID, text=caption + f"\n🔗 Screenshot: {req.screenshot_url or 'Not Provided'}", reply_markup=kb, parse_mode="Markdown")
         except Exception as e:
             logging.error(f"Error sending recharge to group 1: {e}")
             
-    return {"status": "success", "message": "UTR submitted for approval!"}
+    return {"status": "success", "message": "UTR & Screenshot submitted for approval!"}
 
 @app.post("/api/book-slot")
 async def book_slot(req: BookingReq):
@@ -185,9 +185,7 @@ async def book_slot(req: BookingReq):
     booking_id = f"bk_{int(time.time())}"
     await bookings_col.insert_one({"_id": booking_id, "user_id": req.user_id, "host_id": req.host_id, "host_name": req.host_name, "duration_mins": req.duration_mins, "token_cost": req.token_cost, "status": "pending", "timestamp": datetime.utcnow()})
     await users_col.update_one({"_id": req.user_id}, {"$inc": {"tokens": -req.token_cost}})
-    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="✅ Accept", callback_data=f"accbk_{booking_id}"), InlineKeyboardButton(text="❌ Decline", callback_data=f"canbk_{booking_id}")]])
-    await notify_all_groups(f"📅 **SLOT BOOKING**\n👤 User: `{req.user_id}`\n👩 Host: {req.host_name}\n🪙 Tokens: {req.token_cost}", reply_markup=kb)
-    return {"status": "success", "booking_id": booking_id, "message": "Booking request sent!"}
+    return {"status": "success", "booking_id": booking_id, "message": "Slot booked successfully!"}
 
 @app.post("/api/send-gift")
 async def send_gift(req: GiftReq):
@@ -200,8 +198,8 @@ async def send_gift(req: GiftReq):
     if req.channel:
         await chats_col.insert_one({
             "channel": req.channel,
-            "sender": "Gift Alert",
-            "text": f"sent {req.gift_name} 🎁",
+            "sender": "Gift Alert 🎁",
+            "text": f"sent {req.gift_name}!",
             "type": "gift",
             "timestamp": datetime.utcnow()
         })
@@ -257,7 +255,13 @@ async def register_host(req: RegisterHostReq):
         doc = {"_id": f"host_{req.user_id}", "user_id": req.user_id, "name": req.name, "age": req.age, "rate": req.rate, "lang": req.lang, "loc": req.loc, "img": req.img, "bio": req.bio, "status": "pending", "isVerified": False, "isPrivate": False, "created_at": datetime.utcnow()}
         await hosts_col.update_one({"_id": doc["_id"]}, {"$set": doc}, upsert=True)
         kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="✅ Approve", callback_data=f"apphost_{req.user_id}"), InlineKeyboardButton(text="❌ Reject", callback_data=f"rejhost_{req.user_id}")]])
-        await notify_all_groups(f"🟡 **HOST REGISTRATION**\n👤 User ID: `{req.user_id}`\n📛 Name: {req.name}\n🪙 Rate: {req.rate}/min", reply_markup=kb, photo=req.img)
+        
+        # Send Host Registration ONLY to Group 1
+        if bot and GROUP_1_ID != 0:
+            if req.img and req.img.startswith("http"):
+                await bot.send_photo(chat_id=GROUP_1_ID, photo=req.img, caption=f"🟡 **HOST REGISTRATION**\n👤 User ID: `{req.user_id}`\n📛 Name: {req.name}\n🪙 Rate: {req.rate}/min", reply_markup=kb, parse_mode="Markdown")
+            else:
+                await bot.send_message(chat_id=GROUP_1_ID, text=f"🟡 **HOST REGISTRATION**\n👤 User ID: `{req.user_id}`\n📛 Name: {req.name}\n🪙 Rate: {req.rate}/min", reply_markup=kb, parse_mode="Markdown")
         return {"status": "success", "message": "Submitted for approval!"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
@@ -280,12 +284,16 @@ async def approve_recharge(call: types.CallbackQuery):
             except:
                 pass
                 
-        if call.message and call.message.text:
+        if call.message:
             try:
-                await call.message.edit_text(call.message.text + "\n\n✅ **APPROVED BY ADMIN**", parse_mode="Markdown")
+                if call.message.caption:
+                    await call.message.edit_caption(caption=call.message.caption + "\n\n✅ **APPROVED BY ADMIN**", reply_markup=None, parse_mode="Markdown")
+                elif call.message.text:
+                    await call.message.edit_text(call.message.text + "\n\n✅ **APPROVED BY ADMIN**", reply_markup=None, parse_mode="Markdown")
             except:
                 pass
                 
+        # Send Approved Log to Group 3
         if bot and GROUP_3_ID != 0:
             try:
                 await bot.send_message(chat_id=GROUP_3_ID, text=f"✅ **RECHARGE APPROVED LOG**\n👤 User ID: `{tx['user_id']}`\n💵 Amount: ₹{tx['amount_inr']}\n📌 UTR: `{tx['utr_number']}`\n🪙 Tokens Added: {tx['tokens']}", parse_mode="Markdown")
@@ -298,9 +306,12 @@ async def approve_host_cb(call: types.CallbackQuery):
         host_u_id = int(call.data.split("_")[1])
         await hosts_col.update_one({"user_id": host_u_id}, {"$set": {"status": "approved", "isVerified": True}}, upsert=True)
         await hosts_col.update_one({"_id": f"host_{host_u_id}"}, {"$set": {"status": "approved", "isVerified": True}}, upsert=True)
-        if call.message and call.message.caption:
+        if call.message:
             try:
-                await call.message.edit_caption(caption=call.message.caption + "\n\n✅ **APPROVED**", reply_markup=None, parse_mode="Markdown")
+                if call.message.caption:
+                    await call.message.edit_caption(caption=call.message.caption + "\n\n✅ **APPROVED**", reply_markup=None, parse_mode="Markdown")
+                elif call.message.text:
+                    await call.message.edit_text(call.message.text + "\n\n✅ **APPROVED**", reply_markup=None, parse_mode="Markdown")
             except:
                 pass
         if bot:
