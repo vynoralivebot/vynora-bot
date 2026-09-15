@@ -1,7 +1,7 @@
 import os
 from pymongo import MongoClient
 
-MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://...") # Apni MongoDB URI yahan ya Render Env me dalein
+MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://...") 
 client = MongoClient(MONGO_URI)
 db = client["vynora_live_db"]
 
