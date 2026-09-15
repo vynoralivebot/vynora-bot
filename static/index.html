@@ -96,17 +96,17 @@
         .nav-item.active { color: #FF007A; font-weight: 700; }
         .nav-item i { font-size: 1.1rem; }
 
-        /* MODAL OVERLAY - Z-INDEX FIXED TO SHOW ABOVE VIDEO */
+        /* MODAL OVERLAY & FULLSCREEN CSS */
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(10px); z-index: 9999 !important; display: none; justify-content: center; align-items: flex-end; }
         .modal-overlay.active { display: flex; }
         .modal-card { background: #130E26; border-top: 1px solid var(--card-border); border-radius: 24px 24px 0 0; width: 100%; max-width: 480px; padding: 20px; max-height: 88vh; overflow-y: auto; }
         .input-box { width: 100%; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--card-border); padding: 12px; border-radius: 12px; color: white; margin-bottom: 10px; outline: none; }
 
-        /* VIDEO CALL & FILTERS CSS */
-        #video-call-screen { position: fixed; inset: 0; background: #000; z-index: 999; display: none; flex-direction: column; }
+        /* VIDEO CALL & FULLSCREEN FIX */
+        #video-call-screen { position: fixed; inset: 0; width: 100vw; height: 100vh; background: #000; z-index: 999; display: none; flex-direction: column; }
         #video-call-screen.active { display: flex; }
-        #main-video-view { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
-        #pip-video-view { position: absolute; top: 70px; right: 16px; width: 100px; height: 140px; background: #111; border-radius: 14px; overflow: hidden; border: 2px solid #FF007A; z-index: 5; cursor: pointer; }
+        #main-video-view { position: absolute; inset: 0; width: 100vw; height: 100vh; object-fit: cover; z-index: 1; }
+        #pip-video-view { position: absolute; top: 70px; right: 16px; width: 100px; height: 140px; background: #111; border-radius: 14px; overflow: hidden; border: 2px solid #FF007A; z-index: 5; cursor: pointer; display: none; }
         
         .live-top-bar { position: absolute; top: 16px; left: 16px; right: 16px; z-index: 10; display: flex; justify-content: space-between; align-items: center; }
         .live-host-pill { background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.15); padding: 4px 12px 4px 4px; border-radius: 30px; display: flex; align-items: center; gap: 8px; color: white; font-size: 0.85rem; font-weight: 700; }
@@ -118,7 +118,6 @@
         .chat-bubble b { color: var(--accent-cyan); margin-right: 4px; }
         .chat-bubble.gift-announcement { background: rgba(255, 0, 122, 0.4); border: 1px solid #FF007A; color: var(--gold); font-weight: 700; }
 
-        /* CAMERA FILTERS BAR */
         .filter-bar { position: absolute; bottom: 75px; left: 16px; right: 16px; z-index: 10; display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
         .cam-filter-btn { background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 4px 10px; border-radius: 15px; font-size: 0.72rem; cursor: pointer; white-space: nowrap; font-weight: 600; }
         .cam-filter-btn.active { background: #FF007A; border-color: #FF007A; }
@@ -132,7 +131,6 @@
         .gift-item { background: rgba(255,255,255,0.06); border: 1px solid var(--card-border); border-radius: 16px; padding: 14px; text-align: center; cursor: pointer; }
         .gift-emoji { font-size: 2rem; margin-bottom: 6px; }
 
-        /* CSS CAMERA FILTERS DEFINITIONS */
         .filter-normal { filter: none; }
         .filter-beauty { filter: brightness(1.15) contrast(1.05) saturate(1.1) drop-shadow(0 0 2px rgba(255,192,203,0.5)); }
         .filter-rosy { filter: sepia(0.2) hue-rotate(330deg) saturate(1.3) brightness(1.05); }
@@ -180,7 +178,6 @@
             <div class="profile-avatar-wrapper">
                 <img id="profile-avatar-img" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop" class="profile-avatar-img">
                 <div class="cam-edit-icon" onclick="promptPhotoUpdate()"><i class="fa-solid fa-camera"></i></div>
-                <!-- HIDDEN FILE INPUT FOR PROFILE PIC -->
                 <input type="file" id="profile-file-input" style="display: none;" accept="image/*" onchange="uploadProfilePhoto(this)">
             </div>
             <div class="user-meta">
@@ -274,7 +271,6 @@
 
         <div class="live-chat-messages" id="chat-messages-container"></div>
 
-        <!-- CAMERA FILTERS BAR -->
         <div class="filter-bar">
             <div class="cam-filter-btn active" onclick="applyCameraFilter('filter-normal', this)">✨ Normal</div>
             <div class="cam-filter-btn" onclick="applyCameraFilter('filter-beauty', this)">🌟 Beauty Glow</div>
@@ -310,7 +306,7 @@
         </div>
     </div>
 
-    <!-- RECHARGE MODAL WITH FILE UPLOAD SCREENSHOT OPTION -->
+    <!-- RECHARGE MODAL -->
     <div class="modal-overlay" id="recharge-modal">
         <div class="modal-card">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
@@ -479,6 +475,7 @@
         async function startVideoCall(channelName, safeUid, role) {
             document.getElementById('video-call-screen').classList.add('active');
             document.getElementById('chat-messages-container').innerHTML = '';
+            document.getElementById('pip-video-view').style.display = 'none'; // Hide PIP initially to prevent black box
             
             try {
                 const res = await fetch(`/api/agora-token?channelName=${channelName}&uid=${safeUid}&role=${role}`);
@@ -498,6 +495,7 @@
                     await agoraClient.subscribe(user, mediaType);
                     if (mediaType === "video") {
                         user.videoTrack.play("main-video-view");
+                        document.getElementById('pip-video-view').style.display = 'block'; // Show PIP when remote joins
                     }
                     if (mediaType === "audio") {
                         user.audioTrack.play();
@@ -510,6 +508,7 @@
                     if (user.hasVideo) {
                         await agoraClient.subscribe(user, "video");
                         user.videoTrack.play("main-video-view");
+                        document.getElementById('pip-video-view').style.display = 'block';
                     }
                     if (user.hasAudio) {
                         await agoraClient.subscribe(user, "audio");
@@ -523,8 +522,6 @@
                     localTracks.videoTrack.play("main-video-view");
                     isMainViewLocal = true;
                     await agoraClient.publish([localTracks.audioTrack, localTracks.videoTrack]);
-                } else {
-                    document.getElementById('pip-video-view').style.display = 'none';
                 }
 
                 startChatPolling(channelName);
@@ -566,7 +563,7 @@
             if (localTracks.videoTrack) localTracks.videoTrack.close();
             if (agoraClient) await agoraClient.leave();
             document.getElementById('video-call-screen').classList.remove('active');
-            document.getElementById('pip-video-view').style.display = 'block';
+            document.getElementById('pip-video-view').style.display = 'none';
             initData();
         }
 
@@ -668,7 +665,6 @@
             } catch(e) { alert("Booking failed"); }
         }
 
-        // PROFILE PICTURE FILE UPLOAD HANDLERS
         function promptPhotoUpdate() {
             document.getElementById('profile-file-input').click();
         }
@@ -689,6 +685,7 @@
                         document.getElementById('profile-avatar-img').src = data.avatar_url;
                         document.getElementById('header-avatar-img').src = data.avatar_url;
                         alert("Profile photo updated successfully!");
+                        fetchHosts(); // Refresh main page hosts list instantly
                     } else {
                         alert(data.message || "Error updating photo");
                     }
@@ -743,7 +740,6 @@
             } catch(e) { alert("Registration error"); }
         }
 
-        // RECHARGE SUBMISSION WITH FILE UPLOAD
         async function submitRecharge() {
             const utr = document.getElementById('recharge-utr').value.trim();
             const fileInput = document.getElementById('recharge-screenshot');
