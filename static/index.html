@@ -89,8 +89,6 @@
         .qr-box { text-align: center; background: white; padding: 10px; border-radius: 12px; margin: 12px 0; }
         .qr-box img { width: 140px; height: 140px; }
 
-        .booking-option-card { background: rgba(255,255,255,0.04); border: 1px solid var(--card-border); padding: 12px; border-radius: 14px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
-
         .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background: rgba(10, 7, 20, 0.95); backdrop-filter: blur(16px); border-top: 1px solid var(--card-border); display: flex; justify-content: space-around; align-items: center; z-index: 150; }
         .nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--text-muted); font-size: 0.7rem; cursor: pointer; }
         .nav-item.active { color: #FF007A; font-weight: 700; }
@@ -152,12 +150,12 @@
     </header>
 
     <div id="home-tab-view">
-        <div class="promo-banner">
+        <div class="promo-banner" id="promo-banner-card">
             <div>
                 <h3>✨ Vynora VIP Live Lounge</h3>
                 <p>Connect 1v1 with Premium Verified Hosts!</p>
             </div>
-            <button class="get-btn" onclick="openHostRegistrationModal()">Become Host</button>
+            <button class="get-btn" onclick="openHostRegistrationModal()" id="become-host-banner-btn">Become Host</button>
         </div>
 
         <div class="filter-container">
@@ -189,41 +187,23 @@
                 <div><div style="font-size:0.75rem; color:var(--text-muted);">Tokens Balance</div><b style="color:var(--gold);">🪙 <span id="profile-tokens-count">0</span></b></div>
                 <i class="fa-solid fa-chevron-right" style="font-size:0.8rem; color:var(--text-muted);"></i>
             </div>
-            <div class="wallet-box">
+            <!-- Total Earnings Box (Clickable for Host Withdrawal) -->
+            <div class="wallet-box" onclick="openWithdrawModal()" id="earnings-box" style="display:none;">
                 <div><div style="font-size:0.75rem; color:var(--text-muted);">Total Earnings</div><b style="color:var(--accent-cyan);">💰 <span id="profile-earnings-count">0</span></b></div>
                 <i class="fa-solid fa-chevron-right" style="font-size:0.8rem; color:var(--text-muted);"></i>
             </div>
         </div>
 
-        <!-- Withdraw Button -->
-        <div style="margin-bottom: 20px;">
+        <!-- Host Withdraw Action Button -->
+        <div style="margin-bottom: 20px; display:none;" id="withdraw-btn-container">
             <button class="call-btn" style="background: linear-gradient(135deg, #00F5D4 0%, #00B2FF 100%); color: #000;" onclick="openWithdrawModal()">
                 <i class="fa-solid fa-wallet"></i> Withdraw Earnings (UPI)
             </button>
         </div>
 
-        <div class="action-icon-grid">
-            <div class="icon-card" id="go-live-card" style="display: none; background: rgba(255,0,122,0.25); border-color: #FF007A;" onclick="startMyLiveStream()">
-                <i class="fa-solid fa-tower-broadcast" style="color:#FF007A;"></i>
-                <p style="color:white; font-weight:700;">Go Live 🔴</p>
-            </div>
-            <div class="icon-card" id="host-bookings-card" style="display: none; background: rgba(0,245,212,0.15); border-color: var(--accent-cyan);" onclick="openHostBookingsModal()">
-                <i class="fa-solid fa-clipboard-list" style="color:var(--accent-cyan);"></i>
-                <p style="color:white; font-weight:700;">Bookings</p>
-            </div>
-            <div class="icon-card" id="toggle-live-card" style="display: none; background: rgba(0,245,212,0.15); border-color: var(--accent-cyan);" onclick="toggleHostOnlineStatus()">
-                <i class="fa-solid fa-power-off" style="color:var(--accent-cyan);" id="live-toggle-icon"></i>
-                <p style="color:white; font-weight:700;" id="live-toggle-text">Status</p>
-            </div>
-            <!-- My Bookings Button for Users -->
-            <div class="icon-card" style="background: rgba(255,215,0,0.15); border-color: var(--gold);" onclick="openUserBookingsModal()">
-                <i class="fa-solid fa-calendar-check" style="color:var(--gold);"></i>
-                <p style="color:white; font-weight:700;">My Bookings</p>
-            </div>
-            <div class="icon-card" onclick="openHostRegistrationModal()">
-                <i class="fa-solid fa-video" style="color:#FF007A;"></i>
-                <p>Creator Center</p>
-            </div>
+        <!-- Action Icon Grid (Dynamic for Host vs User) -->
+        <div class="action-icon-grid" id="profile-action-grid">
+            <!-- Populated dynamically based on Host Status -->
         </div>
     </div>
 
@@ -292,7 +272,7 @@
                 </div>
             </div>
 
-            <div class="booking-option-card" style="background:rgba(0,245,212,0.08); border-color:var(--accent-cyan);">
+            <div class="booking-option-card" style="background:rgba(0,245,212,0.08); border-color:var(--accent-cyan); display:flex; justify-content:space-between; align-items:center; padding:12px; border-radius:14px; margin-bottom:10px;">
                 <div><b>⚡ Watch Public Stream</b><p style="font-size:0.7rem; color:var(--text-muted);">Join live stream free</p></div>
                 <button class="call-btn" style="width:auto; padding:6px 12px; background:var(--accent-cyan); color:#000;" onclick="joinPublicStream()">👀 Watch Live</button>
             </div>
@@ -446,13 +426,53 @@
             try {
                 const hostRes = await fetch(`/api/host/status/${userId}`);
                 const hostData = await hostRes.json();
+                
+                const actionGrid = document.getElementById('profile-action-grid');
+                const earningsBox = document.getElementById('earnings-box');
+                const withdrawBtnContainer = document.getElementById('withdraw-btn-container');
+                const promoBannerCard = document.getElementById('promo-banner-card');
+
                 if (hostData.is_host && hostData.status === "approved") {
-                    document.getElementById('go-live-card').style.display = 'block';
-                    document.getElementById('host-bookings-card').style.display = 'block';
-                    document.getElementById('toggle-live-card').style.display = 'block';
-                    
+                    // HOST DASHBOARD VIEW (Creator Center hidden, Host options shown)
+                    earningsBox.style.display = 'flex';
+                    withdrawBtnContainer.style.display = 'block';
+                    promoBannerCard.style.display = 'none';
+
                     const isOnline = hostData.is_online;
-                    document.getElementById('live-toggle-text').innerText = isOnline ? "Online 🟢" : "Offline 🔴";
+                    actionGrid.innerHTML = `
+                        <div class="icon-card" style="background: rgba(255,0,122,0.25); border-color: #FF007A;" onclick="startMyLiveStream()">
+                            <i class="fa-solid fa-tower-broadcast" style="color:#FF007A;"></i>
+                            <p style="color:white; font-weight:700;">Go Live 🔴</p>
+                        </div>
+                        <div class="icon-card" style="background: rgba(0,245,212,0.15); border-color: var(--accent-cyan);" onclick="openHostBookingsModal()">
+                            <i class="fa-solid fa-clipboard-list" style="color:var(--accent-cyan);"></i>
+                            <p style="color:white; font-weight:700;">Bookings</p>
+                        </div>
+                        <div class="icon-card" style="background: rgba(0,245,212,0.15); border-color: var(--accent-cyan);" onclick="toggleHostOnlineStatus()">
+                            <i class="fa-solid fa-power-off" style="color:var(--accent-cyan);"></i>
+                            <p style="color:white; font-weight:700;">${isOnline ? "Online 🟢" : "Offline 🔴"}</p>
+                        </div>
+                        <div class="icon-card" style="background: rgba(255,215,0,0.15); border-color: var(--gold);" onclick="openUserBookingsModal()">
+                            <i class="fa-solid fa-calendar-check" style="color:var(--gold);"></i>
+                            <p style="color:white; font-weight:700;">My Bookings</p>
+                        </div>
+                    `;
+                } else {
+                    // USER DASHBOARD VIEW (Only My Bookings & Creator Center shown)
+                    earningsBox.style.display = 'none';
+                    withdrawBtnContainer.style.display = 'none';
+                    promoBannerCard.style.display = 'flex';
+
+                    actionGrid.innerHTML = `
+                        <div class="icon-card" style="background: rgba(255,215,0,0.15); border-color: var(--gold);" onclick="openUserBookingsModal()">
+                            <i class="fa-solid fa-calendar-check" style="color:var(--gold);"></i>
+                            <p style="color:white; font-weight:700;">My Bookings</p>
+                        </div>
+                        <div class="icon-card" onclick="openHostRegistrationModal()">
+                            <i class="fa-solid fa-video" style="color:#FF007A;"></i>
+                            <p>Creator Center</p>
+                        </div>
+                    `;
                 }
             } catch(e) {}
 
@@ -529,7 +549,7 @@
                                 <p style="font-size:0.85rem; font-weight:700;">User ID: ${b.user_id}</p>
                                 <p style="font-size:0.75rem; color:var(--gold);">⏱️ ${b.duration_mins} Mins | 🪙 ${b.token_cost} Tokens</p>
                             </div>
-                            <span style="font-size:0.75rem; color:var(--accent-cyan); font-weight:700;">${b.status}</span>
+                            <span style="font-size:0.75rem; color:var(--accent-cyan); font-weight:700;">${b.status.toUpperCase()}</span>
                         </div>
                     `).join('');
                 } else {
@@ -912,6 +932,7 @@
         function openRechargeModal() { document.getElementById('recharge-modal').classList.add('active'); }
         function closeModal(id) { document.getElementById(id).classList.remove('active'); }
         function openHostRegistrationModal() { document.getElementById('host-reg-modal').classList.add('active'); }
+        function openSupportLink() { window.open("https://t.me/video_call_grou", "_blank"); }
 
         async function submitHostRegistration() {
             const name = document.getElementById('host-name-input').value.trim();
