@@ -1,8 +1,7 @@
 import os
 import time
-from fastapi import FastAPI, UploadFile, File, Form, Request, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import requests
 from agora_token_builder import RtcTokenBuilder
@@ -13,7 +12,7 @@ app = FastAPI()
 # Mount static files for frontend (index.html)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Telegram Bot Credentials
+# Telegram Bot Credentials & Group IDs
 BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN")
 GROUP_1_ID = os.getenv("GROUP_1_ID", "-100XXXXXXXXXX") # Recharge & Host Approvals Group
 GROUP_2_ID = os.getenv("GROUP_2_ID", "-100XXXXXXXXXX") # New Users Group
@@ -71,7 +70,7 @@ class WithdrawModel(BaseModel):
     tokens: int
 
 
-# --- API Endpoints for Frontend ---
+# --- API Endpoints ---
 
 @app.get("/api/user/{user_id}")
 def get_user(user_id: int):
@@ -79,7 +78,6 @@ def get_user(user_id: int):
     if not user:
         user = {"user_id": user_id, "tokens": 100, "earnings": 0, "avatar": ""}
         users_col.insert_one(user)
-        # Notify Group 2 about new user
         send_telegram_message(GROUP_2_ID, f"👤 <b>New User Started Bot!</b>\nID: <code>{user_id}</code>")
     return {"tokens": user.get("tokens", 100), "earnings": user.get("earnings", 0), "avatar": user.get("avatar", "")}
 
@@ -110,10 +108,8 @@ def book_slot(data: BookingModel):
     if not user or user.get("tokens", 0) < data.token_cost:
         return {"status": "error", "message": "Insufficient tokens!"}
 
-    # Deduct tokens from user
     users_col.update_one({"user_id": data.user_id}, {"$inc": {"tokens": -data.token_cost}})
 
-    # Create booking request
     booking_id = str(int(time.time()))
     booking_doc = {
         "booking_id": booking_id,
@@ -126,7 +122,6 @@ def book_slot(data: BookingModel):
     }
     bookings_col.insert_one(booking_doc)
 
-    # Find host telegram id
     host = hosts_col.find_one({"id": data.host_id})
     if host and "user_id" in host:
         host_telegram_id = host["user_id"]
@@ -140,7 +135,6 @@ def book_slot(data: BookingModel):
         }
         msg = f"🔔 <b>New Private Booking Request!</b>\n\n👤 User ID: <code>{data.user_id}</code>\n⏱️ Duration: {data.duration_mins} Mins\n🪙 Cost: {data.token_cost} Tokens"
         send_telegram_message(host_telegram_id, msg, reply_markup=keyboard)
-        # Also notify Group 1
         send_telegram_message(GROUP_1_ID, f"📋 <b>Booking Created</b>\nHost: {data.host_name}\nUser: {data.user_id}\nCost: {data.token_cost} Tokens")
 
     return {"status": "success", "booking_id": booking_id}
@@ -156,17 +150,15 @@ def get_host_bookings(user_id: int):
 @app.post("/api/register-host")
 def register_host(data: HostRegisterModel):
     host_data = data.dict()
-    host_data["status"] = "approved" # Aap chahe toh 'pending' karke manual approve kar sakte hain
+    host_data["status"] = "approved"
     host_data["id"] = f"h_{data.user_id}"
     hosts_col.update_one({"user_id": data.user_id}, {"$set": host_data}, upsert=True)
     
-    # Notify Group 1
     send_telegram_message(GROUP_1_ID, f"📹 <b>New Host Registered!</b>\nName: {data.name}\nRate: {data.rate} Tokens/min\nID: <code>{data.user_id}</code>")
     return {"status": "success", "message": "Host registered successfully and approved!"}
 
 @app.post("/api/recharge")
 async def recharge(user_id: int = Form(...), amount_inr: int = Form(...), utr_number: str = Form(...), screenshot: UploadFile = File(...)):
-    # Save recharge request in DB
     recharges_col.insert_one({
         "user_id": user_id,
         "amount_inr": amount_inr,
@@ -174,11 +166,9 @@ async def recharge(user_id: int = Form(...), amount_inr: int = Form(...), utr_nu
         "status": "pending"
     })
     
-    # Give tokens instantly or notify Group 1 for manual approval
     tokens_to_add = amount_inr if amount_inr < 500 else amount_inr + 50
     users_col.update_one({"user_id": user_id}, {"$inc": {"tokens": tokens_to_add}}, upsert=True)
 
-    # Notify Group 1
     send_telegram_message(GROUP_1_ID, f"💳 <b>New Recharge Request!</b>\nUser ID: <code>{user_id}</code>\nAmount: ₹{amount_inr}\nUTR: <code>{utr_number}</code>\n✅ Added {tokens_to_add} Tokens automatically.")
     return {"status": "success", "message": f"Recharge submitted! {tokens_to_add} tokens added."}
 
@@ -188,7 +178,6 @@ def withdraw_earnings(data: WithdrawModel):
     if not user or user.get("earnings", 0) < data.tokens:
         return {"status": "error", "message": "Insufficient earnings balance!"}
 
-    # Deduct from earnings & log withdrawal
     users_col.update_one({"user_id": data.user_id}, {"$inc": {"earnings": -data.tokens}})
     withdrawals_col.insert_one({
         "user_id": data.user_id,
@@ -197,7 +186,6 @@ def withdraw_earnings(data: WithdrawModel):
         "status": "pending"
     })
 
-    # Notify Team Group 3
     send_telegram_message(GROUP_3_ID, f"💸 <b>New Withdrawal Request!</b>\n\n👤 Host ID: <code>{data.user_id}</code>\n🪙 Tokens: {data.tokens}\n📱 UPI ID: <code>{data.upi_id}</code>")
     return {"status": "success", "message": "Withdrawal request sent to team successfully!"}
 
@@ -207,15 +195,12 @@ def send_gift(data: GiftModel):
     if not user or user.get("tokens", 0) < data.gift_cost:
         return {"status": "error", "message": "Not enough tokens"}
 
-    # Deduct from user
     users_col.update_one({"user_id": data.user_id}, {"$inc": {"tokens": -data.gift_cost}})
     
-    # Add to host earnings (Find host by host_id)
     host = hosts_col.find_one({"id": data.host_id})
     if host and "user_id" in host:
         users_col.update_one({"user_id": host["user_id"]}, {"$inc": {"earnings": data.gift_cost}}, upsert=True)
 
-    # Log gift in chat
     chats_col.insert_one({
         "channel": data.channel,
         "sender": data.sender_name,
@@ -241,15 +226,13 @@ def get_chat(channel: str):
     messages = list(chats_col.find({"channel": channel}, {"_id": 0}).sort("time", 1).limit(50))
     return {"messages": messages}
 
-
-# --- Telegram Webhook for Inline Button Accept/Reject Actions ---
+# --- Telegram Webhook for Buttons ---
 @app.post("/telegram-webhook")
 async def telegram_webhook(req: Request):
     body = await req.json()
     if "callback_query" in body:
         callback = body["callback_query"]
         data_str = callback["data"]
-        from_user = callback["from"]["id"]
         message_id = callback["message"]["message_id"]
         chat_id = callback["message"]["chat"]["id"]
 
@@ -259,7 +242,6 @@ async def telegram_webhook(req: Request):
             if booking:
                 bookings_col.update_one({"booking_id": booking_id}, {"$set": {"status": "approved"}})
                 user_id = booking["user_id"]
-                # Notify User via Telegram
                 send_telegram_message(user_id, "🎉 <b>Badhai ho!</b> Host ne aapki booking request accept kar li hai. Ab aap session join kar sakte hain!")
                 requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={
                     "chat_id": chat_id,
@@ -274,9 +256,7 @@ async def telegram_webhook(req: Request):
                 bookings_col.update_one({"booking_id": booking_id}, {"$set": {"status": "rejected"}})
                 user_id = booking["user_id"]
                 token_cost = booking["token_cost"]
-                # Refund tokens to user
                 users_col.update_one({"user_id": user_id}, {"$inc": {"tokens": token_cost}})
-                # Notify User
                 send_telegram_message(user_id, f"❌ Aapki booking request host dwara reject kar di gayi hai. Aapke {token_cost} tokens refund kar diye gaye hain.")
                 requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={
                     "chat_id": chat_id,
