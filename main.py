@@ -104,6 +104,12 @@ class RegisterHostReq(BaseModel):
     img: str
     bio: str
 
+class GiftReq(BaseModel):
+    user_id: int
+    host_id: str
+    gift_cost: int
+    gift_name: str
+
 class UpdateProfileReq(BaseModel):
     user_id: int
     avatar_url: str
@@ -153,7 +159,7 @@ async def process_recharge(req: RechargeReq):
     tx_id = f"tx_{int(time.time())}"
     await recharges_col.insert_one({"_id": tx_id, "user_id": req.user_id, "amount_inr": req.amount_inr, "utr_number": req.utr_number, "tokens": int(req.amount_inr), "status": "pending", "timestamp": datetime.utcnow()})
     kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="✅ Approve", callback_data=f"appr_{tx_id}"), InlineKeyboardButton(text="❌ Reject", callback_data=f"rejc_{tx_id}")]])
-    await notify_all_groups(f"💳 **NEW RECHARGE**\n👤 User: `{req.user_id}`\n💵 ₹{req.amount_inr}\n📌 UTR: `{req.utr_number}`", reply_markup=kb)
+    await notify_all_groups(f"💳 **NEW RECHARGE**\n👤 User ID: `{req.user_id}`\n💵 Amount: ₹{req.amount_inr}\n📌 UTR: `{req.utr_number}`", reply_markup=kb)
     return {"status": "success", "message": "UTR submitted for approval!"}
 
 @app.post("/api/book-slot")
@@ -167,6 +173,20 @@ async def book_slot(req: BookingReq):
     kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="✅ Accept", callback_data=f"accbk_{booking_id}"), InlineKeyboardButton(text="❌ Decline", callback_data=f"canbk_{booking_id}")]])
     await notify_all_groups(f"📅 **SLOT BOOKING**\n👤 User: `{req.user_id}`\n👩 Host: {req.host_name}\n🪙 Tokens: {req.token_cost}", reply_markup=kb)
     return {"status": "success", "booking_id": booking_id, "message": "Booking request sent!"}
+
+@app.post("/api/send-gift")
+async def send_gift(req: GiftReq):
+    user = await users_col.find_one({"_id": req.user_id})
+    if not user or user.get("tokens", 0) < req.gift_cost:
+        return {"status": "error", "message": "Insufficient tokens to send gift!"}
+    
+    # Deduct tokens from user
+    await users_col.update_one({"_id": req.user_id}, {"$inc": {"tokens": -req.gift_cost}})
+    
+    # Add earnings to host
+    await hosts_col.update_one({"_id": req.host_id}, {"$inc": {"earnings": req.gift_cost}}, upsert=True)
+    
+    return {"status": "success", "message": f"Successfully sent {req.gift_name}! 🎁"}
 
 DUMMY_HOSTS = [
     { "id": "h1", "name": "Anu ❤️", "rate": 50, "isVerified": True, "isPrivate": False, "bio": "Friendly 1v1 chats 💖", "img": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop" },
@@ -210,8 +230,23 @@ async def approve_recharge(call: types.CallbackQuery):
     if tx and tx.get("status") == "pending":
         await recharges_col.update_one({"_id": tx_id}, {"$set": {"status": "approved"}})
         await users_col.update_one({"_id": tx["user_id"]}, {"$inc": {"tokens": tx["tokens"]}}, upsert=True)
+        
+        # User ko direct Telegram message bhejein ki recharge approve ho gaya hai
+        if bot:
+            try:
+                await bot.send_message(
+                    chat_id=tx["user_id"],
+                    text=f"🎉 **Badhaai ho!** Aapka ₹{tx['amount_inr']} ka recharge approve ho gaya hai aur `{tx['tokens']} Tokens` aapke account mein add kar diye gaye hain! 🪙",
+                    parse_mode="Markdown"
+                )
+            except Exception as e:
+                logging.error(f"Could not notify user {tx['user_id']}: {e}")
+
         if call.message and call.message.text:
-            await call.message.edit_text(call.message.text + "\n\n✅ **APPROVED**", parse_mode="Markdown")
+            try:
+                await call.message.edit_text(call.message.text + "\n\n✅ **APPROVED BY ADMIN**", parse_mode="Markdown")
+            except:
+                pass
 
 @dp.callback_query(F.data.startswith("apphost_"))
 async def approve_host_cb(call: types.CallbackQuery):
@@ -220,7 +255,10 @@ async def approve_host_cb(call: types.CallbackQuery):
         await hosts_col.update_one({"user_id": host_u_id}, {"$set": {"status": "approved", "isVerified": True}}, upsert=True)
         await hosts_col.update_one({"_id": f"host_{host_u_id}"}, {"$set": {"status": "approved", "isVerified": True}}, upsert=True)
         if call.message and call.message.caption:
-            await call.message.edit_caption(caption=call.message.caption + "\n\n✅ **APPROVED**", reply_markup=None, parse_mode="Markdown")
+            try:
+                await call.message.edit_caption(caption=call.message.caption + "\n\n✅ **APPROVED**", reply_markup=None, parse_mode="Markdown")
+            except:
+                pass
         if bot:
             try:
                 await bot.send_message(chat_id=host_u_id, text="🎉 Aapka host account approve ho gaya hai! Ab app khol kar Live jayein.", parse_mode="Markdown")
