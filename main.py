@@ -135,11 +135,11 @@ def book_slot(data: BookingModel):
     }
     bookings_col.insert_one(booking_doc)
 
-    # Robust Host Lookup for Telegram Notification
+    # Safe Host Lookup for Telegram Notification
     host = hosts_col.find_one({"id": data.host_id}) or hosts_col.find_one({"user_id": int(data.host_id.replace("h_", "")) if data.host_id.startswith("h_") else None})
     
     if host:
-        host_telegram_id = host.get("user_id") or int(host.get("id", "0").replace("h_", ""))
+        host_telegram_id = host.get("user_id") or int(host.get("id", "0").replace("h_", "")) if str(host.get("id", "")).startswith("h_") else None
         if host_telegram_id:
             keyboard = {
                 "inline_keyboard": [
@@ -157,10 +157,13 @@ def book_slot(data: BookingModel):
 @app.get("/api/host/bookings/{user_id}")
 def get_host_bookings(user_id: int):
     try:
+        # Match by user_id OR host id format
         host = hosts_col.find_one({"user_id": int(user_id)}) or hosts_col.find_one({"id": f"h_{user_id}"})
         if not host:
             return {"bookings": []}
-        host_bookings = list(bookings_col.find({"host_id": host["id"]}, {"_id": 0}))
+        
+        h_identifier = host.get("id") or f"h_{user_id}"
+        host_bookings = list(bookings_col.find({"host_id": h_identifier}, {"_id": 0}))
         return {"bookings": host_bookings}
     except Exception as e:
         print("Error in host bookings:", e)
@@ -171,7 +174,7 @@ def get_user_bookings(user_id: int):
     try:
         user_bookings = list(bookings_col.find({"user_id": int(user_id)}, {"_id": 0}))
         for b in user_bookings:
-            host = hosts_col.find_one({"id": b["host_id"]})
+            host = hosts_col.find_one({"id": b["host_id"]}) or hosts_col.find_one({"user_id": int(b["host_id"].replace("h_", "")) if str(b["host_id"]).startswith("h_") else 0})
             if host:
                 b["host_user_id"] = host.get("user_id")
                 b["host_img"] = host.get("img")
@@ -232,7 +235,7 @@ def send_gift(data: GiftModel):
         return {"status": "error", "message": "Not enough tokens"}
 
     users_col.update_one({"user_id": int(data.user_id)}, {"$inc": {"tokens": -data.gift_cost}})
-    host = hosts_col.find_one({"id": data.host_id})
+    host = hosts_col.find_one({"id": data.host_id}) or hosts_col.find_one({"user_id": int(data.host_id.replace("h_", "")) if str(data.host_id).startswith("h_") else 0})
     if host and "user_id" in host:
         users_col.update_one({"user_id": int(host["user_id"])}, {"$inc": {"earnings": data.gift_cost}}, upsert=True)
 
@@ -293,7 +296,7 @@ async def telegram_webhook(req: Request):
             booking = bookings_col.find_one({"booking_id": booking_id})
             if booking:
                 bookings_col.update_one({"booking_id": booking_id}, {"$set": {"status": "approved"}})
-                host = hosts_col.find_one({"id": booking["host_id"]})
+                host = hosts_col.find_one({"id": booking["host_id"]}) or hosts_col.find_one({"user_id": int(booking["host_id"].replace("h_", "")) if str(booking["host_id"]).startswith("h_") else 0})
                 if host and "user_id" in host:
                     users_col.update_one({"user_id": int(host["user_id"])}, {"$inc": {"earnings": booking["token_cost"]}}, upsert=True)
                 send_telegram_message(int(booking["user_id"]), "🎉 <b>Host accepted your booking!</b> Go to 'My Bookings' in the app to join.")
