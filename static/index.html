@@ -43,7 +43,6 @@
         .promo-banner p { font-size: 0.75rem; opacity: 0.9; }
         .get-btn { background: white; color: #FF007A; font-weight: 800; border: none; padding: 6px 14px; border-radius: 14px; font-size: 0.8rem; cursor: pointer; }
 
-        /* FILTER TABS STYLING */
         .filter-container { display: flex; gap: 8px; padding: 0 16px 12px 16px; overflow-x: auto; }
         .filter-pill { background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); padding: 6px 14px; border-radius: 20px; font-size: 0.78rem; color: var(--text-muted); cursor: pointer; white-space: nowrap; }
         .filter-pill.active { background: #FF007A; color: white; border-color: #FF007A; font-weight: 700; }
@@ -100,6 +99,44 @@
         .modal-overlay.active { display: flex; }
         .modal-card { background: #130E26; border-top: 1px solid var(--card-border); border-radius: 24px 24px 0 0; width: 100%; max-width: 480px; padding: 20px; max-height: 88vh; overflow-y: auto; }
         .input-box { width: 100%; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--card-border); padding: 12px; border-radius: 12px; color: white; margin-bottom: 10px; outline: none; }
+
+        /* PROFESSIONAL FULL-SCREEN LIVE STYLING (Tango/Chamet Style) */
+        #video-call-screen {
+            position: fixed; inset: 0; background: #000; z-index: 999; display: none; flex-direction: column;
+        }
+        #video-call-screen.active { display: flex; }
+        #remote-video {
+            position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1;
+        }
+        #local-video {
+            position: absolute; top: 70px; right: 16px; width: 100px; height: 140px; background: #111; border-radius: 14px; overflow: hidden; border: 2px solid #FF007A; z-index: 5; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+        .live-top-bar {
+            position: absolute; top: 16px; left: 16px; right: 16px; z-index: 10; display: flex; justify-content: space-between; align-items: center;
+        }
+        .live-host-pill {
+            background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.15); padding: 4px 12px 4px 4px; border-radius: 30px; display: flex; align-items: center; gap: 8px; color: white; font-size: 0.85rem; font-weight: 700;
+        }
+        .live-host-pill img { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; }
+        .live-viewer-count {
+            background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.15); padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; color: var(--accent-cyan); font-weight: 700;
+        }
+        .live-bottom-bar {
+            position: absolute; bottom: 20px; left: 16px; right: 16px; z-index: 10; display: flex; align-items: center; gap: 10px;
+        }
+        .live-chat-input {
+            flex: 1; background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); padding: 10px 16px; border-radius: 30px; color: white; font-size: 0.85rem; outline: none;
+        }
+        .live-action-btn {
+            width: 44px; height: 44px; border-radius: 50%; background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; color: white; font-size: 1.1rem; cursor: pointer;
+        }
+        .live-end-btn {
+            background: #FF0033; border: none;
+        }
+        .gifts-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 15px 0; }
+        .gift-item { background: rgba(255,255,255,0.06); border: 1px solid var(--card-border); border-radius: 16px; padding: 14px; text-align: center; cursor: pointer; transition: 0.2s; }
+        .gift-item:active { transform: scale(0.95); border-color: #FF007A; background: rgba(255,0,122,0.15); }
+        .gift-emoji { font-size: 2rem; margin-bottom: 6px; }
     </style>
 </head>
 <body>
@@ -127,7 +164,6 @@
             <button class="get-btn" onclick="openHostRegistrationModal()">Become Host</button>
         </div>
 
-        <!-- FILTER TABS -->
         <div class="filter-container">
             <div class="filter-pill active" onclick="filterHosts('all', this)">🔥 All Hosts</div>
             <div class="filter-pill" onclick="filterHosts('verified', this)">💎 Verified Only</div>
@@ -135,7 +171,7 @@
             <div class="filter-pill" onclick="filterHosts('budget', this)">⚡ Under 50🪙</div>
         </div>
 
-        <div class="section-header"><i class="fa-solid fa-video" style="color:#FF007A;"></i> 1v1 Verified Streamers</div>
+        <div class="section-header"><i class="fa-solid fa-video" style="color:#FF007A;"></i> Public Live Streams & Streamers</div>
         <div class="host-grid" id="hosts-container"></div>
     </div>
 
@@ -203,8 +239,8 @@
                 </div>
             </div>
             <div class="booking-option-card">
-                <div><b>⚡ 1 Min Direct Trial</b><p style="font-size:0.72rem; color:var(--text-muted);">Instant direct call</p></div>
-                <button class="call-btn" style="width:auto; padding:8px 14px;" onclick="confirmBooking(1, 50)">🪙 50 Tokens</button>
+                <div><b>⚡ Join Public Stream / Watch</b><p style="font-size:0.72rem; color:var(--text-muted);">Watch live broadcast free</p></div>
+                <button class="call-btn" style="width:auto; padding:8px 14px; background:var(--accent-cyan); color:#000;" onclick="joinPublicStream()">👀 Watch Live</button>
             </div>
             <div class="booking-option-card">
                 <div><b>⏱️ 5 Mins Slot Booking</b><p style="font-size:0.72rem; color:var(--text-muted);">Private 1v1 reserved slot</p></div>
@@ -213,15 +249,70 @@
         </div>
     </div>
 
-    <!-- AGORA 1v1 VIDEO CALL SCREEN -->
-    <div class="modal-overlay" id="video-call-screen" style="background:#0A0714; align-items:center; justify-content:center;">
-        <div style="width:100%; height:100%; display:flex; flex-direction:column; position:relative;">
-            <div id="remote-video" style="width:100%; flex:1; background:#111;"></div>
-            <div id="local-video" style="position:absolute; top:20px; right:20px; width:110px; height:150px; background:#222; border-radius:12px; overflow:hidden; border:2px solid #FF007A;"></div>
-            <div style="position:absolute; bottom:30px; left:0; right:0; display:flex; justify-content:center; gap:20px;">
-                <button onclick="leaveCall()" style="background:#FF0033; color:white; border:none; padding:12px 24px; border-radius:30px; font-weight:700; cursor:pointer;">
-                    <i class="fa-solid fa-phone-slash"></i> End Call
-                </button>
+    <!-- PROFESSIONAL FULL-SCREEN LIVE SCREEN (Tango/Chamet Style) -->
+    <div id="video-call-screen">
+        <div id="remote-video"></div>
+        <div id="local-video"></div>
+        
+        <!-- Top Bar -->
+        <div class="live-top-bar">
+            <div class="live-host-pill">
+                <img id="live-active-img" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop">
+                <div>
+                    <div id="live-active-name" style="font-size:0.8rem; line-height:1;">Streamer</div>
+                    <div style="font-size:0.65rem; color:var(--gold);">🪙 <span id="live-host-rate">50</span>/m</div>
+                </div>
+            </div>
+            <div class="live-viewer-count">👁️ <span id="viewer-count">1</span> Watching</div>
+        </div>
+
+        <!-- Bottom Action Bar -->
+        <div class="live-bottom-bar">
+            <input type="text" class="live-chat-input" placeholder="Say something nice..." id="chat-input">
+            <div class="live-action-btn" onclick="openGiftModal()" title="Send Gift">🎁</div>
+            <div class="live-action-btn live-end-btn" onclick="leaveCall()" title="End Call"><i class="fa-solid fa-phone-slash"></i></div>
+        </div>
+    </div>
+
+    <!-- GIFT SENDING MODAL -->
+    <div class="modal-overlay" id="gift-modal">
+        <div class="modal-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h3>🎁 Send Gift to Streamer</h3>
+                <button style="background:none; border:none; color:white; font-size:1.2rem;" onclick="closeModal('gift-modal')">✕</button>
+            </div>
+            <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:10px;">Your Tokens: 🪙 <span id="gift-user-tokens">0</span></p>
+            <div class="gifts-grid">
+                <div class="gift-item" onclick="sendGift(10, 'Rose 🌹')">
+                    <div class="gift-emoji">🌹</div>
+                    <div style="font-size:0.8rem; font-weight:700;">Rose</div>
+                    <div style="font-size:0.7rem; color:var(--gold);">🪙 10</div>
+                </div>
+                <div class="gift-item" onclick="sendGift(50, 'Heart ❤️')">
+                    <div class="gift-emoji">❤️</div>
+                    <div style="font-size:0.8rem; font-weight:700;">Heart</div>
+                    <div style="font-size:0.7rem; color:var(--gold);">🪙 50</div>
+                </div>
+                <div class="gift-item" onclick="sendGift(100, 'Ring 💍')">
+                    <div class="gift-emoji">💍</div>
+                    <div style="font-size:0.8rem; font-weight:700;">Ring</div>
+                    <div style="font-size:0.7rem; color:var(--gold);">🪙 100</div>
+                </div>
+                <div class="gift-item" onclick="sendGift(250, 'Crown 👑')">
+                    <div class="gift-emoji">👑</div>
+                    <div style="font-size:0.8rem; font-weight:700;">Crown</div>
+                    <div style="font-size:0.7rem; color:var(--gold);">🪙 250</div>
+                </div>
+                <div class="gift-item" onclick="sendGift(500, 'Sports Car 🏎️')">
+                    <div class="gift-emoji">🏎️</div>
+                    <div style="font-size:0.8rem; font-weight:700;">Car</div>
+                    <div style="font-size:0.7rem; color:var(--gold);">🪙 500</div>
+                </div>
+                <div class="gift-item" onclick="sendGift(1000, 'Castle 🏰')">
+                    <div class="gift-emoji">🏰</div>
+                    <div style="font-size:0.8rem; font-weight:700;">Castle</div>
+                    <div style="font-size:0.7rem; color:var(--gold);">🪙 1000</div>
+                </div>
             </div>
         </div>
     </div>
@@ -321,17 +412,17 @@
         function renderHosts(list) {
             const container = document.getElementById('hosts-container');
             if(list.length === 0) {
-                container.innerHTML = `<p style="grid-column: span 2; text-align:center; color:var(--text-muted); padding:20px;">No online hosts available.</p>`;
+                container.innerHTML = `<p style="grid-column: span 2; text-align:center; color:var(--text-muted); padding:20px;">No online streams available.</p>`;
                 return;
             }
             container.innerHTML = list.map(h => `
-                <div class="host-card" onclick="openBookingDrawer('${h.id}', '${h.name}', '${h.img}', '${h.bio || 'Online 1v1 Streamer'}', ${h.rate || 50})">
+                <div class="host-card" onclick="openBookingDrawer('${h.id}', '${h.name}', '${h.img}', '${h.bio || 'Live Stream'}', ${h.rate || 50})">
                     <img src="${h.img}" class="host-thumb">
-                    <div class="badge-live">LIVE</div>
+                    <div class="badge-live">LIVE 🔴</div>
                     <div class="badge-rate">🪙 ${h.rate || 50}/m</div>
                     <div class="host-info">
                         <div class="host-name">${h.name} <i class="fa-solid fa-circle-check" style="color:#00B2FF;"></i></div>
-                        <button class="call-btn"><i class="fa-solid fa-calendar-check"></i> Book Slot</button>
+                        <button class="call-btn"><i class="fa-solid fa-eye"></i> Watch / Book</button>
                     </div>
                 </div>
             `).join('');
@@ -341,15 +432,137 @@
             document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
             el.classList.add('active');
 
-            if (type === 'all') {
-                renderHosts(allHostsList);
-            } else if (type === 'verified') {
-                renderHosts(allHostsList.filter(h => h.isVerified));
-            } else if (type === 'private') {
-                renderHosts(allHostsList.filter(h => h.isPrivate));
-            } else if (type === 'budget') {
-                renderHosts(allHostsList.filter(h => (h.rate || 50) <= 50));
+            if (type === 'all') renderHosts(allHostsList);
+            else if (type === 'verified') renderHosts(allHostsList.filter(h => h.isVerified));
+            else if (type === 'private') renderHosts(allHostsList.filter(h => h.isPrivate));
+            else if (type === 'budget') renderHosts(allHostsList.filter(h => (h.rate || 50) <= 50));
+        }
+
+        function openBookingDrawer(id, name, img, bio, rate) {
+            selectedHostObj = { id, name, img, rate };
+            document.getElementById('bk-host-name').innerText = `${name} Profile`;
+            document.getElementById('drawer-host-img').src = img;
+            document.getElementById('drawer-name-title').innerText = name;
+            document.getElementById('drawer-bio').innerText = bio;
+            document.getElementById('drawer-rate').innerText = rate;
+            document.getElementById('host-booking-modal').classList.add('active');
+        }
+
+        function joinPublicStream() {
+            closeModal('host-booking-modal');
+            document.getElementById('live-active-name').innerText = selectedHostObj.name;
+            document.getElementById('live-active-img').src = selectedHostObj.img;
+            document.getElementById('live-host-rate').innerText = selectedHostObj.rate;
+            startVideoCall("public_live_" + selectedHostObj.id, userId % 2147483647, "subscriber");
+        }
+
+        function startMyLiveStream() {
+            document.getElementById('live-active-name').innerText = userName;
+            document.getElementById('live-active-img').src = telegramPhoto || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop";
+            document.getElementById('live-host-rate').innerText = "50";
+            startVideoCall("host_broadcast_" + userId, userId % 2147483647, "publisher");
+        }
+
+        async function startVideoCall(channelName, safeUid, role) {
+            document.getElementById('video-call-screen').classList.add('active');
+            try {
+                const res = await fetch(`/api/agora-token?channelName=${channelName}&uid=${safeUid}&role=${role}`);
+                const data = await res.json();
+
+                if (data.status !== "success") {
+                    alert("Token error: " + data.message);
+                    document.getElementById('video-call-screen').classList.remove('active');
+                    return;
+                }
+
+                if (agoraClient) await agoraClient.leave().catch(() => {});
+
+                agoraClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+
+                agoraClient.on("user-published", async (user, mediaType) => {
+                    await agoraClient.subscribe(user, mediaType);
+                    if (mediaType === "video") user.videoTrack.play("remote-video");
+                    if (mediaType === "audio") user.audioTrack.play();
+                });
+
+                await agoraClient.join(data.appId, data.channel, data.token, data.uid);
+
+                if (role === "publisher") {
+                    localTracks.audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+                    localTracks.videoTrack = await AgoraRTC.createCameraVideoTrack();
+                    localTracks.videoTrack.play("local-video");
+                    await agoraClient.publish([localTracks.audioTrack, localTracks.videoTrack]);
+                } else {
+                    document.getElementById('local-video').style.display = 'none';
+                }
+            } catch (error) {
+                console.error("Agora join failed:", error);
+                alert("Video connection failed!");
+                document.getElementById('video-call-screen').classList.remove('active');
             }
+        }
+
+        async function leaveCall() {
+            if (localTracks.audioTrack) localTracks.audioTrack.close();
+            if (localTracks.videoTrack) localTracks.videoTrack.close();
+            if (agoraClient) await agoraClient.leave();
+            document.getElementById('video-call-screen').classList.remove('active');
+            document.getElementById('local-video').style.display = 'block';
+            initData();
+        }
+
+        function openGiftModal() {
+            document.getElementById('gift-user-tokens').innerText = userTokens;
+            document.getElementById('gift-modal').classList.add('active');
+        }
+
+        async function sendGift(cost, giftName) {
+            if (userTokens < cost) {
+                alert("⚠️ Low balance! Please recharge to send gifts.");
+                closeModal('gift-modal');
+                openRechargeModal();
+                return;
+            }
+            try {
+                const hostId = selectedHostObj ? selectedHostObj.id : "h1";
+                const res = await fetch('/api/send-gift', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ user_id: parseInt(userId), host_id: hostId, gift_cost: cost, gift_name: giftName })
+                });
+                const data = await res.json();
+                if (data.status === "success") {
+                    userTokens -= cost;
+                    document.getElementById('user-token-bal').innerText = userTokens;
+                    alert(`🎁 You sent ${giftName} successfully!`);
+                    closeModal('gift-modal');
+                } else {
+                    alert(data.message);
+                }
+            } catch(e) { alert("Failed to send gift"); }
+        }
+
+        async function confirmBooking(mins, cost) {
+            if (userTokens < cost) {
+                alert(`⚠️ Balance Low! You need ${cost} Tokens.`);
+                openRechargeModal();
+                return;
+            }
+            try {
+                const res = await fetch('/api/book-slot', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        user_id: parseInt(userId), host_id: selectedHostObj.id,
+                        host_name: selectedHostObj.name, duration_mins: mins, token_cost: cost
+                    })
+                });
+                const data = await res.json();
+                if(data.status === "success") {
+                    closeModal('host-booking-modal');
+                    startVideoCall("vynora_call_" + data.booking_id, userId % 2147483647, "publisher");
+                } else { alert(data.message); }
+            } catch(e) { alert("Booking failed"); }
         }
 
         async function promptPhotoUpdate() {
@@ -365,13 +578,9 @@
                     if(data.status === "success") {
                         document.getElementById('profile-avatar-img').src = newUrl;
                         document.getElementById('header-avatar-img').src = newUrl;
-                        alert("Profile photo updated & saved successfully!");
-                    } else {
-                        alert("Failed to save profile picture.");
+                        alert("Profile photo updated successfully!");
                     }
-                } catch(e) {
-                    alert("Connection error while saving photo.");
-                }
+                } catch(e) { alert("Error saving photo"); }
             }
         }
 
@@ -386,95 +595,6 @@
                 document.getElementById('profile-tab-view').classList.add('active');
                 document.getElementById('nav-profile').classList.add('active');
             }
-        }
-
-        function openBookingDrawer(id, name, img, bio, rate) {
-            selectedHostObj = { id, name };
-            document.getElementById('bk-host-name').innerText = `${name} Profile`;
-            document.getElementById('drawer-host-img').src = img;
-            document.getElementById('drawer-name-title').innerText = name;
-            document.getElementById('drawer-bio').innerText = bio;
-            document.getElementById('drawer-rate').innerText = rate;
-            document.getElementById('host-booking-modal').classList.add('active');
-        }
-
-        async function confirmBooking(mins, cost) {
-            if (userTokens < cost) {
-                alert(`⚠️ Balance Low! You need ${cost} Tokens.`);
-                openRechargeModal();
-                return;
-            }
-
-            try {
-                const res = await fetch('/api/book-slot', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        user_id: parseInt(userId),
-                        host_id: selectedHostObj.id,
-                        host_name: selectedHostObj.name,
-                        duration_mins: mins,
-                        token_cost: cost
-                    })
-                });
-                const data = await res.json();
-                if(data.status === "success") {
-                    closeModal('host-booking-modal');
-                    startVideoCall("vynora_call_" + data.booking_id, userId % 2147483647);
-                } else {
-                    alert(data.message);
-                }
-            } catch(e) { alert("Booking failed"); }
-        }
-
-        function startMyLiveStream() {
-            startVideoCall("host_broadcast_" + userId, userId % 2147483647);
-        }
-
-        async function startVideoCall(channelName, safeUid) {
-            document.getElementById('video-call-screen').classList.add('active');
-            try {
-                const res = await fetch(`/api/agora-token?channelName=${channelName}&uid=${safeUid}&role=publisher`);
-                const data = await res.json();
-
-                if (data.status !== "success") {
-                    alert("Token error: " + data.message);
-                    document.getElementById('video-call-screen').classList.remove('active');
-                    return;
-                }
-
-                if (agoraClient) {
-                    await agoraClient.leave().catch(() => {});
-                }
-
-                agoraClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
-
-                agoraClient.on("user-published", async (user, mediaType) => {
-                    await agoraClient.subscribe(user, mediaType);
-                    if (mediaType === "video") user.videoTrack.play("remote-video");
-                    if (mediaType === "audio") user.audioTrack.play();
-                });
-
-                await agoraClient.join(data.appId, data.channel, data.token, data.uid);
-
-                localTracks.audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
-                localTracks.videoTrack = await AgoraRTC.createCameraVideoTrack();
-
-                localTracks.videoTrack.play("local-video");
-                await agoraClient.publish([localTracks.audioTrack, localTracks.videoTrack]);
-            } catch (error) {
-                console.error("Agora join failed:", error);
-                alert("Video call connection failed!");
-                document.getElementById('video-call-screen').classList.remove('active');
-            }
-        }
-
-        async function leaveCall() {
-            if (localTracks.audioTrack) localTracks.audioTrack.close();
-            if (localTracks.videoTrack) localTracks.videoTrack.close();
-            if (agoraClient) await agoraClient.leave();
-            document.getElementById('video-call-screen').classList.remove('active');
-            initData();
         }
 
         function selectPlan(amt, el) {
