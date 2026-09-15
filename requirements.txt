@@ -1,7 +1,7 @@
-fastapi==0.110.0
-uvicorn==0.28.0
-motor==3.3.2
-aiogram==3.4.1
-pydantic==2.6.4
-python-dotenv==1.0.1
+fastapi
+uvicorn
+motor
+aiogram>=3.7.0
+pydantic
+python-dotenv
 agora-token-builder
