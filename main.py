@@ -297,17 +297,17 @@ async def approve_host_cb(call: types.CallbackQuery):
     try:
         host_u_id = int(call.data.split("_")[1])
         await hosts_col.update_one({"user_id": host_u_id}, {"$set": {"status": "approved", "isVerified": True}}, upsert=True)
-        await hosts_col.update_one({"_id": f"host_{host_u_id}"}, {"$set": &quot;status&quot;: &quot;approved&quot;, &quot;isVerified&quot;: True}, upsert=True)
+        await hosts_col.update_one({"_id": f"host_{host_u_id}"}, {"$set": {"status": "approved", "isVerified": True}}, upsert=True)
         if call.message and call.message.caption:
             try:
-                await call.message.edit_caption(caption=call.message.caption + &quot;\n\n✅ **APPROVED**&quot;, reply_markup=None, parse_mode=&quot;Markdown&quot;)
+                await call.message.edit_caption(caption=call.message.caption + "\n\n✅ **APPROVED**", reply_markup=None, parse_mode="Markdown")
             except:
                 pass
         if bot:
             try:
-                await bot.send_message(chat_id=host_u_id, text=&quot;🎉 Aapka host account approve ho gaya hai! Ab app khol kar Live jayein.&quot;, parse_mode=&quot;Markdown&quot;)
+                await bot.send_message(chat_id=host_u_id, text="🎉 Aapka host account approve ho gaya hai! Ab app khol kar Live jayein.", parse_mode="Markdown")
             except:
                 pass
-        await call.answer(&quot;Approved successfully!&quot;, show_alert=True)
+        await call.answer("Approved successfully!", show_alert=True)
     except Exception as e:
-        await call.answer(f&quot;Error: {e}&quot;, show_alert=True)
+        await call.answer(f"Error: {e}", show_alert=True)
