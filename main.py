@@ -129,7 +129,6 @@ async def get_user_profile(user_id: int):
         return {"user_id": user_id, "tokens": 0, "earnings": 0, "avatar": ""}
     return {"user_id": user_id, "tokens": user.get("tokens", 0), "earnings": user.get("earnings", 0), "avatar": user.get("avatar", "")}
 
-# UPDATED PROFILE PHOTO FILE UPLOAD ROUTE
 @app.post("/api/update-profile-photo")
 async def update_profile_photo(user_id: int = Form(...), avatar: UploadFile = File(...)):
     try:
@@ -153,7 +152,6 @@ async def get_host_status(user_id: int):
         return {"is_host": True, "status": "approved", "isVerified": True, "role": "host"}
     return {"is_host": False, "status": host.get("status", "none") if host else "none", "role": "user"}
 
-# UPDATED RECHARGE ROUTE WITH FILE UPLOAD
 @app.post("/api/recharge")
 async def process_recharge(
     user_id: int = Form(...),
@@ -283,11 +281,10 @@ async def register_host(req: RegisterHostReq):
 if os.path.exists("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# FIXED CALLBACK QUERY FOR RECHARGE APPROVAL
 @dp.callback_query(F.data.startswith("appr_"))
 async def approve_recharge(call: types.CallbackQuery):
     await call.answer("Processing...")
-    tx_id = call.data.replace("appr_", "", 1)  # Fixed split bug!
+    tx_id = call.data.replace("appr_", "", 1)
     tx = await recharges_col.find_one({"_id": tx_id})
     if tx and tx.get("status") == "pending":
         await recharges_col.update_one({"_id": tx_id}, {"$set": {"status": "approved"}})
@@ -310,7 +307,7 @@ async def approve_recharge(call: types.CallbackQuery):
                 
         if bot and GROUP_3_ID != 0:
             try:
-                await bot.send_message(chat_id=GROUP_3_ID, text=f"✅ **RECHARGE APPROVED LOG**\n👤 User ID: `{tx['user_id']}`\n💵 Amount: ₹{tx['amount_inr']}\n📌 UTR: `{tx['utr_number']}`\n🪙 Tokens Added: {tx['tokens']}", parse_mode="Markdown")
+                await bot.send_memory(chat_id=GROUP_3_ID, text=f"✅ **RECHARGE APPROVED LOG**\n👤 User ID: `{tx['user_id']}`\n💵 Amount: ₹{tx['amount_inr']}\n📌 UTR: `{tx['utr_number']}`\n🪙 Tokens Added: {tx['tokens']}", parse_mode="Markdown")
             except Exception as e:
                 logging.error(f"Error sending approval log to group 3: {e}")
 
