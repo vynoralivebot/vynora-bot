@@ -102,19 +102,27 @@
         .modal-card { background: #130E26; border-top: 1px solid var(--card-border); border-radius: 24px 24px 0 0; width: 100%; max-width: 480px; padding: 20px; max-height: 88vh; overflow-y: auto; }
         .input-box { width: 100%; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--card-border); padding: 12px; border-radius: 12px; color: white; margin-bottom: 10px; outline: none; }
 
-        /* FULL SCREEN LIVE */
+        /* FULL SCREEN LIVE & CHAT BOX */
         #video-call-screen { position: fixed; inset: 0; background: #000; z-index: 999; display: none; flex-direction: column; }
         #video-call-screen.active { display: flex; }
         #remote-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
         #local-video { position: absolute; top: 70px; right: 16px; width: 100px; height: 140px; background: #111; border-radius: 14px; overflow: hidden; border: 2px solid #FF007A; z-index: 5; }
+        
         .live-top-bar { position: absolute; top: 16px; left: 16px; right: 16px; z-index: 10; display: flex; justify-content: space-between; align-items: center; }
         .live-host-pill { background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.15); padding: 4px 12px 4px 4px; border-radius: 30px; display: flex; align-items: center; gap: 8px; color: white; font-size: 0.85rem; font-weight: 700; }
         .live-host-pill img { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; }
         .live-viewer-count { background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.15); padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; color: var(--accent-cyan); font-weight: 700; }
-        .live-bottom-bar { position: absolute; bottom: 20px; left: 16px; right: 16px; z-index: 10; display: flex; align-items: center; gap: 10px; }
+        
+        /* Floating Chat Messages Box */
+        .live-chat-messages { position: absolute; bottom: 80px; left: 16px; right: 100px; max-height: 180px; overflow-y: auto; z-index: 10; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+        .chat-bubble { background: rgba(0,0,0,0.5); backdrop-filter: blur(6px); padding: 6px 12px; border-radius: 12px; font-size: 0.8rem; color: white; width: fit-content; max-width: 100%; word-break: break-word; }
+        .chat-bubble b { color: var(--accent-cyan); margin-right: 4px; }
+
+        .live-bottom-bar { position: absolute; bottom: 20px; left: 16px; right: 16px; z-index: 10; display: flex; align-items: center; gap: 8px; }
         .live-chat-input { flex: 1; background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); padding: 10px 16px; border-radius: 30px; color: white; font-size: 0.85rem; outline: none; }
-        .live-action-btn { width: 44px; height: 44px; border-radius: 50%; background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; color: white; font-size: 1.1rem; cursor: pointer; }
+        .live-action-btn { width: 42px; height: 42px; border-radius: 50%; background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; color: white; font-size: 1.1rem; cursor: pointer; flex-shrink: 0; }
         .live-end-btn { background: #FF0033; border: none; }
+        
         .gifts-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 15px 0; }
         .gift-item { background: rgba(255,255,255,0.06); border: 1px solid var(--card-border); border-radius: 16px; padding: 14px; text-align: center; cursor: pointer; }
         .gift-emoji { font-size: 2rem; margin-bottom: 6px; }
@@ -221,7 +229,7 @@
                 </div>
             </div>
             <div class="booking-option-card">
-                <div><b>⚡ Join Public Stream</b><p style="font-size:0.72rem; color:var(--text-muted);">Watch live broadcast free</p></div>
+                <div><b>⚡ Watch Public Stream</b><p style="font-size:0.72rem; color:var(--text-muted);">Join live stream free</p></div>
                 <button class="call-btn" style="width:auto; padding:8px 14px; background:var(--accent-cyan); color:#000;" onclick="joinPublicStream()">👀 Watch Live</button>
             </div>
             <div class="booking-option-card">
@@ -235,6 +243,7 @@
     <div id="video-call-screen">
         <div id="remote-video"></div>
         <div id="local-video"></div>
+        
         <div class="live-top-bar">
             <div class="live-host-pill">
                 <img id="live-active-img" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop">
@@ -245,8 +254,13 @@
             </div>
             <div class="live-viewer-count">👁️ <span id="viewer-count">1</span> Watching</div>
         </div>
+
+        <!-- Chat Messages Container -->
+        <div class="live-chat-messages" id="chat-messages-container"></div>
+
         <div class="live-bottom-bar">
-            <input type="text" class="live-chat-input" placeholder="Say something nice..." id="chat-input">
+            <input type="text" class="live-chat-input" placeholder="Say something nice..." id="chat-input" onkeypress="handleChatKey(event)">
+            <div class="live-action-btn" onclick="sendChatMessage()" title="Send SMS"><i class="fa-solid fa-paper-plane" style="color:var(--accent-cyan);"></i></div>
             <div class="live-action-btn" onclick="openGiftModal()" title="Send Gift">🎁</div>
             <div class="live-action-btn live-end-btn" onclick="leaveCall()" title="End Call"><i class="fa-solid fa-phone-slash"></i></div>
         </div>
@@ -379,7 +393,7 @@
                 return;
             }
             container.innerHTML = list.map(h => `
-                <div class="host-card" onclick="openBookingDrawer('${h.id}', '${h.name}', '${h.img}', '${h.bio || 'Live Stream'}', ${h.rate || 50})">
+                <div class="host-card" onclick="openBookingDrawer('${h.id}', '${h.user_id || h.id}', '${h.name}', '${h.img}', '${h.bio || 'Live Stream'}', ${h.rate || 50})">
                     <img src="${h.img}" class="host-thumb">
                     <div class="badge-live">LIVE 🔴</div>
                     <div class="badge-rate">🪙 ${h.rate || 50}/m</div>
@@ -401,8 +415,8 @@
             else if (type === 'budget') renderHosts(allHostsList.filter(h => (h.rate || 50) <= 50));
         }
 
-        function openBookingDrawer(id, name, img, bio, rate) {
-            selectedHostObj = { id, name, img, rate };
+        function openBookingDrawer(id, hostUserId, name, img, bio, rate) {
+            selectedHostObj = { id, hostUserId, name, img, rate };
             document.getElementById('bk-host-name').innerText = `${name} Profile`;
             document.getElementById('drawer-host-img').src = img;
             document.getElementById('drawer-name-title').innerText = name;
@@ -416,18 +430,25 @@
             document.getElementById('live-active-name').innerText = selectedHostObj.name;
             document.getElementById('live-active-img').src = selectedHostObj.img;
             document.getElementById('live-host-rate').innerText = selectedHostObj.rate;
-            startVideoCall("public_live_" + selectedHostObj.id, userId % 2147483647, "subscriber");
+            
+            // EXACT CHANNEL NAME MATCH (Host ke user_id se match karega)
+            const channelName = "host_live_" + selectedHostObj.hostUserId;
+            startVideoCall(channelName, userId % 2147483647, "subscriber");
         }
 
         function startMyLiveStream() {
             document.getElementById('live-active-name').innerText = userName;
             document.getElementById('live-active-img').src = telegramPhoto || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop";
             document.getElementById('live-host-rate').innerText = "50";
-            startVideoCall("host_broadcast_" + userId, userId % 2147483647, "publisher");
+            
+            // EXACT CHANNEL NAME MATCH (Apne user_id par broadcast karega)
+            const channelName = "host_live_" + userId;
+            startVideoCall(channelName, userId % 2147483647, "publisher");
         }
 
         async function startVideoCall(channelName, safeUid, role) {
             document.getElementById('video-call-screen').classList.add('active');
+            document.getElementById('chat-messages-container.innerHTML = ''');
             try {
                 const res = await fetch(`/api/agora-token?channelName=${channelName}&uid=${safeUid}&role=${role}`);
                 const data = await res.json();
@@ -444,8 +465,12 @@
 
                 agoraClient.on("user-published", async (user, mediaType) => {
                     await agoraClient.subscribe(user, mediaType);
-                    if (mediaType === "video") user.videoTrack.play("remote-video");
-                    if (mediaType === "audio") user.audioTrack.play();
+                    if (mediaType === "video") {
+                        user.videoTrack.play("remote-video");
+                    }
+                    if (mediaType === "audio") {
+                        user.audioTrack.play();
+                    }
                 });
 
                 await agoraClient.join(data.appId, data.channel, data.token, data.uid);
@@ -474,6 +499,27 @@
             initData();
         }
 
+        // Chat SMS sending feature
+        function sendChatMessage() {
+            const input = document.getElementById('chat-input');
+            const text = input.value.trim();
+            if(!text) return;
+
+            const container = document.getElementById('chat-messages-container');
+            const bubble = document.createElement('div');
+            bubble.className = 'chat-bubble';
+            bubble.innerHTML = `<b>${userName}:</b> ${text}`;
+            container.appendChild(bubble);
+            container.scrollTop = container.scrollHeight;
+            input.value = '';
+        }
+
+        function handleChatKey(e) {
+            if (e.key === 'Enter') {
+                sendChatMessage();
+            }
+        }
+
         function openGiftModal() {
             document.getElementById('gift-user-tokens').innerText = userTokens;
             document.getElementById('gift-modal').classList.add('active');
@@ -497,6 +543,15 @@
                 if (data.status === "success") {
                     userTokens -= cost;
                     document.getElementById('user-token-bal').innerText = userTokens;
+                    
+                    // Show gift message in chat
+                    const container = document.getElementById('chat-messages-container');
+                    const bubble = document.createElement('div');
+                    bubble.className = 'chat-bubble';
+                    bubble.innerHTML = `🎁 <b>${userName}</b> sent <b>${giftName}</b>!`;
+                    container.appendChild(bubble);
+                    container.scrollTop = container.scrollHeight;
+
                     alert(`🎁 You sent ${giftName} successfully!`);
                     closeModal('gift-modal');
                 } else {
