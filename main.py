@@ -1,82 +1,40 @@
 import os
 import time
-import logging
-from datetime import datetime
-from typing import Optional
-
-from fastapi import FastAPI, HTTPException, Request, Form, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, Form, Request, HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-import motor.motor_asyncio
-from aiogram import Bot, Dispatcher, types, F
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Update, WebAppInfo
-
-try:
-    from agora_token_builder import RtcTokenBuilder
-except ImportError:
-    RtcTokenBuilder = None
-
-logging.basicConfig(level=logging.INFO)
-
-MONGO_URI = os.getenv("MONGO_URI", "")
-BOT_TOKEN = os.getenv("BOT_TOKEN", "")
-RENDER_URL = os.getenv("RENDER_URL", "https://vynora-bot.onrender.com")
-
-GROUP_1_ID = int(os.getenv("GROUP_1_ID", "0"))
-GROUP_2_ID = int(os.getenv("GROUP_2_ID", "0"))
-GROUP_3_ID = int(os.getenv("GROUP_3_ID", "0"))
-SUPER_ADMIN_ID = int(os.getenv("SUPER_ADMIN_ID", "7001825467"))
+import requests
+from agora_token_builder import RtcTokenBuilder
+from database import users_col, hosts_col, bookings_col, recharges_col, withdrawals_col, chats_col
 
 app = FastAPI()
-bot = Bot(token=BOT_TOKEN) if BOT_TOKEN else None
-dp = Dispatcher()
 
-client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URI, serverSelectionTimeoutMS=10000)
-db = client.get_database("vynora_live_db")
+# Mount static files for frontend (index.html)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
-users_col = db.users
-recharges_col = db.recharges
-hosts_col = db.hosts
-bookings_col = db.bookings
-chats_col = db.chats
+# Telegram Bot Credentials
+BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN")
+GROUP_1_ID = os.getenv("GROUP_1_ID", "-100XXXXXXXXXX") # Recharge & Host Approvals Group
+GROUP_2_ID = os.getenv("GROUP_2_ID", "-100XXXXXXXXXX") # New Users Group
+GROUP_3_ID = os.getenv("GROUP_3_ID", "-100XXXXXXXXXX") # Team / Withdrawals Group
 
-os.makedirs("static/uploads", exist_ok=True)
+AGORA_APP_ID = os.getenv("AGORA_APP_ID", "YOUR_AGORA_APP_ID")
+AGORA_APP_CERTIFICATE = os.getenv("AGORA_APP_CERTIFICATE", "YOUR_AGORA_CERTIFICATE")
 
-@app.on_event("startup")
-async def startup_event():
-    if bot:
-        try:
-            await bot.delete_webhook(drop_pending_updates=True)
-            webhook_url = f"{RENDER_URL}/webhook"
-            await bot.set_webhook(webhook_url, drop_pending_updates=True)
-        except Exception as e:
-            logging.error(f"Webhook setup error: {e}")
+TELEGRAM_API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
-@app.post("/webhook")
-async def telegram_webhook(request: Request):
-    if not bot:
-        return {"ok": False}
-    data = await request.json()
-    update = Update.model_validate(data, context={"bot": bot})
-    await dp.feed_webhook_update(bot, update)
-    return {"ok": True}
+def send_telegram_message(chat_id, text, reply_markup=None):
+    payload = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
+    if reply_markup:
+        payload["reply_markup"] = reply_markup
+    try:
+        requests.post(f"{TELEGRAM_API_URL}/sendMessage", json=payload)
+    except Exception as e:
+        print("Telegram Error:", e)
 
-@dp.message(F.text == "/start")
-async def cmd_start(message: types.Message):
-    kb = InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="🚀 Launch Vynora Live 1v1", web_app=WebAppInfo(url=RENDER_URL))
-    ]])
-    await message.answer("✨ **Vynora Live 1v1 me aapka swagat hai!**", reply_markup=kb, parse_mode="Markdown")
-
-class BookingReq(BaseModel):
-    user_id: int
-    host_id: str
-    host_name: str
-    duration_mins: int
-    token_cost: int
-
-class RegisterHostReq(BaseModel):
+# --- Pydantic Models ---
+class HostRegisterModel(BaseModel):
     user_id: int
     name: str
     age: int
@@ -86,295 +44,244 @@ class RegisterHostReq(BaseModel):
     img: str
     bio: str
 
-class GiftReq(BaseModel):
+class BookingModel(BaseModel):
+    user_id: int
+    host_id: str
+    host_name: str
+    duration_mins: int
+    token_cost: int
+
+class GiftModel(BaseModel):
     user_id: int
     host_id: str
     gift_cost: int
     gift_name: str
-    channel: Optional[str] = None
-    sender_name: Optional[str] = "User"
+    channel: str
+    sender_name: str
 
-class ChatReq(BaseModel):
+class ChatModel(BaseModel):
     channel: str
     sender: str
     text: str
     type: str = "chat"
 
-@app.get("/")
-async def serve_home():
-    if os.path.exists("static/index.html"):
-        return FileResponse("static/index.html")
-    return JSONResponse({"status": "error", "message": "index.html not found"}, status_code=404)
+class WithdrawModel(BaseModel):
+    user_id: int
+    upi_id: str
+    tokens: int
 
-@app.get("/api/agora-token")
-async def get_agora_token(channelName: str, uid: int, role: str = "publisher"):
-    app_id = os.getenv("AGORA_APP_ID", "")
-    app_cert = os.getenv("AGORA_APP_CERTIFICATE", "")
-    
-    if not app_id or not app_cert or not RtcTokenBuilder:
-        return JSONResponse({"status": "error", "message": "Agora credentials missing"}, status_code=500)
-    
-    token = RtcTokenBuilder.buildTokenWithUid(
-        app_id, app_cert, channelName, uid, 
-        1 if role == "publisher" else 2, int(time.time()) + 7200
-    )
-    return {"status": "success", "token": token, "appId": app_id, "channel": channelName, "uid": uid}
+
+# --- API Endpoints for Frontend ---
 
 @app.get("/api/user/{user_id}")
-async def get_user_profile(user_id: int):
-    user = await users_col.find_one({"_id": user_id})
+def get_user(user_id: int):
+    user = users_col.find_one({"user_id": user_id})
     if not user:
-        new_user = {"_id": user_id, "tokens": 0, "earnings": 0, "avatar": "", "created_at": datetime.utcnow()}
-        await users_col.insert_one(new_user)
-        return {"user_id": user_id, "tokens": 0, "earnings": 0, "avatar": ""}
-    return {"user_id": user_id, "tokens": user.get("tokens", 0), "earnings": user.get("earnings", 0), "avatar": user.get("avatar", "")}
-
-@app.post("/api/update-profile-photo")
-async def update_profile_photo(user_id: int = Form(...), avatar: UploadFile = File(...)):
-    try:
-        filename = f"avatar_{user_id}_{int(time.time())}_{avatar.filename}"
-        filepath = os.path.join("static/uploads", filename)
-        with open(filepath, "wb") as buffer:
-            buffer.write(await avatar.read())
-        
-        avatar_url = f"{RENDER_URL}/static/uploads/{filename}"
-        
-        await users_col.update_one({"_id": user_id}, {"$set": {"avatar": avatar_url}}, upsert=True)
-        await hosts_col.update_one({"user_id": user_id}, {"$set": {"img": avatar_url}})
-        await hosts_col.update_one({"_id": f"host_{user_id}"}, {"$set": {"img": avatar_url}})
-        
-        return {"status": "success", "message": "Profile picture updated successfully!", "avatar_url": avatar_url}
-    except Exception as e:
-        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+        user = {"user_id": user_id, "tokens": 100, "earnings": 0, "avatar": ""}
+        users_col.insert_one(user)
+        # Notify Group 2 about new user
+        send_telegram_message(GROUP_2_ID, f"👤 <b>New User Started Bot!</b>\nID: <code>{user_id}</code>")
+    return {"tokens": user.get("tokens", 100), "earnings": user.get("earnings", 0), "avatar": user.get("avatar", "")}
 
 @app.get("/api/host/status/{user_id}")
-async def get_host_status(user_id: int):
-    if user_id == SUPER_ADMIN_ID:
-        return {"is_host": True, "status": "approved", "isVerified": True, "role": "admin"}
-    host = await hosts_col.find_one({"user_id": user_id}) or await hosts_col.find_one({"_id": f"host_{user_id}"})
-    if host and host.get("status") == "approved":
-        return {"is_host": True, "status": "approved", "isVerified": True, "role": "host"}
-    return {"is_host": False, "status": host.get("status", "none") if host else "none", "role": "user"}
+def get_host_status(user_id: int):
+    host = hosts_col.find_one({"user_id": user_id})
+    if host:
+        return {"is_host": True, "status": host.get("status", "pending")}
+    return {"is_host": False, "status": "none"}
 
-@app.get("/api/host/bookings/{user_id}")
-async def get_host_bookings(user_id: int):
-    host = await hosts_col.find_one({"user_id": user_id})
-    host_id = host.get("_id") if host else f"host_{user_id}"
-    
-    cursor = bookings_col.find({"$or": [{"host_id": str(host_id)}, {"host_id": str(user_id)}]}).sort("timestamp", -1).limit(20)
-    bookings = []
-    async for doc in cursor:
-        bookings.append({
-            "id": str(doc["_id"]),
-            "user_id": doc.get("user_id"),
-            "duration_mins": doc.get("duration_mins"),
-            "token_cost": doc.get("token_cost"),
-            "status": doc.get("status", "pending"),
-            "timestamp": doc.get("timestamp").isoformat() if doc.get("timestamp") else ""
-        })
-    return {"status": "success", "bookings": bookings}
+@app.get("/api/hosts")
+def get_hosts():
+    hosts = list(hosts_col.find({"status": "approved"}, {"_id": 0}))
+    return {"hosts": hosts}
 
-@app.post("/api/recharge")
-async def process_recharge(
-    user_id: int = Form(...),
-    amount_inr: float = Form(...),
-    utr_number: str = Form(...),
-    screenshot: UploadFile = File(...)
-):
-    try:
-        filename = f"recharge_{user_id}_{int(time.time())}_{screenshot.filename}"
-        filepath = os.path.join("static/uploads", filename)
-        with open(filepath, "wb") as buffer:
-            buffer.write(await screenshot.read())
-            
-        screenshot_url = f"{RENDER_URL}/static/uploads/{filename}"
-        tx_id = f"tx_{int(time.time())}"
-        
-        await recharges_col.insert_one({
-            "_id": tx_id, "user_id": user_id, "amount_inr": amount_inr, 
-            "utr_number": utr_number, "screenshot_url": screenshot_url,
-            "tokens": int(amount_inr), "status": "pending", "timestamp": datetime.utcnow()
-        })
-        
-        kb = InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text="✅ Approve", callback_data=f"appr_{tx_id}"), 
-            InlineKeyboardButton(text="❌ Reject", callback_data=f"rejc_{tx_id}")
-        ]])
-        
-        if bot and GROUP_1_ID != 0:
-            try:
-                caption = f"💳 **NEW RECHARGE APPROVAL**\n👤 User ID: `{user_id}`\n💵 Amount: ₹{amount_inr}\n📌 UTR: `{utr_number}`"
-                await bot.send_photo(chat_id=GROUP_1_ID, photo=screenshot_url, caption=caption, reply_markup=kb, parse_mode="Markdown")
-            except Exception as e:
-                logging.error(f"Error sending recharge to group 1: {e}")
-                
-        return {"status": "success", "message": "UTR & Screenshot submitted for approval!"}
-    except Exception as e:
-        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+@app.get("/api/agora-token")
+def get_agora_token(channelName: str, uid: int, role: str):
+    privilege_expired_ts = int(time.time()) + 3600
+    rtc_role = 1 if role == "publisher" else 2
+    token = RtcTokenBuilder.buildTokenWithUid(
+        AGORA_APP_ID, AGORA_APP_CERTIFICATE, channelName, uid, rtc_role, privilege_expired_ts
+    )
+    return {"status": "success", "token": token, "appId": AGORA_APP_ID, "channel": channelName, "uid": uid}
 
 @app.post("/api/book-slot")
-async def book_slot(req: BookingReq):
-    user = await users_col.find_one({"_id": req.user_id})
-    if not user or user.get("tokens", 0) < req.token_cost:
-        return {"status": "error", "message": "Insufficient Token Balance!"}
-    
-    booking_id = f"bk_{int(time.time())}"
-    await bookings_col.insert_one({
-        "_id": booking_id, "user_id": req.user_id, "host_id": req.host_id, 
-        "host_name": req.host_name, "duration_mins": req.duration_mins, 
-        "token_cost": req.token_cost, "status": "pending", "timestamp": datetime.utcnow()
-    })
-    await users_col.update_one({"_id": req.user_id}, {"$inc": {"tokens": -req.token_cost}})
-    
-    host_doc = await hosts_col.find_one({"$or": [{"_id": req.host_id}, {"user_id": int(req.host_id) if str(req.host_id).isdigit() else None}]})
-    host_user_id = host_doc.get("user_id") if host_doc else None
-    
-    await hosts_col.update_one({"_id": req.host_id}, {"$inc": {"earnings": req.token_cost}}, upsert=True)
-    if host_user_id:
-        await hosts_col.update_one({"user_id": host_user_id}, {"$inc": {"earnings": req.token_cost}}, upsert=True)
-        await users_col.update_one({"_id": host_user_id}, {"$inc": {"earnings": req.token_cost}}, upsert=True)
+def book_slot(data: BookingModel):
+    user = users_col.find_one({"user_id": data.user_id})
+    if not user or user.get("tokens", 0) < data.token_cost:
+        return {"status": "error", "message": "Insufficient tokens!"}
 
-    return {"status": "success", "booking_id": booking_id, "message": "Slot booked successfully!"}
+    # Deduct tokens from user
+    users_col.update_one({"user_id": data.user_id}, {"$inc": {"tokens": -data.token_cost}})
+
+    # Create booking request
+    booking_id = str(int(time.time()))
+    booking_doc = {
+        "booking_id": booking_id,
+        "user_id": data.user_id,
+        "host_id": data.host_id,
+        "host_name": data.host_name,
+        "duration_mins": data.duration_mins,
+        "token_cost": data.token_cost,
+        "status": "pending"
+    }
+    bookings_col.insert_one(booking_doc)
+
+    # Find host telegram id
+    host = hosts_col.find_one({"id": data.host_id})
+    if host and "user_id" in host:
+        host_telegram_id = host["user_id"]
+        keyboard = {
+            "inline_keyboard": [
+                [
+                    {"text": "✅ Accept Request", "callback_data": f"accept_bk_{booking_id}"},
+                    {"text": "❌ Reject Request", "callback_data": f"reject_bk_{booking_id}"}
+                ]
+            ]
+        }
+        msg = f"🔔 <b>New Private Booking Request!</b>\n\n👤 User ID: <code>{data.user_id}</code>\n⏱️ Duration: {data.duration_mins} Mins\n🪙 Cost: {data.token_cost} Tokens"
+        send_telegram_message(host_telegram_id, msg, reply_markup=keyboard)
+        # Also notify Group 1
+        send_telegram_message(GROUP_1_ID, f"📋 <b>Booking Created</b>\nHost: {data.host_name}\nUser: {data.user_id}\nCost: {data.token_cost} Tokens")
+
+    return {"status": "success", "booking_id": booking_id}
+
+@app.get("/api/host/bookings/{user_id}")
+def get_host_bookings(user_id: int):
+    host = hosts_col.find_one({"user_id": user_id})
+    if not host:
+        return {"bookings": []}
+    host_bookings = list(bookings_col.find({"host_id": host["id"]}, {"_id": 0}))
+    return {"bookings": host_bookings}
+
+@app.post("/api/register-host")
+def register_host(data: HostRegisterModel):
+    host_data = data.dict()
+    host_data["status"] = "approved" # Aap chahe toh 'pending' karke manual approve kar sakte hain
+    host_data["id"] = f"h_{data.user_id}"
+    hosts_col.update_one({"user_id": data.user_id}, {"$set": host_data}, upsert=True)
+    
+    # Notify Group 1
+    send_telegram_message(GROUP_1_ID, f"📹 <b>New Host Registered!</b>\nName: {data.name}\nRate: {data.rate} Tokens/min\nID: <code>{data.user_id}</code>")
+    return {"status": "success", "message": "Host registered successfully and approved!"}
+
+@app.post("/api/recharge")
+async def recharge(user_id: int = Form(...), amount_inr: int = Form(...), utr_number: str = Form(...), screenshot: UploadFile = File(...)):
+    # Save recharge request in DB
+    recharges_col.insert_one({
+        "user_id": user_id,
+        "amount_inr": amount_inr,
+        "utr_number": utr_number,
+        "status": "pending"
+    })
+    
+    # Give tokens instantly or notify Group 1 for manual approval
+    tokens_to_add = amount_inr if amount_inr < 500 else amount_inr + 50
+    users_col.update_one({"user_id": user_id}, {"$inc": {"tokens": tokens_to_add}}, upsert=True)
+
+    # Notify Group 1
+    send_telegram_message(GROUP_1_ID, f"💳 <b>New Recharge Request!</b>\nUser ID: <code>{user_id}</code>\nAmount: ₹{amount_inr}\nUTR: <code>{utr_number}</code>\n✅ Added {tokens_to_add} Tokens automatically.")
+    return {"status": "success", "message": f"Recharge submitted! {tokens_to_add} tokens added."}
+
+@app.post("/api/withdraw")
+def withdraw_earnings(data: WithdrawModel):
+    user = users_col.find_one({"user_id": data.user_id})
+    if not user or user.get("earnings", 0) < data.tokens:
+        return {"status": "error", "message": "Insufficient earnings balance!"}
+
+    # Deduct from earnings & log withdrawal
+    users_col.update_one({"user_id": data.user_id}, {"$inc": {"earnings": -data.tokens}})
+    withdrawals_col.insert_one({
+        "user_id": data.user_id,
+        "upi_id": data.upi_id,
+        "tokens": data.tokens,
+        "status": "pending"
+    })
+
+    # Notify Team Group 3
+    send_telegram_message(GROUP_3_ID, f"💸 <b>New Withdrawal Request!</b>\n\n👤 Host ID: <code>{data.user_id}</code>\n🪙 Tokens: {data.tokens}\n📱 UPI ID: <code>{data.upi_id}</code>")
+    return {"status": "success", "message": "Withdrawal request sent to team successfully!"}
 
 @app.post("/api/send-gift")
-async def send_gift(req: GiftReq):
-    user = await users_col.find_one({"_id": req.user_id})
-    if not user or user.get("tokens", 0) < req.gift_cost:
-        return {"status": "error", "message": "Insufficient tokens to send gift!"}
+def send_gift(data: GiftModel):
+    user = users_col.find_one({"user_id": data.user_id})
+    if not user or user.get("tokens", 0) < data.gift_cost:
+        return {"status": "error", "message": "Not enough tokens"}
+
+    # Deduct from user
+    users_col.update_one({"user_id": data.user_id}, {"$inc": {"tokens": -data.gift_cost}})
     
-    await users_col.update_one({"_id": req.user_id}, {"$inc": {"tokens": -req.gift_cost}})
-    
-    host_doc = await hosts_col.find_one({"$or": [{"_id": req.host_id}, {"user_id": int(req.host_id) if str(req.host_id).isdigit() else None}]})
-    host_user_id = host_doc.get("user_id") if host_doc else None
-    
-    await hosts_col.update_one({"_id": req.host_id}, {"$inc": {"earnings": req.gift_cost}}, upsert=True)
-    if host_user_id:
-        await hosts_col.update_one({"user_id": host_user_id}, {"$inc": {"earnings": req.gift_cost}}, upsert=True)
-        await users_col.update_one({"_id": host_user_id}, {"$inc": {"earnings": req.gift_cost}}, upsert=True)
-    
-    if req.channel:
-        sender_display = req.sender_name if req.sender_name else "User"
-        await chats_col.insert_one({
-            "channel": req.channel,
-            "sender": sender_display,
-            "text": f"sent {req.gift_name} 🎁",
-            "type": "gift",
-            "timestamp": datetime.utcnow()
-        })
-        
-    return {"status": "success", "message": f"Successfully sent {req.gift_name}! 🎁"}
+    # Add to host earnings (Find host by host_id)
+    host = hosts_col.find_one({"id": data.host_id})
+    if host and "user_id" in host:
+        users_col.update_one({"user_id": host["user_id"]}, {"$inc": {"earnings": data.gift_cost}}, upsert=True)
+
+    # Log gift in chat
+    chats_col.insert_one({
+        "channel": data.channel,
+        "sender": data.sender_name,
+        "text": f"sent gift {data.gift_name} (🪙 {data.gift_cost})",
+        "type": "gift",
+        "time": time.time()
+    })
+    return {"status": "success"}
 
 @app.post("/api/send-chat")
-async def send_chat(req: ChatReq):
-    await chats_col.insert_one({
-        "channel": req.channel,
-        "sender": req.sender,
-        "text": req.text,
-        "type": req.type,
-        "timestamp": datetime.utcnow()
+def send_chat(data: ChatModel):
+    chats_col.insert_one({
+        "channel": data.channel,
+        "sender": data.sender,
+        "text": data.text,
+        "type": data.type,
+        "time": time.time()
     })
     return {"status": "success"}
 
 @app.get("/api/get-chat/{channel}")
-async def get_chat(channel: str):
-    cursor = chats_col.find({"channel": channel}).sort("timestamp", 1).limit(50)
-    messages = []
-    async for doc in cursor:
-        messages.append({
-            "sender": doc.get("sender"),
-            "text": doc.get("text"),
-            "type": doc.get("type", "chat")
-        })
-    return {"status": "success", "messages": messages}
+def get_chat(channel: str):
+    messages = list(chats_col.find({"channel": channel}, {"_id": 0}).sort("time", 1).limit(50))
+    return {"messages": messages}
 
-DUMMY_HOSTS = [
-    { "id": "h1", "name": "Anu ❤️", "rate": 50, "isVerified": True, "isPrivate": False, "bio": "Friendly 1v1 chats 💖", "img": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop" },
-    { "id": "h2", "name": "Sophia Rose", "rate": 80, "isVerified": True, "isPrivate": True, "bio": "High quality 1v1 👑", "img": "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=600&auto=format&fit=crop" }
-]
 
-@app.get("/api/hosts")
-async def get_online_hosts():
-    try:
-        cursor = hosts_col.find({"status": "approved"})
-        hosts_list = []
-        async for doc in cursor:
-            hosts_list.append({
-                "id": str(doc["_id"]), "user_id": doc.get("user_id"), "name": doc.get("name", "Host"),
-                "rate": doc.get("rate", 50), "isVerified": True, "isPrivate": doc.get("isPrivate", False),
-                "bio": doc.get("bio", "Verified Host"), "img": doc.get("img", "")
-            })
-        return {"status": "success", "hosts": hosts_list + DUMMY_HOSTS}
-    except Exception as e:
-        return {"status": "success", "hosts": DUMMY_HOSTS}
+# --- Telegram Webhook for Inline Button Accept/Reject Actions ---
+@app.post("/telegram-webhook")
+async def telegram_webhook(req: Request):
+    body = await req.json()
+    if "callback_query" in body:
+        callback = body["callback_query"]
+        data_str = callback["data"]
+        from_user = callback["from"]["id"]
+        message_id = callback["message"]["message_id"]
+        chat_id = callback["message"]["chat"]["id"]
 
-@app.post("/api/register-host")
-async def register_host(req: RegisterHostReq):
-    try:
-        doc = {"_id": f"host_{req.user_id}", "user_id": req.user_id, "name": req.name, "age": req.age, "rate": req.rate, "lang": req.lang, "loc": req.loc, "img": req.img, "bio": req.bio, "status": "pending", "isVerified": False, "isPrivate": False, "created_at": datetime.utcnow()}
-        await hosts_col.update_one({"_id": doc["_id"]}, {"$set": doc}, upsert=True)
-        kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="✅ Approve", callback_data=f"apphost_{req.user_id}"), InlineKeyboardButton(text="❌ Reject", callback_data=f"rejhost_{req.user_id}")]])
-        
-        if bot and GROUP_1_ID != 0:
-            if req.img and req.img.startswith("http"):
-                await bot.send_photo(chat_id=GROUP_1_ID, photo=req.img, caption=f"🟡 **HOST REGISTRATION**\n👤 User ID: `{req.user_id}`\n📛 Name: {req.name}\n🪙 Rate: {req.rate}/min", reply_markup=kb, parse_mode="Markdown")
-            else:
-                await bot.send_message(chat_id=GROUP_1_ID, text=f"🟡 **HOST REGISTRATION**\n👤 User ID: `{req.user_id}`\n📛 Name: {req.name}\n🪙 Rate: {req.rate}/min", reply_markup=kb, parse_mode="Markdown")
-        return {"status": "success", "message": "Submitted for approval!"}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
+        if data_str.startswith("accept_bk_"):
+            booking_id = data_str.replace("accept_bk_", "")
+            booking = bookings_col.find_one({"booking_id": booking_id})
+            if booking:
+                bookings_col.update_one({"booking_id": booking_id}, {"$set": {"status": "approved"}})
+                user_id = booking["user_id"]
+                # Notify User via Telegram
+                send_telegram_message(user_id, "🎉 <b>Badhai ho!</b> Host ne aapki booking request accept kar li hai. Ab aap session join kar sakte hain!")
+                requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={
+                    "chat_id": chat_id,
+                    "message_id": message_id,
+                    "text": f"✅ Booking Approved Successfully for User {user_id}"
+                })
 
-if os.path.exists("static"):
-    app.mount("/static", StaticFiles(directory="static"), name="static")
+        elif data_str.startswith("reject_bk_"):
+            booking_id = data_str.replace("reject_bk_", "")
+            booking = bookings_col.find_one({"booking_id": booking_id})
+            if booking:
+                bookings_col.update_one({"booking_id": booking_id}, {"$set": {"status": "rejected"}})
+                user_id = booking["user_id"]
+                token_cost = booking["token_cost"]
+                # Refund tokens to user
+                users_col.update_one({"user_id": user_id}, {"$inc": {"tokens": token_cost}})
+                # Notify User
+                send_telegram_message(user_id, f"❌ Aapki booking request host dwara reject kar di gayi hai. Aapke {token_cost} tokens refund kar diye gaye hain.")
+                requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={
+                    "chat_id": chat_id,
+                    "message_id": message_id,
+                    "text": f"❌ Booking Rejected. {token_cost} tokens refunded to user {user_id}."
+                })
 
-@dp.callback_query(F.data.startswith("appr_"))
-async def approve_recharge(call: types.CallbackQuery):
-    await call.answer("Processing...")
-    tx_id = call.data.replace("appr_", "", 1)
-    tx = await recharges_col.find_one({"_id": tx_id})
-    if tx and tx.get("status") == "pending":
-        await recharges_col.update_one({"_id": tx_id}, {"$set": {"status": "approved"}})
-        await users_col.update_one({"_id": tx["user_id"]}, {"$inc": {"tokens": tx["tokens"]}}, upsert=True)
-        
-        if bot:
-            try:
-                await bot.send_message(chat_id=tx["user_id"], text=f"🎉 **Badhaai ho!** Aapka ₹{tx['amount_inr']} ka recharge approve ho gaya hai aur `{tx['tokens']} Tokens` add ho gaye hain! 🪙", parse_mode="Markdown")
-            except:
-                pass
-                
-        if call.message:
-            try:
-                if call.message.caption:
-                    await call.message.edit_caption(caption=call.message.caption + "\n\n✅ **APPROVED BY ADMIN**", reply_markup=None, parse_mode="Markdown")
-                elif call.message.text:
-                    await call.message.edit_text(call.message.text + "\n\n✅ **APPROVED BY ADMIN**", reply_markup=None, parse_mode="Markdown")
-            except:
-                pass
-                
-        if bot and GROUP_3_ID != 0:
-            try:
-                await bot.send_message(chat_id=GROUP_3_ID, text=f"✅ **RECHARGE APPROVED LOG**\n👤 User ID: `{tx['user_id']}`\n💵 Amount: ₹{tx['amount_inr']}\n📌 UTR: `{tx['utr_number']}`\n🪙 Tokens Added: {tx['tokens']}", parse_mode="Markdown")
-            except Exception as e:
-                logging.error(f"Error sending approval log to group 3: {e}")
-
-@dp.callback_query(F.data.startswith("apphost_"))
-async def approve_host_cb(call: types.CallbackQuery):
-    try:
-        host_u_id = int(call.data.split("_")[1])
-        await hosts_col.update_one({"user_id": host_u_id}, {"$set": {"status": "approved", "isVerified": True}}, upsert=True)
-        await hosts_col.update_one({"_id": f"host_{host_u_id}"}, {"$set": {"status": "approved", "isVerified": True}}, upsert=True)
-        if call.message:
-            try:
-                if call.message.caption:
-                    await call.message.edit_caption(caption=call.message.caption + "\n\n✅ **APPROVED**", reply_markup=None, parse_mode="Markdown")
-                elif call.message.text:
-                    await call.message.edit_text(call.message.text + "\n\n✅ **APPROVED**", reply_markup=None, parse_mode="Markdown")
-            except:
-                pass
-        if bot:
-            try:
-                await bot.send_message(chat_id=host_u_id, text="🎉 Aapka host account approve ho gaya hai! Ab app khol kar Live jayein.", parse_mode="Markdown")
-            except:
-                pass
-        await call.answer("Approved successfully!", show_alert=True)
-    except Exception as e:
-        await call.answer(f"Error: {e}", show_alert=True)
+    return {"status": "ok"}
