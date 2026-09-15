@@ -226,7 +226,6 @@ async def book_slot(req: BookingReq):
     })
     await users_col.update_one({"_id": req.user_id}, {"$inc": {"tokens": -req.token_cost}})
     
-    # Also add earnings to host when slot is booked
     host_doc = await hosts_col.find_one({"$or": [{"_id": req.host_id}, {"user_id": int(req.host_id) if str(req.host_id).isdigit() else None}]})
     host_user_id = host_doc.get("user_id") if host_doc else None
     
@@ -243,10 +242,8 @@ async def send_gift(req: GiftReq):
     if not user or user.get("tokens", 0) < req.gift_cost:
         return {"status": "error", "message": "Insufficient tokens to send gift!"}
     
-    # Deduct from user tokens
     await users_col.update_one({"_id": req.user_id}, {"$inc": {"tokens": -req.gift_cost}})
     
-    # Find host and update earnings in hosts & users collection
     host_doc = await hosts_col.find_one({"$or": [{"_id": req.host_id}, {"user_id": int(req.host_id) if str(req.host_id).isdigit() else None}]})
     host_user_id = host_doc.get("user_id") if host_doc else None
     
@@ -364,7 +361,7 @@ async def approve_host_cb(call: types.CallbackQuery):
     try:
         host_u_id = int(call.data.split("_")[1])
         await hosts_col.update_one({"user_id": host_u_id}, {"$set": {"status": "approved", "isVerified": True}}, upsert=True)
-        await hosts_col.update_id = await hosts_col.update_one({"_id": f"host_{host_u_id}"}, {"$set": {"status": "approved", "isVerified": True}}, upsert=True)
+        await hosts_col.update_one({"_id": f"host_{host_u_id}"}, {"$set": {"status": "approved", "isVerified": True}}, upsert=True)
         if call.message:
             try:
                 if call.message.caption:
