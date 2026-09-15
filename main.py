@@ -4,7 +4,7 @@ import logging
 from datetime import datetime
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Form, UploadFile, File
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
@@ -41,6 +41,9 @@ hosts_col = db.hosts
 bookings_col = db.bookings
 chats_col = db.chats
 
+# Ensure uploads folder exists
+os.makedirs("static/uploads", exist_ok=True)
+
 @app.on_event("startup")
 async def startup_event():
     if bot:
@@ -66,12 +69,6 @@ async def cmd_start(message: types.Message):
         InlineKeyboardButton(text="🚀 Launch Vynora Live 1v1", web_app=WebAppInfo(url=RENDER_URL))
     ]])
     await message.answer("✨ **Vynora Live 1v1 me aapka swagat hai!**", reply_markup=kb, parse_mode="Markdown")
-
-class RechargeReq(BaseModel):
-    user_id: int
-    amount_inr: float
-    utr_number: str
-    screenshot_url: Optional[str] = ""
 
 class BookingReq(BaseModel):
     user_id: int
@@ -103,10 +100,6 @@ class ChatReq(BaseModel):
     text: str
     type: str = "chat"
 
-class UpdateProfileReq(BaseModel):
-    user_id: int
-    avatar_url: str
-
 @app.get("/")
 async def serve_home():
     if os.path.exists("static/index.html"):
@@ -136,10 +129,20 @@ async def get_user_profile(user_id: int):
         return {"user_id": user_id, "tokens": 0, "earnings": 0, "avatar": ""}
     return {"user_id": user_id, "tokens": user.get("tokens", 0), "earnings": user.get("earnings", 0), "avatar": user.get("avatar", "")}
 
+# UPDATED PROFILE PHOTO FILE UPLOAD ROUTE
 @app.post("/api/update-profile-photo")
-async def update_profile_photo(req: UpdateProfileReq):
-    await users_col.update_one({"_id": req.user_id}, {"$set": {"avatar": req.avatar_url}}, upsert=True)
-    return {"status": "success", "message": "Profile picture updated successfully!"}
+async def update_profile_photo(user_id: int = Form(...), avatar: UploadFile = File(...)):
+    try:
+        filename = f"avatar_{user_id}_{int(time.time())}_{avatar.filename}"
+        filepath = os.path.join("static/uploads", filename)
+        with open(filepath, "wb") as buffer:
+            buffer.write(await avatar.read())
+        
+        avatar_url = f"{RENDER_URL}/static/uploads/{filename}"
+        await users_col.update_one({"_id": user_id}, {"$set": {"avatar": avatar_url}}, upsert=True)
+        return {"status": "success", "message": "Profile picture updated successfully!", "avatar_url": avatar_url}
+    except Exception as e:
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
 @app.get("/api/host/status/{user_id}")
 async def get_host_status(user_id: int):
@@ -150,32 +153,44 @@ async def get_host_status(user_id: int):
         return {"is_host": True, "status": "approved", "isVerified": True, "role": "host"}
     return {"is_host": False, "status": host.get("status", "none") if host else "none", "role": "user"}
 
+# UPDATED RECHARGE ROUTE WITH FILE UPLOAD
 @app.post("/api/recharge")
-async def process_recharge(req: RechargeReq):
-    tx_id = f"tx_{int(time.time())}"
-    await recharges_col.insert_one({
-        "_id": tx_id, "user_id": req.user_id, "amount_inr": req.amount_inr, 
-        "utr_number": req.utr_number, "screenshot_url": req.screenshot_url,
-        "tokens": int(req.amount_inr), "status": "pending", "timestamp": datetime.utcnow()
-    })
-    
-    kb = InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="✅ Approve", callback_data=f"appr_{tx_id}"), 
-        InlineKeyboardButton(text="❌ Reject", callback_data=f"rejc_{tx_id}")
-    ]])
-    
-    # Send Recharge Request ONLY to Group 1
-    if bot and GROUP_1_ID != 0:
-        try:
-            caption = f"💳 **NEW RECHARGE APPROVAL**\n👤 User ID: `{req.user_id}`\n💵 Amount: ₹{req.amount_inr}\n📌 UTR: `{req.utr_number}`"
-            if req.screenshot_url and req.screenshot_url.startswith("http"):
-                await bot.send_photo(chat_id=GROUP_1_ID, photo=req.screenshot_url, caption=caption, reply_markup=kb, parse_mode="Markdown")
-            else:
-                await bot.send_message(chat_id=GROUP_1_ID, text=caption + f"\n🔗 Screenshot: {req.screenshot_url or 'Not Provided'}", reply_markup=kb, parse_mode="Markdown")
-        except Exception as e:
-            logging.error(f"Error sending recharge to group 1: {e}")
+async def process_recharge(
+    user_id: int = Form(...),
+    amount_inr: float = Form(...),
+    utr_number: str = Form(...),
+    screenshot: UploadFile = File(...)
+):
+    try:
+        filename = f"recharge_{user_id}_{int(time.time())}_{screenshot.filename}"
+        filepath = os.path.join("static/uploads", filename)
+        with open(filepath, "wb") as buffer:
+            buffer.write(await screenshot.read())
             
-    return {"status": "success", "message": "UTR & Screenshot submitted for approval!"}
+        screenshot_url = f"{RENDER_URL}/static/uploads/{filename}"
+        tx_id = f"tx_{int(time.time())}"
+        
+        await recharges_col.insert_one({
+            "_id": tx_id, "user_id": user_id, "amount_inr": amount_inr, 
+            "utr_number": utr_number, "screenshot_url": screenshot_url,
+            "tokens": int(amount_inr), "status": "pending", "timestamp": datetime.utcnow()
+        })
+        
+        kb = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="✅ Approve", callback_data=f"appr_{tx_id}"), 
+            InlineKeyboardButton(text="❌ Reject", callback_data=f"rejc_{tx_id}")
+        ]])
+        
+        if bot and GROUP_1_ID != 0:
+            try:
+                caption = f"💳 **NEW RECHARGE APPROVAL**\n👤 User ID: `{user_id}`\n💵 Amount: ₹{amount_inr}\n📌 UTR: `{utr_number}`"
+                await bot.send_photo(chat_id=GROUP_1_ID, photo=screenshot_url, caption=caption, reply_markup=kb, parse_mode="Markdown")
+            except Exception as e:
+                logging.error(f"Error sending recharge to group 1: {e}")
+                
+        return {"status": "success", "message": "UTR & Screenshot submitted for approval!"}
+    except Exception as e:
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
 @app.post("/api/book-slot")
 async def book_slot(req: BookingReq):
@@ -256,7 +271,6 @@ async def register_host(req: RegisterHostReq):
         await hosts_col.update_one({"_id": doc["_id"]}, {"$set": doc}, upsert=True)
         kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="✅ Approve", callback_data=f"apphost_{req.user_id}"), InlineKeyboardButton(text="❌ Reject", callback_data=f"rejhost_{req.user_id}")]])
         
-        # Send Host Registration ONLY to Group 1
         if bot and GROUP_1_ID != 0:
             if req.img and req.img.startswith("http"):
                 await bot.send_photo(chat_id=GROUP_1_ID, photo=req.img, caption=f"🟡 **HOST REGISTRATION**\n👤 User ID: `{req.user_id}`\n📛 Name: {req.name}\n🪙 Rate: {req.rate}/min", reply_markup=kb, parse_mode="Markdown")
@@ -269,10 +283,11 @@ async def register_host(req: RegisterHostReq):
 if os.path.exists("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
 
+# FIXED CALLBACK QUERY FOR RECHARGE APPROVAL
 @dp.callback_query(F.data.startswith("appr_"))
 async def approve_recharge(call: types.CallbackQuery):
     await call.answer("Processing...")
-    tx_id = call.data.split("_")[1]
+    tx_id = call.data.replace("appr_", "", 1)  # Fixed split bug!
     tx = await recharges_col.find_one({"_id": tx_id})
     if tx and tx.get("status") == "pending":
         await recharges_col.update_one({"_id": tx_id}, {"$set": {"status": "approved"}})
@@ -293,7 +308,6 @@ async def approve_recharge(call: types.CallbackQuery):
             except:
                 pass
                 
-        # Send Approved Log to Group 3
         if bot and GROUP_3_ID != 0:
             try:
                 await bot.send_message(chat_id=GROUP_3_ID, text=f"✅ **RECHARGE APPROVED LOG**\n👤 User ID: `{tx['user_id']}`\n💵 Amount: ₹{tx['amount_inr']}\n📌 UTR: `{tx['utr_number']}`\n🪙 Tokens Added: {tx['tokens']}", parse_mode="Markdown")
