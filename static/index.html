@@ -96,13 +96,11 @@
         .nav-item.active { color: #FF007A; font-weight: 700; }
         .nav-item i { font-size: 1.1rem; }
 
-        /* MODAL OVERLAY & FULLSCREEN CSS */
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(10px); z-index: 9999 !important; display: none; justify-content: center; align-items: flex-end; }
         .modal-overlay.active { display: flex; }
         .modal-card { background: #130E26; border-top: 1px solid var(--card-border); border-radius: 24px 24px 0 0; width: 100%; max-width: 480px; padding: 20px; max-height: 88vh; overflow-y: auto; }
         .input-box { width: 100%; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--card-border); padding: 12px; border-radius: 12px; color: white; margin-bottom: 10px; outline: none; }
 
-        /* VIDEO CALL & FULLSCREEN FIX */
         #video-call-screen { position: fixed; inset: 0; width: 100vw; height: 100vh; background: #000; z-index: 999; display: none; flex-direction: column; }
         #video-call-screen.active { display: flex; }
         #main-video-view { position: absolute; inset: 0; width: 100vw; height: 100vh; object-fit: cover; z-index: 1; }
@@ -202,12 +200,29 @@
                 <i class="fa-solid fa-tower-broadcast" style="color:#FF007A;"></i>
                 <p style="color:white; font-weight:700;">Go Live 🔴</p>
             </div>
+            <div class="icon-card" id="host-bookings-card" style="display: none; background: rgba(0,245,212,0.15); border-color: var(--accent-cyan);" onclick="openHostBookingsModal()">
+                <i class="fa-solid fa-clipboard-list" style="color:var(--accent-cyan);"></i>
+                <p style="color:white; font-weight:700;">Bookings</p>
+            </div>
             <div class="icon-card" onclick="openHostRegistrationModal()">
                 <i class="fa-solid fa-video" style="color:#FF007A;"></i>
                 <p>Creator Center</p>
             </div>
             <div class="icon-card"><i class="fa-solid fa-gift" style="color:#FF5500;"></i><p>Bonus</p></div>
             <div class="icon-card"><i class="fa-solid fa-crown" style="color:var(--gold);"></i><p>Level</p></div>
+        </div>
+    </div>
+
+    <!-- HOST BOOKINGS MODAL -->
+    <div class="modal-overlay" id="host-bookings-modal">
+        <div class="modal-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h3>📋 Private Slot Booking Requests</h3>
+                <button style="background:none; border:none; color:white; font-size:1.2rem;" onclick="closeModal('host-bookings-modal')">✕</button>
+            </div>
+            <div id="host-bookings-list" style="max-height: 300px; overflow-y: auto;">
+                <p style="text-align:center; color:var(--text-muted);">Loading bookings...</p>
+            </div>
         </div>
     </div>
 
@@ -391,6 +406,7 @@
                 const hostData = await hostRes.json();
                 if (hostData.is_host && hostData.status === "approved") {
                     document.getElementById('go-live-card').style.display = 'block';
+                    document.getElementById('host-bookings-card').style.display = 'block';
                 }
             } catch(e) {}
 
@@ -453,6 +469,31 @@
             document.getElementById('host-booking-modal').classList.add('active');
         }
 
+        async function openHostBookingsModal() {
+            document.getElementById('host-bookings-modal').classList.add('active');
+            const listContainer = document.getElementById('host-bookings-list');
+            listContainer.innerHTML = `<p style="text-align:center; color:var(--text-muted);">Loading bookings...</p>`;
+            try {
+                const res = await fetch(`/api/host/bookings/${userId}`);
+                const data = await res.json();
+                if(data.bookings && data.bookings.length > 0) {
+                    listContainer.innerHTML = data.bookings.map(b => `
+                        <div style="background:rgba(255,255,255,0.05); padding:10px; border-radius:10px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <p style="font-size:0.85rem; font-weight:700;">User ID: ${b.user_id}</p>
+                                <p style="font-size:0.75rem; color:var(--gold);">⏱️ ${b.duration_mins} Mins | 🪙 ${b.token_cost} Tokens</p>
+                            </div>
+                            <span style="font-size:0.75rem; color:var(--accent-cyan); font-weight:700;">${b.status}</span>
+                        </div>
+                    `).join('');
+                } else {
+                    listContainer.innerHTML = `<p style="text-align:center; color:var(--text-muted);">No booking requests found.</p>`;
+                }
+            } catch(e) {
+                listContainer.innerHTML = `<p style="text-align:center; color:#FF0033;">Failed to load bookings.</p>`;
+            }
+        }
+
         function joinPublicStream() {
             closeModal('host-booking-modal');
             document.getElementById('live-active-name').innerText = selectedHostObj.name;
@@ -475,7 +516,7 @@
         async function startVideoCall(channelName, safeUid, role) {
             document.getElementById('video-call-screen').classList.add('active');
             document.getElementById('chat-messages-container').innerHTML = '';
-            document.getElementById('pip-video-view').style.display = 'none'; // Hide PIP initially to prevent black box
+            document.getElementById('pip-video-view').style.display = 'none';
             
             try {
                 const res = await fetch(`/api/agora-token?channelName=${channelName}&uid=${safeUid}&role=${role}`);
@@ -495,7 +536,7 @@
                     await agoraClient.subscribe(user, mediaType);
                     if (mediaType === "video") {
                         user.videoTrack.play("main-video-view");
-                        document.getElementById('pip-video-view').style.display = 'block'; // Show PIP when remote joins
+                        document.getElementById('pip-video-view').style.display = 'block';
                     }
                     if (mediaType === "audio") {
                         user.audioTrack.play();
@@ -627,7 +668,7 @@
                 const res = await fetch('/api/send-gift', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ user_id: parseInt(userId), host_id: hostId, gift_cost: cost, gift_name: giftName, channel: channelName })
+                    body: JSON.stringify({ user_id: parseInt(userId), host_id: hostId, gift_cost: cost, gift_name: giftName, channel: channelName, sender_name: userName })
                 });
                 const data = await res.json();
                 if (data.status === "success") {
@@ -635,6 +676,7 @@
                     document.getElementById('user-token-bal').innerText = userTokens;
                     alert(`🎁 You sent ${giftName} successfully!`);
                     closeModal('gift-modal');
+                    initData(); // Refresh user tokens & earnings
                 } else {
                     alert(data.message);
                 }
@@ -685,7 +727,7 @@
                         document.getElementById('profile-avatar-img').src = data.avatar_url;
                         document.getElementById('header-avatar-img').src = data.avatar_url;
                         alert("Profile photo updated successfully!");
-                        fetchHosts(); // Refresh main page hosts list instantly
+                        fetchHosts();
                     } else {
                         alert(data.message || "Error updating photo");
                     }
