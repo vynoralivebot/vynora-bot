@@ -1,8 +1,6 @@
 fastapi
 uvicorn
-motor
-aiogram>=3.7.0
-pydantic
-python-dotenv
-agora-token-builder
+pymongo
+requests
 python-multipart
+agora-token-builder
