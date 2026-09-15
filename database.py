@@ -1,14 +1,14 @@
 import os
-from motor.motor_asyncio import AsyncIOMotorClient
-from dotenv import load_dotenv
+from pymongo import MongoClient
 
-load_dotenv()
+MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://...") # Apni MongoDB URI yahan ya Render Env me dalein
+client = MongoClient(MONGO_URI)
+db = client["vynora_live_db"]
 
-MONGO_URI = os.getenv("MONGO_URI")
-client = AsyncIOMotorClient(MONGO_URI)
-db = client.telegram_host_platform
-
-users_collection = db.users
-hosts_collection = db.hosts
-bookings_collection = db.bookings
-transactions_collection = db.transactions
+# Collections
+users_col = db["users"]
+hosts_col = db["hosts"]
+bookings_col = db["bookings"]
+recharges_col = db["recharges"]
+withdrawals_col = db["withdrawals"]
+chats_col = db["chats"]
