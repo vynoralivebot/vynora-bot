@@ -87,14 +87,28 @@ def get_user(user_id: int):
 
 @app.get("/api/host/status/{user_id}")
 def get_host_status(user_id: int):
-    host = hosts_col.find_one({"user_id": int(user_id)}) or hosts_col.find_one({"id": f"h_{user_id}"})
+    host = hosts_col.find_one({
+        "$or": [
+            {"user_id": int(user_id)},
+            {"id": str(user_id)},
+            {"id": f"h_{user_id}"},
+            {"_id": f"host_{user_id}"}
+        ]
+    })
     if host:
         return {"is_host": True, "status": host.get("status", "pending"), "is_online": host.get("is_online", False)}
     return {"is_host": False, "status": "none", "is_online": False}
 
 @app.post("/api/host/toggle-live/{user_id}")
 def toggle_host_live(user_id: int):
-    host = hosts_col.find_one({"user_id": int(user_id)}) or hosts_col.find_one({"id": f"h_{user_id}"})
+    host = hosts_col.find_one({
+        "$or": [
+            {"user_id": int(user_id)},
+            {"id": str(user_id)},
+            {"id": f"h_{user_id}"},
+            {"_id": f"host_{user_id}"}
+        ]
+    })
     if not host:
         return {"status": "error", "message": "Host not found"}
     new_status = not host.get("is_online", False)
@@ -103,7 +117,12 @@ def toggle_host_live(user_id: int):
 
 @app.get("/api/hosts")
 def get_hosts():
-    hosts = list(hosts_col.find({"status": "approved"}, {"_id": 0}))
+    hosts_cursor = hosts_col.find({"status": "approved"}, {"_id": 0})
+    hosts = []
+    for h in hosts_cursor:
+        if not h.get("id"):
+            h["id"] = f"h_{h.get('user_id')}"
+        hosts.append(h)
     return {"hosts": hosts}
 
 @app.get("/api/agora-token")
@@ -136,10 +155,17 @@ def book_slot(data: BookingModel):
     bookings_col.insert_one(booking_doc)
 
     # Safe Host Lookup for Telegram Notification
-    host = hosts_col.find_one({"id": data.host_id}) or hosts_col.find_one({"user_id": int(data.host_id.replace("h_", "")) if data.host_id.startswith("h_") else None})
+    clean_host_id = str(data.host_id).replace("h_", "").replace("host_", "")
+    host = hosts_col.find_one({
+        "$or": [
+            {"id": data.host_id},
+            {"_id": f"host_{clean_host_id}"},
+            {"user_id": int(clean_host_id) if clean_host_id.isdigit() else 0}
+        ]
+    })
     
     if host:
-        host_telegram_id = host.get("user_id") or int(host.get("id", "0").replace("h_", "")) if str(host.get("id", "")).startswith("h_") else None
+        host_telegram_id = host.get("user_id") or (int(clean_host_id) if clean_host_id.isdigit() else None)
         if host_telegram_id:
             keyboard = {
                 "inline_keyboard": [
@@ -157,16 +183,28 @@ def book_slot(data: BookingModel):
 @app.get("/api/host/bookings/{user_id}")
 def get_host_bookings(user_id: int):
     try:
-        # Match by user_id OR host id format
-        host = hosts_col.find_one({"user_id": int(user_id)}) or hosts_col.find_one({"id": f"h_{user_id}"})
+        host = hosts_col.find_one({
+            "$or": [
+                {"user_id": int(user_id)},
+                {"id": str(user_id)},
+                {"id": f"h_{user_id}"},
+                {"_id": f"host_{user_id}"}
+            ]
+        })
         if not host:
             return {"bookings": []}
         
-        h_identifier = host.get("id") or f"h_{user_id}"
-        host_bookings = list(bookings_col.find({"host_id": h_identifier}, {"_id": 0}))
+        h_ids = [str(user_id), f"h_{user_id}", f"host_{user_id}"]
+        if host.get("id"):
+            h_ids.append(str(host.get("id")))
+        if host.get("user_id"):
+            h_ids.append(str(host.get("user_id")))
+            h_ids.append(f"h_{host.get('user_id')}")
+
+        host_bookings = list(bookings_col.find({"host_id": {"$in": list(set(h_ids))}}, {"_id": 0}))
         return {"bookings": host_bookings}
     except Exception as e:
-        print("Error in host bookings:", e)
+        print("Error in host bookings:", str(e))
         return {"bookings": []}
 
 @app.get("/api/user/bookings/{user_id}")
@@ -174,13 +212,21 @@ def get_user_bookings(user_id: int):
     try:
         user_bookings = list(bookings_col.find({"user_id": int(user_id)}, {"_id": 0}))
         for b in user_bookings:
-            host = hosts_col.find_one({"id": b["host_id"]}) or hosts_col.find_one({"user_id": int(b["host_id"].replace("h_", "")) if str(b["host_id"]).startswith("h_") else 0})
+            h_val = str(b.get("host_id"))
+            clean_h = h_val.replace("h_", "").replace("host_", "")
+            host = hosts_col.find_one({
+                "$or": [
+                    {"id": h_val},
+                    {"_id": f"host_{clean_h}"},
+                    {"user_id": int(clean_h) if clean_h.isdigit() else 0}
+                ]
+            })
             if host:
-                b["host_user_id"] = host.get("user_id")
+                b["host_user_id"] = host.get("user_id") or (int(clean_h) if clean_h.isdigit() else 0)
                 b["host_img"] = host.get("img")
         return {"bookings": user_bookings}
     except Exception as e:
-        print("Error in user bookings:", e)
+        print("Error in user bookings:", str(e))
         return {"bookings": []}
 
 @app.post("/api/register-host")
@@ -188,6 +234,7 @@ def register_host(data: HostRegisterModel):
     host_data = data.dict()
     host_data["status"] = "approved"
     host_data["id"] = f"h_{data.user_id}"
+    host_data["_id"] = f"host_{data.user_id}"
     host_data["user_id"] = int(data.user_id)
     host_data["is_online"] = True
     hosts_col.update_one({"user_id": int(data.user_id)}, {"$set": host_data}, upsert=True)
@@ -235,7 +282,14 @@ def send_gift(data: GiftModel):
         return {"status": "error", "message": "Not enough tokens"}
 
     users_col.update_one({"user_id": int(data.user_id)}, {"$inc": {"tokens": -data.gift_cost}})
-    host = hosts_col.find_one({"id": data.host_id}) or hosts_col.find_one({"user_id": int(data.host_id.replace("h_", "")) if str(data.host_id).startswith("h_") else 0})
+    clean_h = str(data.host_id).replace("h_", "").replace("host_", "")
+    host = hosts_col.find_one({
+        "$or": [
+            {"id": data.host_id},
+            {"_id": f"host_{clean_h}"},
+            {"user_id": int(clean_h) if clean_h.isdigit() else 0}
+        ]
+    })
     if host and "user_id" in host:
         users_col.update_one({"user_id": int(host["user_id"])}, {"$inc": {"earnings": data.gift_cost}}, upsert=True)
 
@@ -296,7 +350,15 @@ async def telegram_webhook(req: Request):
             booking = bookings_col.find_one({"booking_id": booking_id})
             if booking:
                 bookings_col.update_one({"booking_id": booking_id}, {"$set": {"status": "approved"}})
-                host = hosts_col.find_one({"id": booking["host_id"]}) or hosts_col.find_one({"user_id": int(booking["host_id"].replace("h_", "")) if str(booking["host_id"]).startswith("h_") else 0})
+                h_val = str(booking["host_id"])
+                clean_h = h_val.replace("h_", "").replace("host_", "")
+                host = hosts_col.find_one({
+                    "$or": [
+                        {"id": h_val},
+                        {"_id": f"host_{clean_h}"},
+                        {"user_id": int(clean_h) if clean_h.isdigit() else 0}
+                    ]
+                })
                 if host and "user_id" in host:
                     users_col.update_one({"user_id": int(host["user_id"])}, {"$inc": {"earnings": booking["token_cost"]}}, upsert=True)
                 send_telegram_message(int(booking["user_id"]), "🎉 <b>Host accepted your booking!</b> Go to 'My Bookings' in the app to join.")
