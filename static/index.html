@@ -195,6 +195,13 @@
             </div>
         </div>
 
+        <!-- Host Withdrawal Action Button -->
+        <div style="margin-bottom: 20px;">
+            <button class="call-btn" style="background: linear-gradient(135deg, #00F5D4 0%, #00B2FF 100%); color: #000;" onclick="openWithdrawModal()">
+                <i class="fa-solid fa-wallet"></i> Withdraw Earnings (UPI)
+            </button>
+        </div>
+
         <div class="action-icon-grid">
             <div class="icon-card" id="go-live-card" style="display: none; background: rgba(255,0,122,0.25); border-color: #FF007A;" onclick="startMyLiveStream()">
                 <i class="fa-solid fa-tower-broadcast" style="color:#FF007A;"></i>
@@ -223,6 +230,20 @@
             <div id="host-bookings-list" style="max-height: 300px; overflow-y: auto;">
                 <p style="text-align:center; color:var(--text-muted);">Loading bookings...</p>
             </div>
+        </div>
+    </div>
+
+    <!-- WITHDRAWAL MODAL -->
+    <div class="modal-overlay" id="withdraw-modal">
+        <div class="modal-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h3>💸 Withdraw Earnings</h3>
+                <button style="background:none; border:none; color:white; font-size:1.2rem;" onclick="closeModal('withdraw-modal')">✕</button>
+            </div>
+            <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:10px;">Available Earnings: 🪙 <span id="withdraw-available-bal">0</span></p>
+            <input type="text" id="withdraw-upi-input" class="input-box" placeholder="Enter your UPI ID (e.g. okaxis@paytm)">
+            <input type="number" id="withdraw-amount-input" class="input-box" placeholder="Enter Tokens to Withdraw">
+            <button class="call-btn" style="padding:12px;" onclick="submitWithdrawalRequest()">🚀 Submit Withdrawal Request</button>
         </div>
     </div>
 
@@ -494,6 +515,30 @@
             }
         }
 
+        function openWithdrawModal() {
+            document.getElementById('withdraw-available-bal').innerText = document.getElementById('profile-earnings-count').innerText;
+            document.getElementById('withdraw-modal').classList.add('active');
+        }
+
+        async function submitWithdrawalRequest() {
+            const upiId = document.getElementById('withdraw-upi-input').value.trim();
+            const tokens = parseInt(document.getElementById('withdraw-amount-input').value);
+
+            if (!upiId || !tokens) return alert("Please enter UPI ID and token amount!");
+
+            try {
+                const res = await fetch('/api/withdraw', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ user_id: parseInt(userId), upi_id: upiId, tokens: tokens })
+                });
+                const data = await res.json();
+                alert(data.message);
+                closeModal('withdraw-modal');
+                initData();
+            } catch(e) { alert("Withdrawal request failed"); }
+        }
+
         function joinPublicStream() {
             closeModal('host-booking-modal');
             document.getElementById('live-active-name').innerText = selectedHostObj.name;
@@ -676,7 +721,7 @@
                     document.getElementById('user-token-bal').innerText = userTokens;
                     alert(`🎁 You sent ${giftName} successfully!`);
                     closeModal('gift-modal');
-                    initData(); // Refresh user tokens & earnings
+                    initData(); 
                 } else {
                     alert(data.message);
                 }
@@ -702,7 +747,7 @@
                 const data = await res.json();
                 if(data.status === "success") {
                     closeModal('host-booking-modal');
-                    startVideoCall("vynora_call_" + data.booking_id, userId % 2147483647, "publisher");
+                    alert("Booking request sent! Waiting for host approval.");
                 } else { alert(data.message); }
             } catch(e) { alert("Booking failed"); }
         }
