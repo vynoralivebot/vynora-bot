@@ -41,7 +41,6 @@ hosts_col = db.hosts
 bookings_col = db.bookings
 chats_col = db.chats
 
-# Ensure uploads folder exists
 os.makedirs("static/uploads", exist_ok=True)
 
 @app.on_event("startup")
@@ -138,7 +137,12 @@ async def update_profile_photo(user_id: int = Form(...), avatar: UploadFile = Fi
             buffer.write(await avatar.read())
         
         avatar_url = f"{RENDER_URL}/static/uploads/{filename}"
+        
+        # Update both users and hosts collection so main page updates instantly
         await users_col.update_one({"_id": user_id}, {"$set": {"avatar": avatar_url}}, upsert=True)
+        await hosts_col.update_one({"user_id": user_id}, {"$set": {"img": avatar_url}})
+        await hosts_col.update_one({"_id": f"host_{user_id}"}, {"$set": {"img": avatar_url}})
+        
         return {"status": "success", "message": "Profile picture updated successfully!", "avatar_url": avatar_url}
     except Exception as e:
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
@@ -307,7 +311,7 @@ async def approve_recharge(call: types.CallbackQuery):
                 
         if bot and GROUP_3_ID != 0:
             try:
-                await bot.send_memory(chat_id=GROUP_3_ID, text=f"✅ **RECHARGE APPROVED LOG**\n👤 User ID: `{tx['user_id']}`\n💵 Amount: ₹{tx['amount_inr']}\n📌 UTR: `{tx['utr_number']}`\n🪙 Tokens Added: {tx['tokens']}", parse_mode="Markdown")
+                await bot.send_message(chat_id=GROUP_3_ID, text=f"✅ **RECHARGE APPROVED LOG**\n👤 User ID: `{tx['user_id']}`\n💵 Amount: ₹{tx['amount_inr']}\n📌 UTR: `{tx['utr_number']}`\n🪙 Tokens Added: {tx['tokens']}", parse_mode="Markdown")
             except Exception as e:
                 logging.error(f"Error sending approval log to group 3: {e}")
 
