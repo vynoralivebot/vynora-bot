@@ -39,6 +39,7 @@ users_col = db.users
 recharges_col = db.recharges
 hosts_col = db.hosts
 bookings_col = db.bookings
+chats_col = db.chats
 
 async def notify_all_groups(text, reply_markup=None, photo=None):
     if not bot:
@@ -106,6 +107,13 @@ class GiftReq(BaseModel):
     host_id: str
     gift_cost: int
     gift_name: str
+    channel: Optional[str] = None
+
+class ChatReq(BaseModel):
+    channel: str
+    sender: str
+    text: str
+    type: str = "chat"
 
 class UpdateProfileReq(BaseModel):
     user_id: int
@@ -161,7 +169,6 @@ async def process_recharge(req: RechargeReq):
     
     kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="✅ Approve", callback_data=f"appr_{tx_id}"), InlineKeyboardButton(text="❌ Reject", callback_data=f"rejc_{tx_id}")]])
     
-    # Send recharge request ONLY to Group 1
     if bot and GROUP_1_ID != 0:
         try:
             await bot.send_message(chat_id=GROUP_1_ID, text=f"💳 **NEW RECHARGE APPROVAL**\n👤 User ID: `{req.user_id}`\n💵 Amount: ₹{req.amount_inr}\n📌 UTR: `{req.utr_number}`", reply_markup=kb, parse_mode="Markdown")
@@ -189,7 +196,40 @@ async def send_gift(req: GiftReq):
         return {"status": "error", "message": "Insufficient tokens to send gift!"}
     await users_col.update_one({"_id": req.user_id}, {"$inc": {"tokens": -req.gift_cost}})
     await hosts_col.update_one({"_id": req.host_id}, {"$inc": {"earnings": req.gift_cost}}, upsert=True)
+    
+    if req.channel:
+        await chats_col.insert_one({
+            "channel": req.channel,
+            "sender": "Gift Alert",
+            "text": f"sent {req.gift_name} 🎁",
+            "type": "gift",
+            "timestamp": datetime.utcnow()
+        })
+        
     return {"status": "success", "message": f"Successfully sent {req.gift_name}! 🎁"}
+
+@app.post("/api/send-chat")
+async def send_chat(req: ChatReq):
+    await chats_col.insert_one({
+        "channel": req.channel,
+        "sender": req.sender,
+        "text": req.text,
+        "type": req.type,
+        "timestamp": datetime.utcnow()
+    })
+    return {"status": "success"}
+
+@app.get("/api/get-chat/{channel}")
+async def get_chat(channel: str):
+    cursor = chats_col.find({"channel": channel}).sort("timestamp", 1).limit(50)
+    messages = []
+    async for doc in cursor:
+        messages.append({
+            "sender": doc.get("sender"),
+            "text": doc.get("text"),
+            "type": doc.get("type", "chat")
+        })
+    return {"status": "success", "messages": messages}
 
 DUMMY_HOSTS = [
     { "id": "h1", "name": "Anu ❤️", "rate": 50, "isVerified": True, "isPrivate": False, "bio": "Friendly 1v1 chats 💖", "img": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&auto=format&fit=crop" },
@@ -234,21 +274,18 @@ async def approve_recharge(call: types.CallbackQuery):
         await recharges_col.update_one({"_id": tx_id}, {"$set": {"status": "approved"}})
         await users_col.update_one({"_id": tx["user_id"]}, {"$inc": {"tokens": tx["tokens"]}}, upsert=True)
         
-        # Notify user
         if bot:
             try:
                 await bot.send_message(chat_id=tx["user_id"], text=f"🎉 **Badhaai ho!** Aapka ₹{tx['amount_inr']} ka recharge approve ho gaya hai aur `{tx['tokens']} Tokens` add ho gaye hain! 🪙", parse_mode="Markdown")
             except:
                 pass
                 
-        # Update Group 1 message
         if call.message and call.message.text:
             try:
                 await call.message.edit_text(call.message.text + "\n\n✅ **APPROVED BY ADMIN**", parse_mode="Markdown")
             except:
                 pass
                 
-        # Send Approval Log to Group 3
         if bot and GROUP_3_ID != 0:
             try:
                 await bot.send_message(chat_id=GROUP_3_ID, text=f"✅ **RECHARGE APPROVED LOG**\n👤 User ID: `{tx['user_id']}`\n💵 Amount: ₹{tx['amount_inr']}\n📌 UTR: `{tx['utr_number']}`\n🪙 Tokens Added: {tx['tokens']}", parse_mode="Markdown")
@@ -260,17 +297,17 @@ async def approve_host_cb(call: types.CallbackQuery):
     try:
         host_u_id = int(call.data.split("_")[1])
         await hosts_col.update_one({"user_id": host_u_id}, {"$set": {"status": "approved", "isVerified": True}}, upsert=True)
-        await hosts_col.update_one({"_id": f"host_{host_u_id}"}, {"$set": {"status": "approved", "isVerified": True}}, upsert=True)
+        await hosts_col.update_one({"_id": f"host_{host_u_id}"}, {"$set": &quot;status&quot;: &quot;approved&quot;, &quot;isVerified&quot;: True}, upsert=True)
         if call.message and call.message.caption:
             try:
-                await call.message.edit_caption(caption=call.message.caption + "\n\n✅ **APPROVED**", reply_markup=None, parse_mode="Markdown")
+                await call.message.edit_caption(caption=call.message.caption + &quot;\n\n✅ **APPROVED**&quot;, reply_markup=None, parse_mode=&quot;Markdown&quot;)
             except:
                 pass
         if bot:
             try:
-                await bot.send_message(chat_id=host_u_id, text="🎉 Aapka host account approve ho gaya hai! Ab app khol kar Live jayein.", parse_mode="Markdown")
+                await bot.send_message(chat_id=host_u_id, text=&quot;🎉 Aapka host account approve ho gaya hai! Ab app khol kar Live jayein.&quot;, parse_mode=&quot;Markdown&quot;)
             except:
                 pass
-        await call.answer("Approved successfully!", show_alert=True)
+        await call.answer(&quot;Approved successfully!&quot;, show_alert=True)
     except Exception as e:
-        await call.answer(f"Error: {e}", show_alert=True)
+        await call.answer(f&quot;Error: {e}&quot;, show_alert=True)
