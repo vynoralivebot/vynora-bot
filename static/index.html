@@ -241,7 +241,7 @@
         <div class="action-icon-grid" id="profile-action-grid"></div>
     </div>
 
-    <!-- HOST BOOKINGS MODAL (RECENT BOOKINGS FIRST) -->
+    <!-- HOST BOOKINGS MODAL -->
     <div class="modal-overlay" id="host-bookings-modal">
         <div class="modal-card">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
@@ -267,7 +267,7 @@
         </div>
     </div>
 
-    <!-- HISTORY / CALL LOGS MODAL (RECENT FIRST) -->
+    <!-- HISTORY / CALL LOGS MODAL -->
     <div class="modal-overlay" id="history-modal">
         <div class="modal-card">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
@@ -680,8 +680,8 @@
                                     <button onclick="hostActionBooking('${b.booking_id}', 'reject')" style="background:#FF0033; color:#fff; border:none; padding:6px 10px; border-radius:8px; font-weight:700; cursor:pointer;">Reject</button>
                                 ` : ''}
                                 ${b.status === 'approved' ? `
-                                    <button onclick="startCallWithTimer('${b.channel_name}', 'User #${b.user_id}', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop', ${b.duration_mins}, 'publisher')" style="background:var(--accent-cyan); color:#000; border:none; padding:6px 10px; border-radius:8px; font-weight:800; cursor:pointer;">🚀 Call Now</button>
-                                ` : ''}
+                                    <button onclick="pendingApprovedBooking = {booking_id: '${b.booking_id}', channel_name: '${b.channel_name}', host_name: 'User #${b.user_id}', host_img: '', duration_mins: ${b.duration_mins}}; startCallWithTimer('${b.channel_name}', 'User #${b.user_id}', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop', ${b.duration_mins}, 'publisher')" style="background:var(--accent-cyan); color:#000; border:none; padding:6px 10px; border-radius:8px; font-weight:800; cursor:pointer;">🚀 Call Now</button>
+                                ` : `<span style="font-size:0.75rem; color:var(--text-muted);">Completed</span>`}
                             </div>
                         </div>
                     `).join('');
@@ -706,6 +706,7 @@
                 openHostBookingsModal();
                 if (action === 'accept' && data.channel_name) {
                     closeModal('host-bookings-modal');
+                    pendingApprovedBooking = { booking_id: bookingId, channel_name: data.channel_name, host_name: "User Private Call", host_img: "", duration_mins: 10 };
                     startCallWithTimer(data.channel_name, "User Private Call", "", 10, "publisher");
                 }
             } catch(e) {
@@ -742,8 +743,8 @@
                                 <p style="font-size:0.72rem; color:${h.status === 'approved' ? 'var(--accent-cyan)' : h.status === 'rejected' ? '#FF0033' : 'var(--text-muted)'}; font-weight:700;">Status: ${h.status.toUpperCase()}</p>
                             </div>
                             ${h.status === 'approved' ? `
-                                <button onclick="startCallWithTimer('${h.channel_name}', '${h.host_name || 'Partner'}', '${h.host_img || ''}', ${h.duration_mins}, 'publisher')" style="background:rgba(0,245,212,0.15); border:1px solid var(--accent-cyan); color:var(--accent-cyan); padding:6px 10px; border-radius:8px; font-weight:700; cursor:pointer;">Rejoin</button>
-                            ` : ''}
+                                <button onclick="pendingApprovedBooking = {booking_id: '${h.booking_id || h._id}', channel_name: '${h.channel_name}', host_name: '${h.host_name || 'Partner'}', host_img: '${h.host_img || ''}', duration_mins: ${h.duration_mins}}; startCallWithTimer('${h.channel_name}', '${h.host_name || 'Partner'}', '${h.host_img || ''}', ${h.duration_mins}, 'publisher')" style="background:rgba(0,245,212,0.15); border:1px solid var(--accent-cyan); color:var(--accent-cyan); padding:6px 10px; border-radius:8px; font-weight:700; cursor:pointer;">Rejoin</button>
+                            ` : `<span style="font-size:0.75rem; color:var(--text-muted);">Completed</span>`}
                         </div>
                     `).join('');
                 } else {
@@ -936,11 +937,24 @@
             const timerBadge = document.getElementById('call-timer-badge');
             if (timerBadge) timerBadge.remove();
 
+            // Mark booking as completed so it won't show Rejoin or ring again
+            if (pendingApprovedBooking && pendingApprovedBooking.booking_id) {
+                try {
+                    await fetch('/api/complete-booking', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ booking_id: pendingApprovedBooking.booking_id })
+                    });
+                } catch(e) {}
+            }
+
             if (localTracks.audioTrack) localTracks.audioTrack.close();
             if (localTracks.videoTrack) localTracks.videoTrack.close();
             if (agoraClient) await agoraClient.leave();
+            
             document.getElementById('video-call-screen').classList.remove('active');
             document.getElementById('pip-video-view').style.display = 'none';
+            pendingApprovedBooking = null;
             initData();
         }
 
