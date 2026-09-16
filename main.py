@@ -48,7 +48,6 @@ class HostRegisterModel(BaseModel):
     rate: int
     lang: str
     loc: str
-    img: str
     bio: str
 
 class UpdateRateModel(BaseModel):
@@ -90,21 +89,25 @@ class WithdrawModel(BaseModel):
 @app.get("/api/user/{user_id}")
 def get_user(user_id: int):
     user = users_col.find_one({"user_id": int(user_id)})
+    if user and user.get("is_banned", False):
+        return {"tokens": 0, "earnings": 0, "net_earnings_tokens": 0, "net_earnings_inr": 0, "avatar": "", "is_banned": True}
+        
     if not user:
-        user = {"user_id": int(user_id), "tokens": 100, "earnings": 0, "avatar": ""}
+        user = {"user_id": int(user_id), "tokens": 100, "earnings": 0, "avatar": "", "is_banned": False}
         users_col.insert_one(user)
         send_telegram_message(GROUP_2_ID, f"👤 <b>New User Started Bot!</b>\nID: <code>{user_id}</code>")
     
     raw_earnings = user.get("earnings", 0)
-    net_earnings_tokens = int(raw_earnings * 0.7)  # 30% platform deduction
-    net_earnings_inr = net_earnings_tokens         # 1 token = ₹1 calculation
+    net_earnings_tokens = int(raw_earnings * 0.7)
+    net_earnings_inr = net_earnings_tokens
 
     return {
         "tokens": user.get("tokens", 100), 
         "earnings": raw_earnings,
         "net_earnings_tokens": net_earnings_tokens,
         "net_earnings_inr": net_earnings_inr,
-        "avatar": user.get("avatar", "")
+        "avatar": user.get("avatar", ""),
+        "is_banned": False
     }
 
 @app.get("/api/host/status/{user_id}")
@@ -147,13 +150,22 @@ def update_host_rate(data: UpdateRateModel):
 
 @app.get("/api/hosts")
 def get_hosts():
-    hosts_cursor = hosts_col.find({"status": "approved"}, {"_id": 0})
-    hosts = []
-    for h in hosts_cursor:
+    db_hosts = list(hosts_col.find({"status": "approved"}, {"_id": 0}))
+    
+    # 5 Gorgeous Dummy Hosts (Protected against real bookings)
+    dummy_hosts = [
+        {"id": "dummy_1", "user_id": 9991, "name": "Sophia 💎", "age": 22, "rate": 40, "lang": "English", "loc": "UK", "img": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&auto=format&fit=crop", "bio": "International VIP Model ✨", "is_online": True, "is_dummy": True},
+        {"id": "dummy_2", "user_id": 9992, "name": "Ananya 🔥", "age": 21, "rate": 50, "lang": "Hindi", "loc": "Mumbai", "img": "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400&auto=format&fit=crop", "bio": "Bollywood dancer & host 💃", "is_online": True, "is_dummy": True},
+        {"id": "dummy_3", "user_id": 9993, "name": "Elena 👑", "age": 23, "rate": 60, "lang": "French", "loc": "France", "img": "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&auto=format&fit=crop", "bio": "Parisian fashion enthusiast 🌸", "is_online": True, "is_dummy": True},
+        {"id": "dummy_4", "user_id": 9994, "name": "Natasha ✨", "age": 20, "rate": 45, "lang": "Russian", "loc": "Russia", "img": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop", "bio": "Professional singer & artist 🎶", "is_online": True, "is_dummy": True},
+        {"id": "dummy_5", "user_id": 9995, "name": "Priya 💫", "age": 22, "rate": 35, "lang": "Hindi", "loc": "Delhi", "img": "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=400&auto=format&fit=crop", "bio": "Friendly companion & gamer 🎮", "is_online": True, "is_dummy": True}
+    ]
+
+    all_hosts = dummy_hosts + db_hosts
+    for h in all_hosts:
         if not h.get("id"):
             h["id"] = f"h_{h.get('user_id')}"
-        hosts.append(h)
-    return {"hosts": hosts}
+    return {"hosts": all_hosts}
 
 @app.get("/api/agora-token")
 def get_agora_token(channelName: str, uid: int, role: str):
@@ -166,6 +178,10 @@ def get_agora_token(channelName: str, uid: int, role: str):
 
 @app.post("/api/book-slot")
 def book_slot(data: BookingModel):
+    # Check if dummy host
+    if str(data.host_id).startswith("dummy_"):
+        return {"status": "error", "message": "✨ Host is currently busy in a private international session. Please try another host!"}
+
     user = users_col.find_one({"user_id": int(data.user_id)})
     if not user or user.get("tokens", 0) < data.token_cost:
         return {"status": "error", "message": f"Insufficient tokens! You need {data.token_cost} tokens."}
@@ -213,7 +229,6 @@ def book_slot(data: BookingModel):
             msg = f"🔔 <b>New Private Booking Request!</b>\n\n👤 User ID: <code>{data.user_id}</code>\n⏱️ Duration: {data.duration_mins} Mins\n🪙 Cost: {data.token_cost} Tokens"
             send_telegram_message(host_telegram_id, msg, reply_markup=keyboard)
             
-            # Send booking notifications to Group 1 and Group 3 as requested
             group_msg = f"📌 <b>New Booking Received!</b>\nHost: {data.host_name}\nUser ID: <code>{data.user_id}</code>\nDuration: {data.duration_mins} Mins\nTokens: {data.token_cost}"
             send_telegram_message(GROUP_1_ID, group_msg)
             send_telegram_message(GROUP_3_ID, group_msg)
@@ -391,12 +406,15 @@ def get_user_bookings(user_id: int):
 
 @app.post("/api/register-host")
 def register_host(data: HostRegisterModel):
+    # Default image placeholder until profile photo is uploaded
     host_data = data.dict()
     host_data["status"] = "pending"
     host_data["id"] = f"h_{data.user_id}"
     host_data["_id"] = f"host_{data.user_id}"
     host_data["user_id"] = int(data.user_id)
     host_data["is_online"] = False
+    host_data["img"] = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop"
+    
     hosts_col.update_one({"user_id": int(data.user_id)}, {"$set": host_data}, upsert=True)
     
     keyboard = {
@@ -487,11 +505,60 @@ async def telegram_webhook(req: Request):
         msg = body["message"]
         chat_id = msg["chat"]["id"]
         user_id = msg["from"]["id"]
-        text = msg.get("text", "")
+        text = msg.get("text", "").strip()
+
+        # --- ADMIN COMMANDS FOR BAN/UNBAN & ADD/CUT TOKENS ---
+        # Format: /ban <user_id> | /unban <user_id> | /addtokens <user_id> <amount> | /cuttokens <user_id> <amount>
+        if text.startswith("/ban "):
+            try:
+                target_id = int(text.replace("/ban ", "").strip())
+                users_col.update_one({"user_id": target_id}, {"$set": {"is_banned": True}}, upsert=True)
+                send_telegram_message(chat_id, f"🚫 User <code>{target_id}</code> has been banned successfully.")
+            except Exception as e:
+                send_telegram_message(chat_id, "❌ Error. Format: /ban <user_id>")
+            return {"ok": True}
+
+        elif text.startswith("/unban "):
+            try:
+                target_id = int(text.replace("/unban ", "").strip())
+                users_col.update_one({"user_id": target_id}, {"$set": {"is_banned": False}}, upsert=True)
+                send_telegram_message(chat_id, f"✅ User <code>{target_id}</code> has been unbanned.")
+            except Exception as e:
+                send_telegram_message(chat_id, "❌ Error. Format: /unban <user_id>")
+            return {"ok": True}
+
+        elif text.startswith("/addtokens "):
+            try:
+                parts = text.replace("/addtokens ", "").strip().split()
+                target_id = int(parts[0])
+                amt = int(parts[1])
+                users_col.update_one({"user_id": target_id}, {"$inc": {"tokens": amt}}, upsert=True)
+                send_telegram_message(chat_id, f"🪙 Added {amt} tokens to User <code>{target_id}</code>.")
+                send_telegram_message(target_id, f"🎉 Admin added +{amt} Tokens to your wallet!")
+            except Exception as e:
+                send_telegram_message(chat_id, "❌ Error. Format: /addtokens <user_id> <amount>")
+            return {"ok": True}
+
+        elif text.startswith("/cuttokens "):
+            try:
+                parts = text.replace("/cuttokens ", "").strip().split()
+                target_id = int(parts[0])
+                amt = int(parts[1])
+                users_col.update_one({"user_id": target_id}, {"$inc": {"tokens": -amt}}, upsert=True)
+                send_telegram_message(chat_id, f"✂️ Cut {amt} tokens from User <code>{target_id}</code>.")
+                send_telegram_message(target_id, f"⚠️ Admin deducted {amt} Tokens from your wallet.")
+            except Exception as e:
+                send_telegram_message(chat_id, "❌ Error. Format: /cuttokens <user_id> <amount>")
+            return {"ok": True}
+
         if text.startswith("/start"):
             user = users_col.find_one({"user_id": int(user_id)})
+            if user and user.get("is_banned", False):
+                send_telegram_message(chat_id, "🚫 Your account has been suspended by the admin.")
+                return {"ok": True}
+
             if not user:
-                users_col.insert_one({"user_id": int(user_id), "tokens": 100, "earnings": 0, "avatar": ""})
+                users_col.insert_one({"user_id": int(user_id), "tokens": 100, "earnings": 0, "avatar": "", "is_banned": False})
                 send_telegram_message(GROUP_2_ID, f"👤 <b>New User Started Bot!</b>\nID: <code>{user_id}</code>")
             webapp_url = "https://vynora-bot.onrender.com/static/index.html"
             keyboard = {"inline_keyboard": [[{"text": "🚀 Open Vynora Live App", "web_app": {"url": webapp_url}}]]}
@@ -531,7 +598,7 @@ async def telegram_webhook(req: Request):
         elif data_str.startswith("reject_rc_"):
             recharge_id = data_str.replace("reject_rc_", "")
             recharges_col.update_one({"recharge_id": recharge_id}, {"$set": {"status": "rejected"}})
-            requests.post(f"{TELEGRAM_API_URL::30}/editMessageText" if hasattr(requests, 'post') else f"{TELEGRAM_API_URL}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": "❌ Recharge Rejected"})
+            requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": "❌ Recharge Rejected"})
 
         elif data_str.startswith("accept_bk_"):
             booking_id = data_str.replace("accept_bk_", "")
