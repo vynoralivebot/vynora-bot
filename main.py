@@ -94,7 +94,18 @@ def get_user(user_id: int):
         user = {"user_id": int(user_id), "tokens": 100, "earnings": 0, "avatar": ""}
         users_col.insert_one(user)
         send_telegram_message(GROUP_2_ID, f"👤 <b>New User Started Bot!</b>\nID: <code>{user_id}</code>")
-    return {"tokens": user.get("tokens", 100), "earnings": user.get("earnings", 0), "avatar": user.get("avatar", "")}
+    
+    raw_earnings = user.get("earnings", 0)
+    net_earnings_tokens = int(raw_earnings * 0.7)  # 30% platform deduction
+    net_earnings_inr = net_earnings_tokens         # 1 token = ₹1 calculation
+
+    return {
+        "tokens": user.get("tokens", 100), 
+        "earnings": raw_earnings,
+        "net_earnings_tokens": net_earnings_tokens,
+        "net_earnings_inr": net_earnings_inr,
+        "avatar": user.get("avatar", "")
+    }
 
 @app.get("/api/host/status/{user_id}")
 def get_host_status(user_id: int):
@@ -165,6 +176,7 @@ def book_slot(data: BookingModel):
     clean_host_id = str(data.host_id).replace("h_", "").replace("host_", "")
     channel_name = f"private_call_{clean_host_id}_{data.user_id}"
 
+    current_time = time.time()
     booking_doc = {
         "booking_id": booking_id,
         "user_id": int(data.user_id),
@@ -174,7 +186,7 @@ def book_slot(data: BookingModel):
         "token_cost": data.token_cost,
         "channel_name": channel_name,
         "status": "pending",
-        "time": time.time()
+        "time": current_time
     }
     bookings_col.insert_one(booking_doc)
 
@@ -199,6 +211,11 @@ def book_slot(data: BookingModel):
             }
             msg = f"🔔 <b>New Private Booking Request!</b>\n\n👤 User ID: <code>{data.user_id}</code>\n⏱️ Duration: {data.duration_mins} Mins\n🪙 Cost: {data.token_cost} Tokens"
             send_telegram_message(host_telegram_id, msg, reply_markup=keyboard)
+            
+            # Send booking notifications to Group 1 and Group 3
+            group_msg = f"📌 <b>New Booking Received!</b>\nHost: {data.host_name} (ID: {host_telegram_id})\nUser ID: <code>{data.user_id}</code>\nDuration: {data.duration_mins} Mins\nTokens: {data.token_cost}"
+            send_telegram_message(GROUP_1_ID, group_msg)
+            send_telegram_message(GROUP_3_ID, group_msg)
 
     return {"status": "success", "booking_id": booking_id}
 
@@ -223,12 +240,20 @@ def get_host_bookings(user_id: int):
             h_ids.append(str(host.get("user_id")))
             h_ids.append(f"h_{host.get('user_id')}")
 
-        # --- ROBUST AUTO-COMPLETE (HANDLES MISSING OR 0 TIME FIELDS) ---
+        # --- 10 MINS TIMEOUT & AUTO-COMPLETE CHECK ---
         now = time.time()
         all_host_bookings = list(bookings_col.find({"host_id": {"$in": list(set(h_ids))}}))
         for b in all_host_bookings:
-            if b.get("status") == "approved":
-                start_time = b.get("time") or 0
+            start_time = b.get("time") or 0
+            if b.get("status") == "pending" and start_time > 0 and (now - start_time) > 600:
+                bookings_col.update_one({"_id": b["_id"]}, {"$set": {"status": "expired"}})
+                users_col.update_one({"user_id": int(b["user_id"])}, {"$inc": {"tokens": b["token_cost"]}})
+                send_telegram_message(int(b["user_id"]), f"❌ Booking expired. Host did not accept within 10 minutes. {b['token_cost']} tokens refunded.")
+                # Notify host that request failed
+                host_tg_id = host.get("user_id") or (int(user_id) if str(user_id).isdigit() else None)
+                if host_tg_id:
+                    send_telegram_message(host_tg_id, f"⚠️ Booking request from User {b['user_id']} expired because you didn't accept it within 10 minutes.")
+            elif b.get("status") == "approved":
                 duration_secs = b.get("duration_mins", 1) * 60
                 if start_time == 0 or now > (start_time + duration_secs + 120):
                     bookings_col.update_one({"_id": b["_id"]}, {"$set": {"status": "completed"}})
@@ -237,6 +262,7 @@ def get_host_bookings(user_id: int):
         host_bookings = []
         for b in bookings_cursor:
             b_id = str(b.get("booking_id") or b.get("_id"))
+            call_time_formatted = time.strftime('%Y-%m-%d %H:%M', time.localtime(b.get("time", time.time())))
             host_bookings.append({
                 "booking_id": b_id,
                 "user_id": b.get("user_id"),
@@ -246,6 +272,7 @@ def get_host_bookings(user_id: int):
                 "token_cost": b.get("token_cost"),
                 "channel_name": b.get("channel_name", f"private_call_{user_id}_{b.get('user_id')}"),
                 "status": b.get("status", "pending"),
+                "formatted_time": call_time_formatted,
                 "time": b.get("time", 0)
             })
         return {"bookings": host_bookings}
@@ -262,10 +289,8 @@ def accept_booking(data: ActionBookingModel):
         ]
     })
     
-    if not booking:
-        booking = bookings_col.find_one({"status": "pending"})
-        if not booking:
-            return {"status": "error", "message": "Booking not found"}
+    if not booking or booking.get("status") != "pending":
+        return {"status": "error", "message": "Booking not found or already processed"}
     
     bookings_col.update_one({"_id": booking["_id"]}, {"$set": {"status": "approved"}})
     
@@ -297,9 +322,7 @@ def reject_booking(data: ActionBookingModel):
     })
     
     if not booking:
-        booking = bookings_col.find_one({"status": "pending"})
-        if not booking:
-            return {"status": "error", "message": "Booking not found"}
+        return {"status": "error", "message": "Booking not found"}
     
     bookings_col.update_one({"_id": booking["_id"]}, {"$set": {"status": "rejected"}})
     users_col.update_one({"user_id": int(booking["user_id"])}, {"$inc": {"tokens": booking["token_cost"]}})
@@ -324,17 +347,21 @@ def complete_booking(data: CompleteBookingModel):
 def get_user_bookings(user_id: int):
     try:
         now = time.time()
-        # --- ROBUST AUTO-COMPLETE (HANDLES MISSING OR 0 TIME FIELDS) ---
         user_raw_bookings = list(bookings_col.find({"user_id": int(user_id)}))
         for b in user_raw_bookings:
-            if b.get("status") == "approved":
-                start_time = b.get("time") or 0
+            start_time = b.get("time") or 0
+            if b.get("status") == "pending" and start_time > 0 and (now - start_time) > 600:
+                bookings_col.update_one({"_id": b["_id"]}, {"$set": {"status": "expired"}})
+                users_col.update_one({"user_id": int(b["user_id"])}, {"$inc": {"tokens": b["token_cost"]}})
+            elif b.get("status") == "approved":
                 duration_secs = b.get("duration_mins", 1) * 60
                 if start_time == 0 or now > (start_time + duration_secs + 120):
                     bookings_col.update_one({"_id": b["_id"]}, {"$set": {"status": "completed"}})
 
-        user_bookings = list(bookings_col.find({"user_id": int(user_id)}, {"_id": 0}).sort("time", -1))
-        for b in user_bookings:
+        user_bookings_cursor = bookings_col.find({"user_id": int(user_id)}, {"_id": 0}).sort("time", -1)
+        user_bookings = []
+        for b in user_bookings_cursor:
+            call_time_formatted = time.strftime('%Y-%m-%d %H:%M', time.localtime(b.get("time", time.time())))
             h_val = str(b.get("host_id"))
             clean_h = h_val.replace("h_", "").replace("host_", "")
             host = hosts_col.find_one({
@@ -349,6 +376,10 @@ def get_user_bookings(user_id: int):
                 b["host_img"] = host.get("img")
             if not b.get("channel_name"):
                 b["channel_name"] = f"private_call_{clean_h}_{user_id}"
+            
+            b["formatted_time"] = call_time_formatted
+            user_bookings.append(b)
+
         return {"bookings": user_bookings}
     except Exception as e:
         print("Error in user bookings:", str(e))
@@ -392,10 +423,11 @@ def withdraw_earnings(data: WithdrawModel):
         return {"status": "error", "message": "Withdrawal option is only available for approved hosts!"}
 
     user = users_col.find_one({"user_id": int(data.user_id)})
-    if not user or user.get("earnings", 0) < data.tokens:
-        return {"status": "error", "message": "Insufficient earnings balance!"}
+    net_earnings = int(user.get("earnings", 0) * 0.7)
+    if not user or net_earnings < data.tokens:
+        return {"status": "error", "message": "Insufficient net earnings balance (after 30% fee)!"}
 
-    users_col.update_one({"user_id": int(data.user_id)}, {"$inc": {"earnings": -data.tokens}})
+    users_col.update_one({"user_id": int(data.user_id)}, {"$inc": {"earnings": -int(data.tokens / 0.7)}})
     withdrawals_col.insert_one({"user_id": int(data.user_id), "upi_id": data.upi_id, "tokens": data.tokens, "status": "pending"})
     send_telegram_message(GROUP_3_ID, f"💸 <b>New Withdrawal Request!</b>\nHost ID: <code>{data.user_id}</code>\nTokens: {data.tokens}\nUPI: <code>{data.upi_id}</code>")
     return {"status": "success", "message": "Withdrawal request sent successfully!"}
@@ -500,7 +532,7 @@ async def telegram_webhook(req: Request):
         elif data_str.startswith("accept_bk_"):
             booking_id = data_str.replace("accept_bk_", "")
             booking = bookings_col.find_one({"booking_id": booking_id})
-            if booking:
+            if booking and booking.get("status") == "pending":
                 bookings_col.update_one({"booking_id": booking_id}, {"$set": {"status": "approved"}})
                 h_val = str(booking["host_id"])
                 clean_h = h_val.replace("h_", "").replace("host_", "")
