@@ -146,7 +146,7 @@ def book_slot(data: BookingModel):
 
     users_col.update_one({"user_id": int(data.user_id)}, {"$inc": {"tokens": -data.token_cost}})
 
-    booking_id = str(uuid.uuid4())[:8] # Unique short booking ID
+    booking_id = str(uuid.uuid4())[:8]
     booking_doc = {
         "booking_id": booking_id,
         "user_id": int(data.user_id),
@@ -224,7 +224,6 @@ def get_host_bookings(user_id: int):
 
 @app.post("/api/host/accept-booking")
 def accept_booking(data: ActionBookingModel):
-    # Search by booking_id or fallback to match string/_id
     booking = bookings_col.find_one({
         "$or": [
             {"booking_id": data.booking_id},
@@ -233,7 +232,6 @@ def accept_booking(data: ActionBookingModel):
     })
     
     if not booking:
-        # Try finding recent pending booking as a robust fallback
         booking = bookings_col.find_one({"status": "pending"})
         if not booking:
             return {"status": "error", "message": "Booking not found"}
