@@ -601,7 +601,8 @@
                     pendingApprovedBooking.host_name,
                     pendingApprovedBooking.host_img,
                     pendingApprovedBooking.duration_mins,
-                    "publisher"
+                    "publisher",
+                    pendingApprovedBooking.call_started_at
                 );
             }
         }
@@ -684,7 +685,7 @@
                                     <button onclick="hostActionBooking('${b.booking_id}', 'reject')" style="background:#FF0033; color:#fff; border:none; padding:6px 10px; border-radius:8px; font-weight:700; cursor:pointer;">Reject</button>
                                 ` : ''}
                                 ${b.status === 'approved' ? `
-                                    <button onclick="pendingApprovedBooking = {booking_id: '${b.booking_id}', channel_name: '${b.channel_name}', host_name: 'User #${b.user_id}', host_img: '', duration_mins: ${b.duration_mins}}; startCallWithTimer('${b.channel_name}', 'User #${b.user_id}', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop', ${b.duration_mins}, 'publisher')" style="background:var(--accent-cyan); color:#000; border:none; padding:6px 10px; border-radius:8px; font-weight:800; cursor:pointer;">🚀 Call Now</button>
+                                    <button onclick="pendingApprovedBooking = {booking_id: '${b.booking_id}', channel_name: '${b.channel_name}', host_name: 'User #${b.user_id}', host_img: '', duration_mins: ${b.duration_mins}, call_started_at: ${b.call_started_at}}; startCallWithTimer('${b.channel_name}', 'User #${b.user_id}', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop', ${b.duration_mins}, 'publisher', ${b.call_started_at})" style="background:var(--accent-cyan); color:#000; border:none; padding:6px 10px; border-radius:8px; font-weight:800; cursor:pointer;">🚀 Call Now</button>
                                 ` : `<span style="font-size:0.75rem; color:var(--text-muted);">${b.status.charAt(0).toUpperCase() + b.status.slice(1)}</span>`}
                             </div>
                         </div>
@@ -710,8 +711,8 @@
                 openHostBookingsModal();
                 if (action === 'accept' && data.channel_name) {
                     closeModal('host-bookings-modal');
-                    pendingApprovedBooking = { booking_id: bookingId, channel_name: data.channel_name, host_name: "User Private Call", host_img: "", duration_mins: 10 };
-                    startCallWithTimer(data.channel_name, "User Private Call", "", 10, "publisher");
+                    pendingApprovedBooking = { booking_id: bookingId, channel_name: data.channel_name, host_name: "User Private Call", host_img: "", duration_mins: 10, call_started_at: data.call_started_at };
+                    startCallWithTimer(data.channel_name, "User Private Call", "", 10, "publisher", data.call_started_at);
                 }
             } catch(e) {
                 alert("Action failed due to network error.");
@@ -748,7 +749,7 @@
                                 <p style="font-size:0.72rem; color:${h.status === 'approved' ? 'var(--accent-cyan)' : h.status === 'rejected' ? '#FF0033' : h.status === 'expired' ? '#FFA500' : 'var(--text-muted)'}; font-weight:700;">Status: ${h.status.toUpperCase()}</p>
                             </div>
                             ${h.status === 'approved' ? `
-                                <button onclick="pendingApprovedBooking = {booking_id: '${h.booking_id || h._id}', channel_name: '${h.channel_name}', host_name: '${h.host_name || 'Partner'}', host_img: '${h.host_img || ''}', duration_mins: ${h.duration_mins}}; startCallWithTimer('${h.channel_name}', '${h.host_name || 'Partner'}', '${h.host_img || ''}', ${h.duration_mins}, 'publisher')" style="background:rgba(0,245,212,0.15); border:1px solid var(--accent-cyan); color:var(--accent-cyan); padding:6px 10px; border-radius:8px; font-weight:700; cursor:pointer;">Rejoin</button>
+                                <button onclick="pendingApprovedBooking = {booking_id: '${h.booking_id || h._id}', channel_name: '${h.channel_name}', host_name: '${h.host_name || 'Partner'}', host_img: '${h.host_img || ''}', duration_mins: ${h.duration_mins}, call_started_at: ${h.call_started_at || h.time}}; startCallWithTimer('${h.channel_name}', '${h.host_name || 'Partner'}', '${h.host_img || ''}', ${h.duration_mins}, 'publisher', ${h.call_started_at || h.time})" style="background:rgba(0,245,212,0.15); border:1px solid var(--accent-cyan); color:var(--accent-cyan); padding:6px 10px; border-radius:8px; font-weight:700; cursor:pointer;">Rejoin</button>
                             ` : `<span style="font-size:0.75rem; color:var(--text-muted);">${h.status.charAt(0).toUpperCase() + h.status.slice(1)}</span>`}
                         </div>
                     `).join('');
@@ -760,7 +761,8 @@
             }
         }
 
-        function startCallWithTimer(channelName, peerName, peerImg, durationMins, role) {
+        // SYNCHRONIZED TIMER LOGIC (Matches Host and User time precisely)
+        function startCallWithTimer(channelName, peerName, peerImg, durationMins, role, callStartedAt) {
             document.getElementById('whatsapp-call-screen').classList.remove('active');
             closeModal('host-bookings-modal');
             closeModal('user-bookings-modal');
@@ -772,7 +774,6 @@
 
             startVideoCall(channelName, userId % 2147483647, role);
 
-            let totalSeconds = durationMins * 60;
             if (callTimerInterval) clearInterval(callTimerInterval);
 
             let timerBadge = document.getElementById('call-timer-badge');
@@ -784,16 +785,22 @@
             }
 
             callTimerInterval = setInterval(() => {
-                let mins = Math.floor(totalSeconds / 60);
-                let secs = totalSeconds % 60;
-                timerBadge.innerText = `⏱️ Time Left: ${mins}:${secs < 10 ? '0' : ''}${secs}`;
+                let nowSecs = Date.now() / 1000;
+                let startSecs = callStartedAt || nowSecs;
+                let elapsed = Math.floor(nowSecs - startSecs);
+                let totalAllowedSeconds = durationMins * 60;
+                let remainingSeconds = totalAllowedSeconds - elapsed;
 
-                if (totalSeconds <= 0) {
+                if (remainingSeconds <= 0) {
                     clearInterval(callTimerInterval);
+                    timerBadge.innerText = `⏱️ Time Left: 0:00`;
                     alert("⏰ Your booked slot time is over! Call ending automatically.");
                     leaveCall();
+                } else {
+                    let mins = Math.floor(remainingSeconds / 60);
+                    let secs = remainingSeconds % 60;
+                    timerBadge.innerText = `⏱️ Time Left: ${mins}:${secs < 10 ? '0' : ''}${secs}`;
                 }
-                totalSeconds--;
             }, 1000);
         }
 
@@ -1114,7 +1121,6 @@
         function closeModal(id) { document.getElementById(id).classList.remove('active'); }
         function openHostRegistrationModal() { document.getElementById('host-reg-modal').classList.add('active'); }
         
-        // Updated Support & Policy Link with detailed rules for both hosts and users
         function openSupportLink() {
             alert("📋 VYNORA LIVE POLICIES & SUPPORT:\n\n1. 🎥 HOST RULES: Approved hosts must stay online and accept private call requests within 10 minutes.\n2. 💸 PAYMENT POLICY: Withdrawals are processed via UPI for approved hosts (30% platform fee deducted automatically).\n3. 👤 USER POLICY: For recharges, upload valid UTR & screenshot. If bookings are ignored for 10 mins, tokens are auto-refunded.\n\nNeed help? Contact Admin Support @VynoraSupport");
             window.open("https://t.me/VynoraSupport", "_blank");
