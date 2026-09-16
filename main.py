@@ -208,6 +208,7 @@ def get_host_bookings(user_id: int):
             h_ids.append(str(host.get("user_id")))
             h_ids.append(f"h_{host.get('user_id')}")
 
+        # Sorted by time descending (Recent first)
         bookings_cursor = bookings_col.find({"host_id": {"$in": list(set(h_ids))}}).sort("time", -1)
         host_bookings = []
         for b in bookings_cursor:
@@ -256,8 +257,8 @@ def accept_booking(data: ActionBookingModel):
         users_col.update_one({"user_id": int(host["user_id"])}, {"$inc": {"earnings": booking["token_cost"]}}, upsert=True)
     
     webapp_url = "https://vynora-bot.onrender.com/static/index.html"
-    user_keyboard = {"inline_keyboard": [[{"text": "📞 Join Video Call", "web_app": {"url": webapp_url}}]]}
-    send_telegram_message(int(booking["user_id"]), f"🎉 <b>Host accepted your booking!</b> Tap below to join your video call.", reply_markup=user_keyboard)
+    user_keyboard = {"inline_keyboard": [[{"text": "📞 Answer Call", "web_app": {"url": webapp_url}}]]}
+    send_telegram_message(int(booking["user_id"]), f"📞 <b>Incoming Video Call!</b>\nHost has accepted your booking. Tap below to pick up.", reply_markup=user_keyboard)
     
     return {"status": "success", "message": "Booking accepted successfully!", "channel_name": booking.get("channel_name")}
 
@@ -284,6 +285,7 @@ def reject_booking(data: ActionBookingModel):
 @app.get("/api/user/bookings/{user_id}")
 def get_user_bookings(user_id: int):
     try:
+        # Sorted by time descending (Recent first)
         user_bookings = list(bookings_col.find({"user_id": int(user_id)}, {"_id": 0}).sort("time", -1))
         for b in user_bookings:
             h_val = str(b.get("host_id"))
@@ -439,8 +441,8 @@ async def telegram_webhook(req: Request):
                     users_col.update_one({"user_id": int(host["user_id"])}, {"$inc": {"earnings": booking["token_cost"]}}, upsert=True)
                 
                 webapp_url = "https://vynora-bot.onrender.com/static/index.html"
-                user_keyboard = {"inline_keyboard": [[{"text": "📞 Join Video Call", "web_app": {"url": webapp_url}}]]}
-                send_telegram_message(int(booking["user_id"]), "🎉 <b>Host accepted your booking!</b> Tap below to join.", reply_markup=user_keyboard)
+                user_keyboard = {"inline_keyboard": [[{"text": "📞 Answer Call", "web_app": {"url": webapp_url}}]]}
+                send_telegram_message(int(booking["user_id"]), "📞 <b>Incoming Video Call!</b> Host accepted your booking. Tap below to pick up.", reply_markup=user_keyboard)
                 requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": "✅ Booking Accepted & Call Ready"})
 
         elif data_str.startswith("reject_bk_"):
