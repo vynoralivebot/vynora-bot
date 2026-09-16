@@ -208,7 +208,6 @@ def get_host_bookings(user_id: int):
             h_ids.append(str(host.get("user_id")))
             h_ids.append(f"h_{host.get('user_id')}")
 
-        # Sorted by time descending (Recent first)
         bookings_cursor = bookings_col.find({"host_id": {"$in": list(set(h_ids))}}).sort("time", -1)
         host_bookings = []
         for b in bookings_cursor:
@@ -221,7 +220,8 @@ def get_host_bookings(user_id: int):
                 "duration_mins": b.get("duration_mins"),
                 "token_cost": b.get("token_cost"),
                 "channel_name": b.get("channel_name", f"private_call_{user_id}_{b.get('user_id')}"),
-                "status": b.get("status", "pending")
+                "status": b.get("status", "pending"),
+                "time": b.get("time", 0)
             })
         return {"bookings": host_bookings}
     except Exception as e:
@@ -258,7 +258,7 @@ def accept_booking(data: ActionBookingModel):
     
     webapp_url = "https://vynora-bot.onrender.com/static/index.html"
     user_keyboard = {"inline_keyboard": [[{"text": "📞 Answer Call", "web_app": {"url": webapp_url}}]]}
-    send_telegram_message(int(booking["user_id"]), f"📞 <b>Incoming Video Call!</b>\nHost has accepted your booking. Tap below to pick up.", reply_markup=user_keyboard)
+    send_telegram_message(int(booking["user_id"]), f"📞 <b>Incoming Video Call!</b> Host accepted your booking. Tap below to pick up.", reply_markup=user_keyboard)
     
     return {"status": "success", "message": "Booking accepted successfully!", "channel_name": booking.get("channel_name")}
 
@@ -285,7 +285,6 @@ def reject_booking(data: ActionBookingModel):
 @app.get("/api/user/bookings/{user_id}")
 def get_user_bookings(user_id: int):
     try:
-        # Sorted by time descending (Recent first)
         user_bookings = list(bookings_col.find({"user_id": int(user_id)}, {"_id": 0}).sort("time", -1))
         for b in user_bookings:
             h_val = str(b.get("host_id"))
