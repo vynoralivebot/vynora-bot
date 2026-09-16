@@ -497,3 +497,18 @@ async def telegram_webhook(req: Request):
                 requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": "❌ Booking Rejected"})
 
     return {"ok": True}
+class CompleteBookingModel(BaseModel):
+    booking_id: str
+
+@app.post("/api/complete-booking")
+def complete_booking(data: CompleteBookingModel):
+    booking = bookings_col.find_one({
+        "$or": [
+            {"booking_id": data.booking_id},
+            {"_id": data.booking_id}
+        ]
+    })
+    if booking:
+        bookings_col.update_one({"_id": booking["_id"]}, {"$set": {"status": "completed"}})
+        return {"status": "success", "message": "Booking marked as completed"}
+    return {"status": "error", "message": "Booking not found"}
