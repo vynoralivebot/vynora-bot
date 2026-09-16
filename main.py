@@ -512,3 +512,7 @@ def complete_booking(data: CompleteBookingModel):
         bookings_col.update_one({"_id": booking["_id"]}, {"$set": {"status": "completed"}})
         return {"status": "success", "message": "Booking marked as completed"}
     return {"status": "error", "message": "Booking not found"}
+@app.get("/api/admin/fix-old-bookings")
+def fix_old_bookings():
+    result = bookings_col.update_many({"status": "approved"}, {"$set": {"status": "completed"}})
+    return {"status": "success", "updated_count": result.modified_count}
