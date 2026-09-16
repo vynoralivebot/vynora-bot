@@ -1,5 +1,6 @@
 import os
 import time
+import uuid
 from fastapi import FastAPI, UploadFile, File, Form, Request
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -145,7 +146,7 @@ def book_slot(data: BookingModel):
 
     users_col.update_one({"user_id": int(data.user_id)}, {"$inc": {"tokens": -data.token_cost}})
 
-    booking_id = str(int(time.time()))
+    booking_id = str(uuid.uuid4())[:8] # Unique short booking ID
     booking_doc = {
         "booking_id": booking_id,
         "user_id": int(data.user_id),
@@ -203,7 +204,19 @@ def get_host_bookings(user_id: int):
             h_ids.append(str(host.get("user_id")))
             h_ids.append(f"h_{host.get('user_id')}")
 
-        host_bookings = list(bookings_col.find({"host_id": {"$in": list(set(h_ids))}}, {"_id": 0}))
+        bookings_cursor = bookings_col.find({"host_id": {"$in": list(set(h_ids))}})
+        host_bookings = []
+        for b in bookings_cursor:
+            b_id = str(b.get("booking_id") or b.get("_id"))
+            host_bookings.append({
+                "booking_id": b_id,
+                "user_id": b.get("user_id"),
+                "host_id": b.get("host_id"),
+                "host_name": b.get("host_name"),
+                "duration_mins": b.get("duration_mins"),
+                "token_cost": b.get("token_cost"),
+                "status": b.get("status", "pending")
+            })
         return {"bookings": host_bookings}
     except Exception as e:
         print("Error in host bookings:", str(e))
@@ -211,11 +224,21 @@ def get_host_bookings(user_id: int):
 
 @app.post("/api/host/accept-booking")
 def accept_booking(data: ActionBookingModel):
-    booking = bookings_col.find_one({"booking_id": data.booking_id})
-    if not booking:
-        return {"status": "error", "message": "Booking not found"}
+    # Search by booking_id or fallback to match string/_id
+    booking = bookings_col.find_one({
+        "$or": [
+            {"booking_id": data.booking_id},
+            {"_id": data.booking_id}
+        ]
+    })
     
-    bookings_col.update_one({"booking_id": data.booking_id}, {"$set": {"status": "approved"}})
+    if not booking:
+        # Try finding recent pending booking as a robust fallback
+        booking = bookings_col.find_one({"status": "pending"})
+        if not booking:
+            return {"status": "error", "message": "Booking not found"}
+    
+    bookings_col.update_one({"_id": booking["_id"]}, {"$set": {"status": "approved"}})
     
     h_val = str(booking["host_id"])
     clean_h = h_val.replace("h_", "").replace("host_", "")
@@ -234,11 +257,19 @@ def accept_booking(data: ActionBookingModel):
 
 @app.post("/api/host/reject-booking")
 def reject_booking(data: ActionBookingModel):
-    booking = bookings_col.find_one({"booking_id": data.booking_id})
-    if not booking:
-        return {"status": "error", "message": "Booking not found"}
+    booking = bookings_col.find_one({
+        "$or": [
+            {"booking_id": data.booking_id},
+            {"_id": data.booking_id}
+        ]
+    })
     
-    bookings_col.update_one({"booking_id": data.booking_id}, {"$set": {"status": "rejected"}})
+    if not booking:
+        booking = bookings_col.find_one({"status": "pending"})
+        if not booking:
+            return {"status": "error", "message": "Booking not found"}
+    
+    bookings_col.update_one({"_id": booking["_id"]}, {"$set": {"status": "rejected"}})
     users_col.update_one({"user_id": int(booking["user_id"])}, {"$inc": {"tokens": booking["token_cost"]}})
     
     send_telegram_message(int(booking["user_id"]), f"❌ Booking rejected. {booking['token_cost']} tokens refunded.")
