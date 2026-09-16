@@ -520,6 +520,7 @@
             startBookingStatusPoller();
         }
 
+        // POLLER WITH LOCALSTORAGE PROTECTION TO PREVENT OLD BOOKINGS FROM RINGING AGAIN
         function startBookingStatusPoller() {
             if (bookingCheckInterval) clearInterval(bookingCheckInterval);
             bookingCheckInterval = setInterval(async () => {
@@ -529,8 +530,9 @@
                     if (data.bookings) {
                         const approvedBooking = data.bookings.find(b => b.status === 'approved');
                         if (approvedBooking && !document.getElementById('video-call-screen').classList.contains('active')) {
-                            if (window.lastNotifiedBookingId !== approvedBooking.booking_id) {
-                                window.lastNotifiedBookingId = approvedBooking.booking_id;
+                            const handledKey = 'handled_call_' + approvedBooking.booking_id;
+                            // Check if this booking was already handled/rung on this device
+                            if (!localStorage.getItem(handledKey)) {
                                 pendingApprovedBooking = approvedBooking;
                                 showWhatsAppIncomingCall(approvedBooking);
                             }
@@ -548,12 +550,18 @@
 
         function declineWhatsAppCall() {
             document.getElementById('whatsapp-call-screen').classList.remove('active');
+            if (pendingApprovedBooking) {
+                localStorage.setItem('handled_call_' + pendingApprovedBooking.booking_id, 'declined');
+            }
         }
 
         function answerWhatsAppCall() {
             document.getElementById('whatsapp-call-screen').classList.remove('active');
             if (pendingApprovedBooking) {
-                // Timer starts HERE precisely when call is answered & joined
+                // Mark as handled so it never rings again for this booking
+                localStorage.setItem('handled_call_' + pendingApprovedBooking.booking_id, 'answered');
+                
+                // Timer starts precisely when call is answered & joined
                 startCallWithTimer(
                     pendingApprovedBooking.channel_name || ("private_call_" + userId),
                     pendingApprovedBooking.host_name,
