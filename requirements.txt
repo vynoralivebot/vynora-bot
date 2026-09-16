@@ -2,5 +2,6 @@ fastapi
 uvicorn
 pymongo
 requests
-python-multipart
 agora-token-builder
+python-multipart
+pydantic
