@@ -99,6 +99,12 @@
         .modal-card { background: #130E26; border-top: 1px solid var(--card-border); border-radius: 24px 24px 0 0; width: 100%; max-width: 480px; padding: 20px; max-height: 88vh; overflow-y: auto; }
         .input-box { width: 100%; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--card-border); padding: 12px; border-radius: 12px; color: white; margin-bottom: 10px; outline: none; }
 
+        /* INCOMING CALL POPUP OVERLAY */
+        #incoming-call-overlay { position: fixed; inset: 0; background: rgba(10, 7, 20, 0.92); backdrop-filter: blur(15px); z-index: 99999; display: none; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 24px; }
+        #incoming-call-overlay.active { display: flex; }
+        .ring-avatar { width: 100px; height: 100px; border-radius: 50%; border: 3px solid #00F5D4; object-fit: cover; margin-bottom: 16px; animation: pulseRing 1.5s infinite; }
+        @keyframes pulseRing { 0% { box-shadow: 0 0 0 0 rgba(0, 245, 212, 0.5); } 70% { box-shadow: 0 0 0 20px rgba(0, 245, 212, 0); } 100% { box-shadow: 0 0 0 0 rgba(0, 245, 212, 0); } }
+
         #video-call-screen { position: fixed; inset: 0; width: 100vw; height: 100vh; background: #000; z-index: 999; display: none; flex-direction: column; }
         #video-call-screen.active { display: flex; }
         #main-video-view { position: absolute; inset: 0; width: 100vw; height: 100vh; object-fit: cover; z-index: 1; }
@@ -135,6 +141,17 @@
     </style>
 </head>
 <body>
+
+    <!-- INCOMING CALL POPUP (WHATSAPP STYLE NOTIFICATION) -->
+    <div id="incoming-call-overlay">
+        <img id="incoming-host-img" src="" class="ring-avatar">
+        <h3 style="font-size: 1.3rem; margin-bottom: 6px;">📞 Private Video Call</h3>
+        <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 24px;">Host <b id="incoming-host-name" style="color:white;"></b> has accepted your booking!</p>
+        <div style="display: flex; gap: 16px; width: 100%; max-width: 300px;">
+            <button onclick="dismissIncomingPopup()" style="flex:1; background: rgba(255,255,255,0.1); border: 1px solid var(--card-border); color: white; padding: 12px; border-radius: 14px; font-weight: 700; cursor: pointer;">Later</button>
+            <button onclick="acceptIncomingCall()" style="flex:1; background: #00F5D4; color: #000; border: none; padding: 12px; border-radius: 14px; font-weight: 800; cursor: pointer; box-shadow: 0 4px 15px rgba(0,245,212,0.4);">Join Call 🚀</button>
+        </div>
+    </div>
 
     <header class="app-header">
         <div class="brand-logo"><i class="fa-solid fa-bolt" style="color:#FF007A;"></i> Vynora Live</div>
@@ -202,7 +219,7 @@
         <div class="action-icon-grid" id="profile-action-grid"></div>
     </div>
 
-    <!-- HOST BOOKINGS MODAL WITH ACCEPT/REJECT BUTTONS -->
+    <!-- HOST BOOKINGS MODAL -->
     <div class="modal-overlay" id="host-bookings-modal">
         <div class="modal-card">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
@@ -398,8 +415,10 @@
         let agoraClient = null;
         let localTracks = { audioTrack: null, videoTrack: null };
         let chatInterval = null;
+        let bookingCheckInterval = null;
         let isMainViewLocal = false;
         let callTimerInterval = null;
+        let pendingApprovedBooking = null;
 
         async function initData() {
             try {
@@ -472,6 +491,52 @@
             } catch(e) {}
 
             fetchHosts();
+            startBookingStatusPoller();
+        }
+
+        // POLLER TO CHECK FOR APPROVED BOOKINGS AND TRIGGER INCOMING CALL POPUP
+        function startBookingStatusPoller() {
+            if (bookingCheckInterval) clearInterval(bookingCheckInterval);
+            bookingCheckInterval = setInterval(async () => {
+                try {
+                    const res = await fetch(`/api/user/bookings/${userId}`);
+                    const data = await res.json();
+                    if (data.bookings) {
+                        // Find any approved booking that hasn't been joined yet
+                        const approvedBooking = data.bookings.find(b => b.status === 'approved');
+                        if (approvedBooking && !document.getElementById('video-call-screen').classList.contains('active')) {
+                            // Check if this specific booking popup hasn't been shown recently
+                            if (window.lastNotifiedBookingId !== approvedBooking.booking_id) {
+                                window.lastNotifiedBookingId = approvedBooking.booking_id;
+                                pendingApprovedBooking = approvedBooking;
+                                showIncomingCallPopup(approvedBooking);
+                            }
+                        }
+                    }
+                } catch(e) {}
+            }, 3000);
+        }
+
+        function showIncomingCallPopup(b) {
+            document.getElementById('incoming-host-name').innerText = b.host_name;
+            document.getElementById('incoming-host-img').src = b.host_img || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop";
+            document.getElementById('incoming-call-overlay').classList.add('active');
+        }
+
+        function dismissIncomingPopup() {
+            document.getElementById('incoming-call-overlay').classList.remove('active');
+        }
+
+        function acceptIncomingCall() {
+            document.getElementById('incoming-call-overlay').classList.remove('active');
+            if (pendingApprovedBooking) {
+                joinApprovedPrivateCall(
+                    pendingApprovedBooking.host_name, 
+                    pendingApprovedBooking.host_img, 
+                    pendingApprovedBooking.host_user_id || 0, 
+                    pendingApprovedBooking.duration_mins
+                );
+            }
         }
 
         async function fetchHosts() {
@@ -613,6 +678,7 @@
 
         function joinApprovedPrivateCall(hostName, hostImg, hostUserId, durationMins) {
             closeModal('user-bookings-modal');
+            dismissIncomingPopup();
             document.getElementById('live-active-name').innerText = hostName;
             document.getElementById('live-active-img').src = hostImg || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop";
             document.getElementById('live-host-rate').innerText = "Private";
