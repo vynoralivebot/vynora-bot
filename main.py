@@ -250,7 +250,14 @@ def accept_booking(data: ActionBookingModel):
     if host and "user_id" in host:
         users_col.update_one({"user_id": int(host["user_id"])}, {"$inc": {"earnings": booking["token_cost"]}}, upsert=True)
     
-    send_telegram_message(int(booking["user_id"]), "🎉 <b>Host accepted your booking!</b> Go to 'My Bookings' in the app to join.")
+    # Send interactive Telegram notification with WebApp join button
+    webapp_url = "https://vynora-bot.onrender.com/static/index.html"
+    user_keyboard = {
+        "inline_keyboard": [
+            [{"text": "📞 Join Call Now", "web_app": {"url": webapp_url}}]
+        ]
+    }
+    send_telegram_message(int(booking["user_id"]), f"🎉 <b>Host accepted your booking!</b>\nTap below to join your private video call.", reply_markup=user_keyboard)
     return {"status": "success", "message": "Booking accepted successfully!"}
 
 @app.post("/api/host/reject-booking")
@@ -270,7 +277,7 @@ def reject_booking(data: ActionBookingModel):
     bookings_col.update_one({"_id": booking["_id"]}, {"$set": {"status": "rejected"}})
     users_col.update_one({"user_id": int(booking["user_id"])}, {"$inc": {"tokens": booking["token_cost"]}})
     
-    send_telegram_message(int(booking["user_id"]), f"❌ Booking rejected. {booking['token_cost']} tokens refunded.")
+    send_telegram_message(int(booking["user_id"]), f"❌ Booking rejected by host. {booking['token_cost']} tokens refunded to your wallet.")
     return {"status": "success", "message": "Booking rejected and tokens refunded!"}
 
 @app.get("/api/user/bookings/{user_id}")
@@ -427,7 +434,10 @@ async def telegram_webhook(req: Request):
                 })
                 if host and "user_id" in host:
                     users_col.update_one({"user_id": int(host["user_id"])}, {"$inc": {"earnings": booking["token_cost"]}}, upsert=True)
-                send_telegram_message(int(booking["user_id"]), "🎉 <b>Host accepted your booking!</b> Go to 'My Bookings' in the app to join.")
+                
+                webapp_url = "https://vynora-bot.onrender.com/static/index.html"
+                user_keyboard = {"inline_keyboard": [[{"text": "📞 Join Call Now", "web_app": {"url": webapp_url}}]]}
+                send_telegram_message(int(booking["user_id"]), "🎉 <b>Host accepted your booking!</b> Tap below to join.", reply_markup=user_keyboard)
                 requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": "✅ Booking Accepted"})
 
         elif data_str.startswith("reject_bk_"):
