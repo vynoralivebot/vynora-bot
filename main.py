@@ -51,6 +51,10 @@ class HostRegisterModel(BaseModel):
     img: str
     bio: str
 
+class UpdateRateModel(BaseModel):
+    user_id: int
+    rate: int
+
 class BookingModel(BaseModel):
     user_id: int
     host_id: str
@@ -113,11 +117,19 @@ def toggle_host_live(user_id: int):
             {"_id": f"host_{user_id}"}
         ]
     })
-    if not host:
-        return {"status": "error", "message": "Host not found"}
+    if not host or host.get("status") != "approved":
+        return {"status": "error", "message": "Host not found or not approved"}
     new_status = not host.get("is_online", False)
     hosts_col.update_one({"_id": host["_id"]}, {"$set": {"is_online": new_status}})
     return {"status": "success", "is_online": new_status}
+
+@app.post("/api/host/update-rate")
+def update_host_rate(data: UpdateRateModel):
+    host = hosts_col.find_one({"user_id": int(data.user_id), "status": "approved"})
+    if not host:
+        return {"status": "error", "message": "Approved host not found"}
+    hosts_col.update_one({"user_id": int(data.user_id)}, {"$set": {"rate": data.rate}})
+    return {"status": "success", "message": "Call rate updated successfully!"}
 
 @app.get("/api/hosts")
 def get_hosts():
@@ -309,14 +321,23 @@ def get_user_bookings(user_id: int):
 @app.post("/api/register-host")
 def register_host(data: HostRegisterModel):
     host_data = data.dict()
-    host_data["status"] = "approved"
+    host_data["status"] = "pending"  # Manual approval required
     host_data["id"] = f"h_{data.user_id}"
     host_data["_id"] = f"host_{data.user_id}"
     host_data["user_id"] = int(data.user_id)
-    host_data["is_online"] = True
+    host_data["is_online"] = False
     hosts_col.update_one({"user_id": int(data.user_id)}, {"$set": host_data}, upsert=True)
-    send_telegram_message(GROUP_1_ID, f"📹 <b>New Host Registered!</b>\nName: {data.name}\nRate: {data.rate} Tokens/min")
-    return {"status": "success", "message": "Host registered successfully and approved!"}
+    
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {"text": "✅ Approve Host", "callback_data": f"approve_host_{data.user_id}"},
+                {"text": "❌ Reject Host", "callback_data": f"reject_host_{data.user_id}"}
+            ]
+        ]
+    }
+    send_telegram_message(GROUP_1_ID, f"📹 <b>New Host Application!</b>\nName: {data.name}\nAge: {data.age}\nRate: {data.rate} Tokens/min\nID: <code>{data.user_id}</code>", reply_markup=keyboard)
+    return {"status": "success", "message": "Host registered successfully! Waiting for admin approval."}
 
 @app.post("/api/recharge")
 async def recharge(user_id: int = Form(...), amount_inr: int = Form(...), utr_number: str = Form(...), screenshot: UploadFile = File(...)):
@@ -330,6 +351,11 @@ async def recharge(user_id: int = Form(...), amount_inr: int = Form(...), utr_nu
 
 @app.post("/api/withdraw")
 def withdraw_earnings(data: WithdrawModel):
+    # Only approved hosts can withdraw
+    host = hosts_col.find_one({"user_id": int(data.user_id), "status": "approved"})
+    if not host:
+        return {"status": "error", "message": "Withdrawal option is only available for approved hosts!"}
+
     user = users_col.find_one({"user_id": int(data.user_id)})
     if not user or user.get("earnings", 0) < data.tokens:
         return {"status": "error", "message": "Insufficient earnings balance!"}
@@ -406,7 +432,22 @@ async def telegram_webhook(req: Request):
         message_id = callback["message"]["message_id"]
         chat_id = callback["message"]["chat"]["id"]
 
-        if data_str.startswith("approve_rc_"):
+        # Host Approval / Rejection Callback
+        if data_str.startswith("approve_host_"):
+            host_user_id = int(data_str.replace("approve_host_", ""))
+            hosts_col.update_one({"user_id": host_user_id}, {"$set": {"status": "approved", "is_online": True}})
+            send_telegram_message(host_user_id, "🎉 <b>Congratulations!</b> Your host application has been approved by the admin.")
+            send_telegram_message(GROUP_3_ID, f"✅ <b>Host Approved!</b> Host ID: <code>{host_user_id}</code> is now active.")
+            requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": "✅ Host Approved Successfully"})
+
+        elif data_str.startswith("reject_host_"):
+            host_user_id = int(data_str.replace("reject_host_", ""))
+            hosts_col.update_one({"user_id": host_user_id}, {"$set": {"status": "rejected"}})
+            send_telegram_message(host_user_id, "❌ Your host application was rejected by the admin.")
+            requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": "❌ Host Application Rejected"})
+
+        # Recharge Approval / Rejection Callback
+        elif data_str.startswith("approve_rc_"):
             recharge_id = data_str.replace("approve_rc_", "")
             rc = recharges_col.find_one({"recharge_id": recharge_id})
             if rc and rc["status"] == "pending":
@@ -415,6 +456,7 @@ async def telegram_webhook(req: Request):
                 tokens = rc["tokens_expected"]
                 users_col.update_one({"user_id": u_id}, {"$inc": {"tokens": tokens}}, upsert=True)
                 send_telegram_message(u_id, f"🎉 <b>Recharge Approved!</b> +{tokens} Tokens added.")
+                send_telegram_message(GROUP_3_ID, f"💳 <b>Recharge Approved & Verified!</b>\nUser ID: <code>{u_id}</code>\nAmount: ₹{rc.get('amount_inr')}\nTokens: +{tokens}\nUTR: <code>{rc.get('utr_number')}</code>")
                 requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": "✅ Recharge Approved Successfully"})
 
         elif data_str.startswith("reject_rc_"):
@@ -422,6 +464,7 @@ async def telegram_webhook(req: Request):
             recharges_col.update_one({"recharge_id": recharge_id}, {"$set": {"status": "rejected"}})
             requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": "❌ Recharge Rejected"})
 
+        # Booking Accept / Reject Callback
         elif data_str.startswith("accept_bk_"):
             booking_id = data_str.replace("accept_bk_", "")
             booking = bookings_col.find_one({"booking_id": booking_id})
