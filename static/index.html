@@ -99,11 +99,11 @@
         .modal-card { background: #130E26; border-top: 1px solid var(--card-border); border-radius: 24px 24px 0 0; width: 100%; max-width: 480px; padding: 20px; max-height: 88vh; overflow-y: auto; }
         .input-box { width: 100%; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--card-border); padding: 12px; border-radius: 12px; color: white; margin-bottom: 10px; outline: none; }
 
-        /* INCOMING CALL POPUP */
-        #incoming-call-overlay { position: fixed; inset: 0; background: rgba(10, 7, 20, 0.92); backdrop-filter: blur(15px); z-index: 99999; display: none; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 24px; }
-        #incoming-call-overlay.active { display: flex; }
-        .ring-avatar { width: 100px; height: 100px; border-radius: 50%; border: 3px solid #00F5D4; object-fit: cover; margin-bottom: 16px; animation: pulseRing 1.5s infinite; }
-        @keyframes pulseRing { 0% { box-shadow: 0 0 0 0 rgba(0, 245, 212, 0.5); } 70% { box-shadow: 0 0 0 20px rgba(0, 245, 212, 0); } 100% { box-shadow: 0 0 0 0 rgba(0, 245, 212, 0); } }
+        /* WHATSAPP STYLE INCOMING CALL SCREEN */
+        #whatsapp-call-screen { position: fixed; inset: 0; background: linear-gradient(135deg, #0A0714 0%, #1a0b2e 100%); z-index: 99999; display: none; flex-direction: column; justify-content: space-between; align-items: center; padding: 50px 20px; text-align: center; }
+        #whatsapp-call-screen.active { display: flex; }
+        .wa-avatar { width: 120px; height: 120px; border-radius: 50%; border: 4px solid #00F5D4; object-fit: cover; margin-bottom: 20px; animation: pulseRing 1.5s infinite; }
+        @keyframes pulseRing { 0% { box-shadow: 0 0 0 0 rgba(0, 245, 212, 0.6); } 70% { box-shadow: 0 0 0 25px rgba(0, 245, 212, 0); } 100% { box-shadow: 0 0 0 0 rgba(0, 245, 212, 0); } }
 
         #video-call-screen { position: fixed; inset: 0; width: 100vw; height: 100vh; background: #000; z-index: 999; display: none; flex-direction: column; }
         #video-call-screen.active { display: flex; }
@@ -142,14 +142,27 @@
 </head>
 <body>
 
-    <!-- INCOMING CALL POPUP FOR USER -->
-    <div id="incoming-call-overlay">
-        <img id="incoming-host-img" src="" class="ring-avatar">
-        <h3 style="font-size: 1.3rem; margin-bottom: 6px;">📞 Private Video Call</h3>
-        <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 24px;">Host <b id="incoming-host-name" style="color:white;"></b> accepted your booking!</p>
-        <div style="display: flex; gap: 16px; width: 100%; max-width: 300px;">
-            <button onclick="dismissIncomingPopup()" style="flex:1; background: rgba(255,255,255,0.1); border: 1px solid var(--card-border); color: white; padding: 12px; border-radius: 14px; font-weight: 700; cursor: pointer;">Later</button>
-            <button onclick="acceptIncomingCall()" style="flex:1; background: #00F5D4; color: #000; border: none; padding: 12px; border-radius: 14px; font-weight: 800; cursor: pointer; box-shadow: 0 4px 15px rgba(0,245,212,0.4);">Join Call 🚀</button>
+    <!-- WHATSAPP STYLE INCOMING CALL SCREEN -->
+    <div id="whatsapp-call-screen">
+        <div>
+            <p style="color: #00F5D4; font-size: 0.8rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 25px;">Incoming Video Call</p>
+            <img id="wa-caller-img" src="" class="wa-avatar">
+            <h2 id="wa-caller-name" style="font-size: 1.6rem; font-weight: 800; color: white; margin-bottom: 6px;">Host Name</h2>
+            <p style="font-size: 0.85rem; color: var(--text-muted);">Vynora Secure 1v1 Call...</p>
+        </div>
+        <div style="display: flex; gap: 50px; justify-content: center; margin-bottom: 40px; width: 100%;">
+            <div onclick="declineWhatsAppCall()" style="display:flex; flex-direction:column; align-items:center; gap:8px; cursor:pointer;">
+                <div style="width: 70px; height: 70px; background: #FF0033; border-radius: 50%; display:flex; align-items:center; justify-content:center; color:white; font-size:1.6rem; box-shadow: 0 4px 20px rgba(255,0,51,0.6);">
+                    <i class="fa-solid fa-phone-slash"></i>
+                </div>
+                <span style="font-size:0.8rem; color:white; font-weight:700;">Decline</span>
+            </div>
+            <div onclick="answerWhatsAppCall()" style="display:flex; flex-direction:column; align-items:center; gap:8px; cursor:pointer;">
+                <div style="width: 70px; height: 70px; background: #00F5D4; border-radius: 50%; display:flex; align-items:center; justify-content:center; color:#000; font-size:1.6rem; box-shadow: 0 4px 20px rgba(0,245,212,0.6); animation: pulseRing 1s infinite;">
+                    <i class="fa-solid fa-phone"></i>
+                </div>
+                <span style="font-size:0.8rem; color:white; font-weight:700;">Accept</span>
+            </div>
         </div>
     </div>
 
@@ -219,11 +232,11 @@
         <div class="action-icon-grid" id="profile-action-grid"></div>
     </div>
 
-    <!-- HOST BOOKINGS MODAL (WITH DIRECT CALL JOIN BUTTON FOR HOST) -->
+    <!-- HOST BOOKINGS MODAL (RECENT BOOKINGS FIRST) -->
     <div class="modal-overlay" id="host-bookings-modal">
         <div class="modal-card">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                <h3>📋 Private Slot Booking Requests</h3>
+                <h3>📋 Recent Booking Requests</h3>
                 <button style="background:none; border:none; color:white; font-size:1.2rem;" onclick="closeModal('host-bookings-modal')">✕</button>
             </div>
             <div id="host-bookings-list" style="max-height: 300px; overflow-y: auto;">
@@ -245,11 +258,11 @@
         </div>
     </div>
 
-    <!-- HISTORY / CALL LOGS MODAL -->
+    <!-- HISTORY / CALL LOGS MODAL (RECENT FIRST) -->
     <div class="modal-overlay" id="history-modal">
         <div class="modal-card">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                <h3>📜 Call & Booking History</h3>
+                <h3>📜 Recent Call History</h3>
                 <button style="background:none; border:none; color:white; font-size:1.2rem;" onclick="closeModal('history-modal')">✕</button>
             </div>
             <div id="history-list-container" style="max-height: 320px; overflow-y: auto;">
@@ -519,7 +532,7 @@
                             if (window.lastNotifiedBookingId !== approvedBooking.booking_id) {
                                 window.lastNotifiedBookingId = approvedBooking.booking_id;
                                 pendingApprovedBooking = approvedBooking;
-                                showIncomingCallPopup(approvedBooking);
+                                showWhatsAppIncomingCall(approvedBooking);
                             }
                         }
                     }
@@ -527,20 +540,21 @@
             }, 3000);
         }
 
-        function showIncomingCallPopup(b) {
-            document.getElementById('incoming-host-name').innerText = b.host_name;
-            document.getElementById('incoming-host-img').src = b.host_img || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop";
-            document.getElementById('incoming-call-overlay').classList.add('active');
+        function showWhatsAppIncomingCall(b) {
+            document.getElementById('wa-caller-name').innerText = b.host_name;
+            document.getElementById('wa-caller-img').src = b.host_img || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop";
+            document.getElementById('whatsapp-call-screen').classList.add('active');
         }
 
-        function dismissIncomingPopup() {
-            document.getElementById('incoming-call-overlay').classList.remove('active');
+        function declineWhatsAppCall() {
+            document.getElementById('whatsapp-call-screen').classList.remove('active');
         }
 
-        function acceptIncomingCall() {
-            document.getElementById('incoming-call-overlay').classList.remove('active');
+        function answerWhatsAppCall() {
+            document.getElementById('whatsapp-call-screen').classList.remove('active');
             if (pendingApprovedBooking) {
-                joinDirectVideoCall(
+                // Timer starts HERE precisely when call is answered & joined
+                startCallWithTimer(
                     pendingApprovedBooking.channel_name || ("private_call_" + userId),
                     pendingApprovedBooking.host_name,
                     pendingApprovedBooking.host_img,
@@ -627,7 +641,7 @@
                                     <button onclick="hostActionBooking('${b.booking_id}', 'reject')" style="background:#FF0033; color:#fff; border:none; padding:6px 10px; border-radius:8px; font-weight:700; cursor:pointer;">Reject</button>
                                 ` : ''}
                                 ${b.status === 'approved' ? `
-                                    <button onclick="joinDirectVideoCall('${b.channel_name}', 'User #${b.user_id}', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop', ${b.duration_mins}, 'publisher')" style="background:var(--accent-cyan); color:#000; border:none; padding:6px 10px; border-radius:8px; font-weight:800; cursor:pointer;">🚀 Join Call</button>
+                                    <button onclick="startCallWithTimer('${b.channel_name}', 'User #${b.user_id}', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop', ${b.duration_mins}, 'publisher')" style="background:var(--accent-cyan); color:#000; border:none; padding:6px 10px; border-radius:8px; font-weight:800; cursor:pointer;">🚀 Call Now</button>
                                 ` : ''}
                             </div>
                         </div>
@@ -653,7 +667,7 @@
                 openHostBookingsModal();
                 if (action === 'accept' && data.channel_name) {
                     closeModal('host-bookings-modal');
-                    joinDirectVideoCall(data.channel_name, "User Private Call", "", 10, "publisher");
+                    startCallWithTimer(data.channel_name, "User Private Call", "", 10, "publisher");
                 }
             } catch(e) {
                 alert("Action failed due to network error.");
@@ -676,7 +690,6 @@
                 let hostData = await hostRes.json();
                 let combinedBookings = [...(data.bookings || []), ...(hostData.bookings || [])];
 
-                // Remove duplicates by booking_id
                 let uniqueMap = new Map();
                 combinedBookings.forEach(b => uniqueMap.set(b.booking_id || b._id, b));
                 let allHistory = Array.from(uniqueMap.values());
@@ -690,7 +703,7 @@
                                 <p style="font-size:0.72rem; color:${h.status === 'approved' ? 'var(--accent-cyan)' : h.status === 'rejected' ? '#FF0033' : 'var(--text-muted)'}; font-weight:700;">Status: ${h.status.toUpperCase()}</p>
                             </div>
                             ${h.status === 'approved' ? `
-                                <button onclick="joinDirectVideoCall('${h.channel_name}', '${h.host_name || 'Partner'}', '${h.host_img || ''}', ${h.duration_mins}, 'publisher')" style="background:rgba(0,245,212,0.15); border:1px solid var(--accent-cyan); color:var(--accent-cyan); padding:6px 10px; border-radius:8px; font-weight:700; cursor:pointer;">Rejoin</button>
+                                <button onclick="startCallWithTimer('${h.channel_name}', '${h.host_name || 'Partner'}', '${h.host_img || ''}', ${h.duration_mins}, 'publisher')" style="background:rgba(0,245,212,0.15); border:1px solid var(--accent-cyan); color:var(--accent-cyan); padding:6px 10px; border-radius:8px; font-weight:700; cursor:pointer;">Rejoin</button>
                             ` : ''}
                         </div>
                     `).join('');
@@ -702,8 +715,9 @@
             }
         }
 
-        function joinDirectVideoCall(channelName, peerName, peerImg, durationMins, role) {
-            dismissIncomingPopup();
+        // TIMER STARTS EXPLICITLY WHEN CALL IS ACCEPTED & CONNECTED
+        function startCallWithTimer(channelName, peerName, peerImg, durationMins, role) {
+            document.getElementById('whatsapp-call-screen').classList.remove('active');
             closeModal('host-bookings-modal');
             closeModal('user-bookings-modal');
             closeModal('history-modal');
