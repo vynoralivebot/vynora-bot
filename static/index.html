@@ -80,11 +80,11 @@
         .icon-card i { font-size: 1.4rem; margin-bottom: 6px; }
         .icon-card p { font-size: 0.72rem; color: var(--text-muted); }
 
-        .plan-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 12px 0; }
+        .plan-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 12px 0; max-height: 180px; overflow-y: auto; }
         .plan-card { background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); padding: 10px 6px; border-radius: 12px; text-align: center; cursor: pointer; }
         .plan-card.active { border-color: #FF007A; background: rgba(255,0,122,0.15); }
-        .plan-amount { font-weight: 800; font-size: 1rem; color: white; }
-        .plan-tokens { font-size: 0.75rem; color: var(--gold); }
+        .plan-amount { font-weight: 800; font-size: 0.95rem; color: white; }
+        .plan-tokens { font-size: 0.7rem; color: var(--gold); }
 
         .qr-box { text-align: center; background: white; padding: 10px; border-radius: 12px; margin: 12px 0; }
         .qr-box img { width: 140px; height: 140px; }
@@ -214,16 +214,16 @@
 
         <div class="wallet-banner-row">
             <div class="wallet-box" onclick="openRechargeModal()">
-                <div><div style="font-size:0.75rem; color:var(--text-muted);">Tokens Balance</div><b style="color:var(--gold);">🪙 <span id="profile-tokens-count">0</span></b></div>
+                <div><div style="font-size:0.75rem; color:var(--text-muted);">Tokens Earned</div><b style="color:var(--gold);">🪙 <span id="profile-tokens-count">0</span></b></div>
                 <i class="fa-solid fa-chevron-right" style="font-size:0.8rem; color:var(--text-muted);"></i>
             </div>
             <div class="wallet-box" onclick="openWithdrawModal()" id="earnings-box" style="display:none;">
-                <div><div style="font-size:0.75rem; color:var(--text-muted);">Total Earnings</div><b style="color:var(--accent-cyan);">💰 <span id="profile-earnings-count">0</span></b></div>
+                <div><div style="font-size:0.75rem; color:var(--text-muted);">Net Payout (70%)</div><b style="color:var(--accent-cyan);">💰 ₹<span id="profile-earnings-count">0</span></b></div>
                 <i class="fa-solid fa-chevron-right" style="font-size:0.8rem; color:var(--text-muted);"></i>
             </div>
         </div>
 
-        <!-- HOST RATE CHANGE SECTION (ONLY FOR APPROVED HOSTS) -->
+        <!-- HOST RATE CHANGE SECTION -->
         <div style="margin-bottom: 16px; display:none; background:rgba(255,255,255,0.04); border:1px solid var(--card-border); padding:14px; border-radius:14px;" id="host-rate-container">
             <h4 style="font-size:0.9rem; margin-bottom:8px; color:var(--gold);">⚙️ Manage Call Rate</h4>
             <div style="display:flex; gap:10px;">
@@ -287,7 +287,7 @@
                 <h3>💸 Withdraw Earnings</h3>
                 <button style="background:none; border:none; color:white; font-size:1.2rem;" onclick="closeModal('withdraw-modal')">✕</button>
             </div>
-            <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:10px;">Available Earnings: 🪙 <span id="withdraw-available-bal">0</span></p>
+            <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:10px;">Available Net Payout (70%): ₹<span id="withdraw-available-bal">0</span></p>
             <input type="text" id="withdraw-upi-input" class="input-box" placeholder="Enter your UPI ID (e.g. okaxis@paytm)">
             <input type="number" id="withdraw-amount-input" class="input-box" placeholder="Enter Tokens to Withdraw">
             <button class="call-btn" style="padding:12px;" onclick="submitWithdrawalRequest()">🚀 Submit Withdrawal Request</button>
@@ -389,7 +389,7 @@
         </div>
     </div>
 
-    <!-- RECHARGE MODAL -->
+    <!-- RECHARGE MODAL (₹50 to ₹2000 Options) -->
     <div class="modal-overlay" id="recharge-modal">
         <div class="modal-card">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
@@ -397,12 +397,15 @@
                 <button style="background:none; border:none; color:white; font-size:1.2rem;" onclick="closeModal('recharge-modal')">✕</button>
             </div>
             <div class="plan-grid">
-                <div class="plan-card active" onclick="selectPlan(100, this)"><div class="plan-amount">₹100</div><div class="plan-tokens">100 Tokens</div></div>
+                <div class="plan-card active" onclick="selectPlan(50, this)"><div class="plan-amount">₹50</div><div class="plan-tokens">50 Tokens</div></div>
+                <div class="plan-card" onclick="selectPlan(100, this)"><div class="plan-amount">₹100</div><div class="plan-tokens">100 Tokens</div></div>
                 <div class="plan-card" onclick="selectPlan(200, this)"><div class="plan-amount">₹200</div><div class="plan-tokens">200 Tokens</div></div>
                 <div class="plan-card" onclick="selectPlan(500, this)"><div class="plan-amount">₹500</div><div class="plan-tokens">550 Tokens</div></div>
+                <div class="plan-card" onclick="selectPlan(1000, this)"><div class="plan-amount">₹1000</div><div class="plan-tokens">1150 Tokens</div></div>
+                <div class="plan-card" onclick="selectPlan(2000, this)"><div class="plan-amount">₹2000</div><div class="plan-tokens">2400 Tokens</div></div>
             </div>
             <div class="qr-box">
-                <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=vynoralive@slc&pn=RajnishKumar" id="upi-qr-img">
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=vynoralive@slc&pn=RajnishKumar&am=50" id="upi-qr-img">
                 <p style="font-size:0.75rem; color:#666; margin-top:4px;">UPI ID: <b>vynoralive@slc</b></p>
             </div>
             
@@ -443,7 +446,7 @@
         const telegramPhoto = tg?.initDataUnsafe?.user?.photo_url || "";
         
         let userTokens = 0;
-        let selectedAmount = 100;
+        let selectedAmount = 50;
         let selectedHostObj = null;
         let allHostsList = [];
 
@@ -466,8 +469,8 @@
                 const data = await res.json();
                 userTokens = data.tokens || 0;
                 document.getElementById('user-token-bal').innerText = userTokens;
-                document.getElementById('profile-tokens-count').innerText = userTokens;
-                document.getElementById('profile-earnings-count').innerText = data.earnings || 0;
+                document.getElementById('profile-tokens-count').innerText = data.earnings || 0;
+                document.getElementById('profile-earnings-count').innerText = data.net_earnings_inr || 0;
 
                 const avatarImg = data.avatar || telegramPhoto || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop";
                 document.getElementById('profile-avatar-img').src = avatarImg;
@@ -672,7 +675,8 @@
                             <div>
                                 <p style="font-size:0.85rem; font-weight:700; color:white;">User ID: ${b.user_id}</p>
                                 <p style="font-size:0.75rem; color:var(--gold);">⏱️ ${b.duration_mins} Mins | 🪙 ${b.token_cost} Tokens</p>
-                                <p style="font-size:0.75rem; color:${b.status === 'approved' ? 'var(--accent-cyan)' : b.status === 'rejected' ? '#FF0033' : 'var(--text-muted)'}; font-weight:700;">Status: ${b.status.toUpperCase()}</p>
+                                <p style="font-size:0.7rem; color:var(--text-muted);">📅 ${b.formatted_time || ''}</p>
+                                <p style="font-size:0.75rem; color:${b.status === 'approved' ? 'var(--accent-cyan)' : b.status === 'rejected' ? '#FF0033' : b.status === 'expired' ? '#FFA500' : 'var(--text-muted)'}; font-weight:700;">Status: ${b.status.toUpperCase()}</p>
                             </div>
                             <div style="display:flex; gap:6px;">
                                 ${b.status === 'pending' ? `
@@ -681,7 +685,7 @@
                                 ` : ''}
                                 ${b.status === 'approved' ? `
                                     <button onclick="pendingApprovedBooking = {booking_id: '${b.booking_id}', channel_name: '${b.channel_name}', host_name: 'User #${b.user_id}', host_img: '', duration_mins: ${b.duration_mins}}; startCallWithTimer('${b.channel_name}', 'User #${b.user_id}', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop', ${b.duration_mins}, 'publisher')" style="background:var(--accent-cyan); color:#000; border:none; padding:6px 10px; border-radius:8px; font-weight:800; cursor:pointer;">🚀 Call Now</button>
-                                ` : `<span style="font-size:0.75rem; color:var(--text-muted);">Completed</span>`}
+                                ` : `<span style="font-size:0.75rem; color:var(--text-muted);">${b.status.charAt(0).toUpperCase() + b.status.slice(1)}</span>`}
                             </div>
                         </div>
                     `).join('');
@@ -740,11 +744,12 @@
                             <div>
                                 <p style="font-size:0.88rem; font-weight:700; color:white;">Call with: ${h.host_name || 'User #' + h.user_id}</p>
                                 <p style="font-size:0.75rem; color:var(--gold);">⏱️ Duration: ${h.duration_mins} Mins | 🪙 Cost: ${h.token_cost} Tokens</p>
-                                <p style="font-size:0.72rem; color:${h.status === 'approved' ? 'var(--accent-cyan)' : h.status === 'rejected' ? '#FF0033' : 'var(--text-muted)'}; font-weight:700;">Status: ${h.status.toUpperCase()}</p>
+                                <p style="font-size:0.7rem; color:var(--text-muted);">📅 ${h.formatted_time || ''}</p>
+                                <p style="font-size:0.72rem; color:${h.status === 'approved' ? 'var(--accent-cyan)' : h.status === 'rejected' ? '#FF0033' : h.status === 'expired' ? '#FFA500' : 'var(--text-muted)'}; font-weight:700;">Status: ${h.status.toUpperCase()}</p>
                             </div>
                             ${h.status === 'approved' ? `
                                 <button onclick="pendingApprovedBooking = {booking_id: '${h.booking_id || h._id}', channel_name: '${h.channel_name}', host_name: '${h.host_name || 'Partner'}', host_img: '${h.host_img || ''}', duration_mins: ${h.duration_mins}}; startCallWithTimer('${h.channel_name}', '${h.host_name || 'Partner'}', '${h.host_img || ''}', ${h.duration_mins}, 'publisher')" style="background:rgba(0,245,212,0.15); border:1px solid var(--accent-cyan); color:var(--accent-cyan); padding:6px 10px; border-radius:8px; font-weight:700; cursor:pointer;">Rejoin</button>
-                            ` : `<span style="font-size:0.75rem; color:var(--text-muted);">Completed</span>`}
+                            ` : `<span style="font-size:0.75rem; color:var(--text-muted);">${h.status.charAt(0).toUpperCase() + h.status.slice(1)}</span>`}
                         </div>
                     `).join('');
                 } else {
@@ -937,7 +942,6 @@
             const timerBadge = document.getElementById('call-timer-badge');
             if (timerBadge) timerBadge.remove();
 
-            // Mark booking as completed so it won't show Rejoin or ring again
             if (pendingApprovedBooking && pendingApprovedBooking.booking_id) {
                 try {
                     await fetch('/api/complete-booking', {
@@ -1109,7 +1113,12 @@
         function openRechargeModal() { document.getElementById('recharge-modal').classList.add('active'); }
         function closeModal(id) { document.getElementById(id).classList.remove('active'); }
         function openHostRegistrationModal() { document.getElementById('host-reg-modal').classList.add('active'); }
-        function openSupportLink() { window.open("https://t.me/video_call_grou", "_blank"); }
+        
+        // Updated Support & Policy Link with detailed rules for both hosts and users
+        function openSupportLink() {
+            alert("📋 VYNORA LIVE POLICIES & SUPPORT:\n\n1. 🎥 HOST RULES: Approved hosts must stay online and accept private call requests within 10 minutes.\n2. 💸 PAYMENT POLICY: Withdrawals are processed via UPI for approved hosts (30% platform fee deducted automatically).\n3. 👤 USER POLICY: For recharges, upload valid UTR & screenshot. If bookings are ignored for 10 mins, tokens are auto-refunded.\n\nNeed help? Contact Admin Support @VynoraSupport");
+            window.open("https://t.me/VynoraSupport", "_blank");
+        }
 
         async function submitHostRegistration() {
             const name = document.getElementById('host-name-input').value.trim();
