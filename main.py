@@ -223,14 +223,14 @@ def get_host_bookings(user_id: int):
             h_ids.append(str(host.get("user_id")))
             h_ids.append(f"h_{host.get('user_id')}")
 
-        # --- AUTO-COMPLETE EXPIRED APPROVED BOOKINGS (HIGH TRAFFIC SAFE) ---
+        # --- ROBUST AUTO-COMPLETE (HANDLES MISSING OR 0 TIME FIELDS) ---
         now = time.time()
         all_host_bookings = list(bookings_col.find({"host_id": {"$in": list(set(h_ids))}}))
         for b in all_host_bookings:
             if b.get("status") == "approved":
-                start_time = b.get("time", now)
+                start_time = b.get("time") or 0
                 duration_secs = b.get("duration_mins", 1) * 60
-                if now > (start_time + duration_secs + 120):
+                if start_time == 0 or now > (start_time + duration_secs + 120):
                     bookings_col.update_one({"_id": b["_id"]}, {"$set": {"status": "completed"}})
 
         bookings_cursor = bookings_col.find({"host_id": {"$in": list(set(h_ids))}}).sort("time", -1)
@@ -324,13 +324,13 @@ def complete_booking(data: CompleteBookingModel):
 def get_user_bookings(user_id: int):
     try:
         now = time.time()
-        # --- AUTO-COMPLETE EXPIRED APPROVED BOOKINGS (HIGH TRAFFIC SAFE) ---
+        # --- ROBUST AUTO-COMPLETE (HANDLES MISSING OR 0 TIME FIELDS) ---
         user_raw_bookings = list(bookings_col.find({"user_id": int(user_id)}))
         for b in user_raw_bookings:
             if b.get("status") == "approved":
-                start_time = b.get("time", now)
+                start_time = b.get("time") or 0
                 duration_secs = b.get("duration_mins", 1) * 60
-                if now > (start_time + duration_secs + 120):
+                if start_time == 0 or now > (start_time + duration_secs + 120):
                     bookings_col.update_one({"_id": b["_id"]}, {"$set": {"status": "completed"}})
 
         user_bookings = list(bookings_col.find({"user_id": int(user_id)}, {"_id": 0}).sort("time", -1))
@@ -478,7 +478,7 @@ async def telegram_webhook(req: Request):
             host_user_id = int(data_str.replace("reject_host_", ""))
             hosts_col.update_one({"user_id": host_user_id}, {"$set": {"status": "rejected"}})
             send_telegram_message(host_user_id, "❌ Your host application was rejected by the admin.")
-            requests.post(f"{TELEGRAM_API_URL::30}/editMessageText" if hasattr(requests, 'post') else f"{TELEGRAM_API_URL}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": "❌ Host Application Rejected"})
+            requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": "❌ Host Application Rejected"})
 
         elif data_str.startswith("approve_rc_"):
             recharge_id = data_str.replace("approve_rc_", "")
