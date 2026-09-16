@@ -187,27 +187,22 @@
                 <div><div style="font-size:0.75rem; color:var(--text-muted);">Tokens Balance</div><b style="color:var(--gold);">🪙 <span id="profile-tokens-count">0</span></b></div>
                 <i class="fa-solid fa-chevron-right" style="font-size:0.8rem; color:var(--text-muted);"></i>
             </div>
-            <!-- Total Earnings Box (Clickable for Host Withdrawal) -->
             <div class="wallet-box" onclick="openWithdrawModal()" id="earnings-box" style="display:none;">
                 <div><div style="font-size:0.75rem; color:var(--text-muted);">Total Earnings</div><b style="color:var(--accent-cyan);">💰 <span id="profile-earnings-count">0</span></b></div>
                 <i class="fa-solid fa-chevron-right" style="font-size:0.8rem; color:var(--text-muted);"></i>
             </div>
         </div>
 
-        <!-- Host Withdraw Action Button -->
         <div style="margin-bottom: 20px; display:none;" id="withdraw-btn-container">
             <button class="call-btn" style="background: linear-gradient(135deg, #00F5D4 0%, #00B2FF 100%); color: #000;" onclick="openWithdrawModal()">
                 <i class="fa-solid fa-wallet"></i> Withdraw Earnings (UPI)
             </button>
         </div>
 
-        <!-- Action Icon Grid (Dynamic for Host vs User) -->
-        <div class="action-icon-grid" id="profile-action-grid">
-            <!-- Populated dynamically based on Host Status -->
-        </div>
+        <div class="action-icon-grid" id="profile-action-grid"></div>
     </div>
 
-    <!-- HOST BOOKINGS MODAL -->
+    <!-- HOST BOOKINGS MODAL WITH ACCEPT/REJECT BUTTONS -->
     <div class="modal-overlay" id="host-bookings-modal">
         <div class="modal-card">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
@@ -433,7 +428,6 @@
                 const promoBannerCard = document.getElementById('promo-banner-card');
 
                 if (hostData.is_host && hostData.status === "approved") {
-                    // HOST DASHBOARD VIEW (Creator Center hidden, Host options shown)
                     earningsBox.style.display = 'flex';
                     withdrawBtnContainer.style.display = 'block';
                     promoBannerCard.style.display = 'none';
@@ -458,7 +452,6 @@
                         </div>
                     `;
                 } else {
-                    // USER DASHBOARD VIEW (Only My Bookings & Creator Center shown)
                     earningsBox.style.display = 'none';
                     withdrawBtnContainer.style.display = 'none';
                     promoBannerCard.style.display = 'flex';
@@ -544,12 +537,18 @@
                 const data = await res.json();
                 if(data.bookings && data.bookings.length > 0) {
                     listContainer.innerHTML = data.bookings.map(b => `
-                        <div style="background:rgba(255,255,255,0.05); padding:10px; border-radius:10px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+                        <div style="background:rgba(255,255,255,0.05); padding:12px; border-radius:12px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
                             <div>
-                                <p style="font-size:0.85rem; font-weight:700;">User ID: ${b.user_id}</p>
+                                <p style="font-size:0.85rem; font-weight:700; color:white;">User ID: ${b.user_id}</p>
                                 <p style="font-size:0.75rem; color:var(--gold);">⏱️ ${b.duration_mins} Mins | 🪙 ${b.token_cost} Tokens</p>
+                                <p style="font-size:0.75rem; color:${b.status === 'approved' ? 'var(--accent-cyan)' : b.status === 'rejected' ? '#FF0033' : 'var(--text-muted)'}; font-weight:700;">Status: ${b.status.toUpperCase()}</p>
                             </div>
-                            <span style="font-size:0.75rem; color:var(--accent-cyan); font-weight:700;">${b.status.toUpperCase()}</span>
+                            ${b.status === 'pending' ? `
+                                <div style="display:flex; gap:6px;">
+                                    <button onclick="hostActionBooking('${b.booking_id}', 'accept')" style="background:#00F5D4; color:#000; border:none; padding:6px 12px; border-radius:8px; font-weight:700; cursor:pointer;">Accept</button>
+                                    <button onclick="hostActionBooking('${b.booking_id}', 'reject')" style="background:#FF0033; color:#fff; border:none; padding:6px 12px; border-radius:8px; font-weight:700; cursor:pointer;">Reject</button>
+                                </div>
+                            ` : `<span style="font-size:0.75rem; color:var(--text-muted);">${b.status}</span>`}
                         </div>
                     `).join('');
                 } else {
@@ -557,6 +556,22 @@
                 }
             } catch(e) {
                 listContainer.innerHTML = `<p style="text-align:center; color:#FF0033;">Failed to load bookings.</p>`;
+            }
+        }
+
+        async function hostActionBooking(bookingId, action) {
+            try {
+                const endpoint = action === 'accept' ? '/api/host/accept-booking' : '/api/host/reject-booking';
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ booking_id: bookingId })
+                });
+                const data = await res.json();
+                alert(data.message);
+                openHostBookingsModal();
+            } catch(e) {
+                alert("Action failed due to network error.");
             }
         }
 
