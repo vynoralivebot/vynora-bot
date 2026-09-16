@@ -65,6 +65,9 @@ class BookingModel(BaseModel):
 class ActionBookingModel(BaseModel):
     booking_id: str
 
+class CompleteBookingModel(BaseModel):
+    booking_id: str
+
 class GiftModel(BaseModel):
     user_id: int
     host_id: str
@@ -220,6 +223,16 @@ def get_host_bookings(user_id: int):
             h_ids.append(str(host.get("user_id")))
             h_ids.append(f"h_{host.get('user_id')}")
 
+        # --- AUTO-COMPLETE EXPIRED APPROVED BOOKINGS (HIGH TRAFFIC SAFE) ---
+        now = time.time()
+        all_host_bookings = list(bookings_col.find({"host_id": {"$in": list(set(h_ids))}}))
+        for b in all_host_bookings:
+            if b.get("status") == "approved":
+                start_time = b.get("time", now)
+                duration_secs = b.get("duration_mins", 1) * 60
+                if now > (start_time + duration_secs + 120):
+                    bookings_col.update_one({"_id": b["_id"]}, {"$set": {"status": "completed"}})
+
         bookings_cursor = bookings_col.find({"host_id": {"$in": list(set(h_ids))}}).sort("time", -1)
         host_bookings = []
         for b in bookings_cursor:
@@ -294,9 +307,32 @@ def reject_booking(data: ActionBookingModel):
     send_telegram_message(int(booking["user_id"]), f"❌ Booking rejected. {booking['token_cost']} tokens refunded.")
     return {"status": "success", "message": "Booking rejected and tokens refunded!"}
 
+@app.post("/api/complete-booking")
+def complete_booking(data: CompleteBookingModel):
+    booking = bookings_col.find_one({
+        "$or": [
+            {"booking_id": data.booking_id},
+            {"_id": data.booking_id}
+        ]
+    })
+    if booking:
+        bookings_col.update_one({"_id": booking["_id"]}, {"$set": {"status": "completed"}})
+        return {"status": "success", "message": "Booking marked as completed"}
+    return {"status": "error", "message": "Booking not found"}
+
 @app.get("/api/user/bookings/{user_id}")
 def get_user_bookings(user_id: int):
     try:
+        now = time.time()
+        # --- AUTO-COMPLETE EXPIRED APPROVED BOOKINGS (HIGH TRAFFIC SAFE) ---
+        user_raw_bookings = list(bookings_col.find({"user_id": int(user_id)}))
+        for b in user_raw_bookings:
+            if b.get("status") == "approved":
+                start_time = b.get("time", now)
+                duration_secs = b.get("duration_mins", 1) * 60
+                if now > (start_time + duration_secs + 120):
+                    bookings_col.update_one({"_id": b["_id"]}, {"$set": {"status": "completed"}})
+
         user_bookings = list(bookings_col.find({"user_id": int(user_id)}, {"_id": 0}).sort("time", -1))
         for b in user_bookings:
             h_val = str(b.get("host_id"))
@@ -321,7 +357,7 @@ def get_user_bookings(user_id: int):
 @app.post("/api/register-host")
 def register_host(data: HostRegisterModel):
     host_data = data.dict()
-    host_data["status"] = "pending"  # Manual approval required
+    host_data["status"] = "pending"
     host_data["id"] = f"h_{data.user_id}"
     host_data["_id"] = f"host_{data.user_id}"
     host_data["user_id"] = int(data.user_id)
@@ -351,7 +387,6 @@ async def recharge(user_id: int = Form(...), amount_inr: int = Form(...), utr_nu
 
 @app.post("/api/withdraw")
 def withdraw_earnings(data: WithdrawModel):
-    # Only approved hosts can withdraw
     host = hosts_col.find_one({"user_id": int(data.user_id), "status": "approved"})
     if not host:
         return {"status": "error", "message": "Withdrawal option is only available for approved hosts!"}
@@ -432,7 +467,6 @@ async def telegram_webhook(req: Request):
         message_id = callback["message"]["message_id"]
         chat_id = callback["message"]["chat"]["id"]
 
-        # Host Approval / Rejection Callback
         if data_str.startswith("approve_host_"):
             host_user_id = int(data_str.replace("approve_host_", ""))
             hosts_col.update_one({"user_id": host_user_id}, {"$set": {"status": "approved", "is_online": True}})
@@ -444,9 +478,8 @@ async def telegram_webhook(req: Request):
             host_user_id = int(data_str.replace("reject_host_", ""))
             hosts_col.update_one({"user_id": host_user_id}, {"$set": {"status": "rejected"}})
             send_telegram_message(host_user_id, "❌ Your host application was rejected by the admin.")
-            requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": "❌ Host Application Rejected"})
+            requests.post(f"{TELEGRAM_API_URL::30}/editMessageText" if hasattr(requests, 'post') else f"{TELEGRAM_API_URL}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": "❌ Host Application Rejected"})
 
-        # Recharge Approval / Rejection Callback
         elif data_str.startswith("approve_rc_"):
             recharge_id = data_str.replace("approve_rc_", "")
             rc = recharges_col.find_one({"recharge_id": recharge_id})
@@ -464,7 +497,6 @@ async def telegram_webhook(req: Request):
             recharges_col.update_one({"recharge_id": recharge_id}, {"$set": {"status": "rejected"}})
             requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": "❌ Recharge Rejected"})
 
-        # Booking Accept / Reject Callback
         elif data_str.startswith("accept_bk_"):
             booking_id = data_str.replace("accept_bk_", "")
             booking = bookings_col.find_one({"booking_id": booking_id})
@@ -497,22 +529,3 @@ async def telegram_webhook(req: Request):
                 requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": "❌ Booking Rejected"})
 
     return {"ok": True}
-class CompleteBookingModel(BaseModel):
-    booking_id: str
-
-@app.post("/api/complete-booking")
-def complete_booking(data: CompleteBookingModel):
-    booking = bookings_col.find_one({
-        "$or": [
-            {"booking_id": data.booking_id},
-            {"_id": data.booking_id}
-        ]
-    })
-    if booking:
-        bookings_col.update_one({"_id": booking["_id"]}, {"$set": {"status": "completed"}})
-        return {"status": "success", "message": "Booking marked as completed"}
-    return {"status": "error", "message": "Booking not found"}
-@app.get("/api/admin/fix-old-bookings")
-def fix_old_bookings():
-    result = bookings_col.update_many({"status": "approved"}, {"$set": {"status": "completed"}})
-    return {"status": "success", "updated_count": result.modified_count}
