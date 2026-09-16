@@ -147,6 +147,9 @@ def book_slot(data: BookingModel):
     users_col.update_one({"user_id": int(data.user_id)}, {"$inc": {"tokens": -data.token_cost}})
 
     booking_id = str(uuid.uuid4())[:8]
+    clean_host_id = str(data.host_id).replace("h_", "").replace("host_", "")
+    channel_name = f"private_call_{clean_host_id}_{data.user_id}"
+
     booking_doc = {
         "booking_id": booking_id,
         "user_id": int(data.user_id),
@@ -154,11 +157,12 @@ def book_slot(data: BookingModel):
         "host_name": data.host_name,
         "duration_mins": data.duration_mins,
         "token_cost": data.token_cost,
-        "status": "pending"
+        "channel_name": channel_name,
+        "status": "pending",
+        "time": time.time()
     }
     bookings_col.insert_one(booking_doc)
 
-    clean_host_id = str(data.host_id).replace("h_", "").replace("host_", "")
     host = hosts_col.find_one({
         "$or": [
             {"id": data.host_id},
@@ -173,7 +177,7 @@ def book_slot(data: BookingModel):
             keyboard = {
                 "inline_keyboard": [
                     [
-                        {"text": "✅ Accept", "callback_data": f"accept_bk_{booking_id}"},
+                        {"text": "✅ Accept & Join", "callback_data": f"accept_bk_{booking_id}"},
                         {"text": "❌ Reject", "callback_data": f"reject_bk_{booking_id}"}
                     ]
                 ]
@@ -204,7 +208,7 @@ def get_host_bookings(user_id: int):
             h_ids.append(str(host.get("user_id")))
             h_ids.append(f"h_{host.get('user_id')}")
 
-        bookings_cursor = bookings_col.find({"host_id": {"$in": list(set(h_ids))}})
+        bookings_cursor = bookings_col.find({"host_id": {"$in": list(set(h_ids))}}).sort("time", -1)
         host_bookings = []
         for b in bookings_cursor:
             b_id = str(b.get("booking_id") or b.get("_id"))
@@ -215,6 +219,7 @@ def get_host_bookings(user_id: int):
                 "host_name": b.get("host_name"),
                 "duration_mins": b.get("duration_mins"),
                 "token_cost": b.get("token_cost"),
+                "channel_name": b.get("channel_name", f"private_call_{user_id}_{b.get('user_id')}"),
                 "status": b.get("status", "pending")
             })
         return {"bookings": host_bookings}
@@ -250,15 +255,11 @@ def accept_booking(data: ActionBookingModel):
     if host and "user_id" in host:
         users_col.update_one({"user_id": int(host["user_id"])}, {"$inc": {"earnings": booking["token_cost"]}}, upsert=True)
     
-    # Send interactive Telegram notification with WebApp join button
     webapp_url = "https://vynora-bot.onrender.com/static/index.html"
-    user_keyboard = {
-        "inline_keyboard": [
-            [{"text": "📞 Join Call Now", "web_app": {"url": webapp_url}}]
-        ]
-    }
-    send_telegram_message(int(booking["user_id"]), f"🎉 <b>Host accepted your booking!</b>\nTap below to join your private video call.", reply_markup=user_keyboard)
-    return {"status": "success", "message": "Booking accepted successfully!"}
+    user_keyboard = {"inline_keyboard": [[{"text": "📞 Join Video Call", "web_app": {"url": webapp_url}}]]}
+    send_telegram_message(int(booking["user_id"]), f"🎉 <b>Host accepted your booking!</b> Tap below to join your video call.", reply_markup=user_keyboard)
+    
+    return {"status": "success", "message": "Booking accepted successfully!", "channel_name": booking.get("channel_name")}
 
 @app.post("/api/host/reject-booking")
 def reject_booking(data: ActionBookingModel):
@@ -277,13 +278,13 @@ def reject_booking(data: ActionBookingModel):
     bookings_col.update_one({"_id": booking["_id"]}, {"$set": {"status": "rejected"}})
     users_col.update_one({"user_id": int(booking["user_id"])}, {"$inc": {"tokens": booking["token_cost"]}})
     
-    send_telegram_message(int(booking["user_id"]), f"❌ Booking rejected by host. {booking['token_cost']} tokens refunded to your wallet.")
+    send_telegram_message(int(booking["user_id"]), f"❌ Booking rejected. {booking['token_cost']} tokens refunded.")
     return {"status": "success", "message": "Booking rejected and tokens refunded!"}
 
 @app.get("/api/user/bookings/{user_id}")
 def get_user_bookings(user_id: int):
     try:
-        user_bookings = list(bookings_col.find({"user_id": int(user_id)}, {"_id": 0}))
+        user_bookings = list(bookings_col.find({"user_id": int(user_id)}, {"_id": 0}).sort("time", -1))
         for b in user_bookings:
             h_val = str(b.get("host_id"))
             clean_h = h_val.replace("h_", "").replace("host_", "")
@@ -297,6 +298,8 @@ def get_user_bookings(user_id: int):
             if host:
                 b["host_user_id"] = host.get("user_id") or (int(clean_h) if clean_h.isdigit() else 0)
                 b["host_img"] = host.get("img")
+            if not b.get("channel_name"):
+                b["channel_name"] = f"private_call_{clean_h}_{user_id}"
         return {"bookings": user_bookings}
     except Exception as e:
         print("Error in user bookings:", str(e))
@@ -436,9 +439,9 @@ async def telegram_webhook(req: Request):
                     users_col.update_one({"user_id": int(host["user_id"])}, {"$inc": {"earnings": booking["token_cost"]}}, upsert=True)
                 
                 webapp_url = "https://vynora-bot.onrender.com/static/index.html"
-                user_keyboard = {"inline_keyboard": [[{"text": "📞 Join Call Now", "web_app": {"url": webapp_url}}]]}
+                user_keyboard = {"inline_keyboard": [[{"text": "📞 Join Video Call", "web_app": {"url": webapp_url}}]]}
                 send_telegram_message(int(booking["user_id"]), "🎉 <b>Host accepted your booking!</b> Tap below to join.", reply_markup=user_keyboard)
-                requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": "✅ Booking Accepted"})
+                requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": "✅ Booking Accepted & Call Ready"})
 
         elif data_str.startswith("reject_bk_"):
             booking_id = data_str.replace("reject_bk_", "")
@@ -447,6 +450,6 @@ async def telegram_webhook(req: Request):
                 bookings_col.update_one({"booking_id": booking_id}, {"$set": {"status": "rejected"}})
                 users_col.update_one({"user_id": int(booking["user_id"])}, {"$inc": {"tokens": booking["token_cost"]}})
                 send_telegram_message(int(booking["user_id"]), f"❌ Booking rejected. {booking['token_cost']} tokens refunded.")
-                requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": "❌ Booking Rejected & Refunded"})
+                requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": "❌ Booking Rejected"})
 
     return {"ok": True}
