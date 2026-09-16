@@ -57,6 +57,9 @@ class BookingModel(BaseModel):
     duration_mins: int
     token_cost: int
 
+class ActionBookingModel(BaseModel):
+    booking_id: str
+
 class GiftModel(BaseModel):
     user_id: int
     host_id: str
@@ -154,7 +157,6 @@ def book_slot(data: BookingModel):
     }
     bookings_col.insert_one(booking_doc)
 
-    # Safe Host Lookup for Telegram Notification
     clean_host_id = str(data.host_id).replace("h_", "").replace("host_", "")
     host = hosts_col.find_one({
         "$or": [
@@ -206,6 +208,41 @@ def get_host_bookings(user_id: int):
     except Exception as e:
         print("Error in host bookings:", str(e))
         return {"bookings": []}
+
+@app.post("/api/host/accept-booking")
+def accept_booking(data: ActionBookingModel):
+    booking = bookings_col.find_one({"booking_id": data.booking_id})
+    if not booking:
+        return {"status": "error", "message": "Booking not found"}
+    
+    bookings_col.update_one({"booking_id": data.booking_id}, {"$set": {"status": "approved"}})
+    
+    h_val = str(booking["host_id"])
+    clean_h = h_val.replace("h_", "").replace("host_", "")
+    host = hosts_col.find_one({
+        "$or": [
+            {"id": h_val},
+            {"_id": f"host_{clean_h}"},
+            {"user_id": int(clean_h) if clean_h.isdigit() else 0}
+        ]
+    })
+    if host and "user_id" in host:
+        users_col.update_one({"user_id": int(host["user_id"])}, {"$inc": {"earnings": booking["token_cost"]}}, upsert=True)
+    
+    send_telegram_message(int(booking["user_id"]), "🎉 <b>Host accepted your booking!</b> Go to 'My Bookings' in the app to join.")
+    return {"status": "success", "message": "Booking accepted successfully!"}
+
+@app.post("/api/host/reject-booking")
+def reject_booking(data: ActionBookingModel):
+    booking = bookings_col.find_one({"booking_id": data.booking_id})
+    if not booking:
+        return {"status": "error", "message": "Booking not found"}
+    
+    bookings_col.update_one({"booking_id": data.booking_id}, {"$set": {"status": "rejected"}})
+    users_col.update_one({"user_id": int(booking["user_id"])}, {"$inc": {"tokens": booking["token_cost"]}})
+    
+    send_telegram_message(int(booking["user_id"]), f"❌ Booking rejected. {booking['token_cost']} tokens refunded.")
+    return {"status": "success", "message": "Booking rejected and tokens refunded!"}
 
 @app.get("/api/user/bookings/{user_id}")
 def get_user_bookings(user_id: int):
