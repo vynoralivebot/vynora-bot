@@ -223,6 +223,15 @@
             </div>
         </div>
 
+        <!-- HOST RATE CHANGE SECTION (ONLY FOR APPROVED HOSTS) -->
+        <div style="margin-bottom: 16px; display:none; background:rgba(255,255,255,0.04); border:1px solid var(--card-border); padding:14px; border-radius:14px;" id="host-rate-container">
+            <h4 style="font-size:0.9rem; margin-bottom:8px; color:var(--gold);">⚙️ Manage Call Rate</h4>
+            <div style="display:flex; gap:10px;">
+                <input type="number" id="new-call-rate-input" class="input-box" placeholder="New Rate (Tokens/min)" style="margin-bottom:0;">
+                <button class="get-btn" style="background:var(--accent-cyan); color:#000; font-weight:700; white-space:nowrap;" onclick="updateHostRate()">Update Rate</button>
+            </div>
+        </div>
+
         <div style="margin-bottom: 20px; display:none;" id="withdraw-btn-container">
             <button class="call-btn" style="background: linear-gradient(135deg, #00F5D4 0%, #00B2FF 100%); color: #000;" onclick="openWithdrawModal()">
                 <i class="fa-solid fa-wallet"></i> Withdraw Earnings (UPI)
@@ -473,10 +482,12 @@
                 const earningsBox = document.getElementById('earnings-box');
                 const withdrawBtnContainer = document.getElementById('withdraw-btn-container');
                 const promoBannerCard = document.getElementById('promo-banner-card');
+                const hostRateContainer = document.getElementById('host-rate-container');
 
                 if (hostData.is_host && hostData.status === "approved") {
                     earningsBox.style.display = 'flex';
                     withdrawBtnContainer.style.display = 'block';
+                    hostRateContainer.style.display = 'block';
                     promoBannerCard.style.display = 'none';
 
                     const isOnline = hostData.is_online;
@@ -501,6 +512,7 @@
                 } else {
                     earningsBox.style.display = 'none';
                     withdrawBtnContainer.style.display = 'none';
+                    hostRateContainer.style.display = 'none';
                     promoBannerCard.style.display = 'flex';
 
                     actionGrid.innerHTML = `
@@ -520,7 +532,29 @@
             startBookingStatusPoller();
         }
 
-        // POLLER WITH LOCALSTORAGE PROTECTION TO PREVENT OLD BOOKINGS FROM RINGING AGAIN
+        async function updateHostRate() {
+            const newRate = parseInt(document.getElementById('new-call-rate-input').value);
+            if (!newRate || newRate <= 0) return alert("Please enter a valid call rate!");
+
+            try {
+                const res = await fetch('/api/host/update-rate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ user_id: parseInt(userId), rate: newRate })
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    alert('✅ Call rate updated successfully!');
+                    document.getElementById('new-call-rate-input').value = '';
+                    fetchHosts();
+                } else {
+                    alert('❌ ' + (data.message || 'Failed to update rate.'));
+                }
+            } catch(e) {
+                alert('❌ Network error while updating rate.');
+            }
+        }
+
         function startBookingStatusPoller() {
             if (bookingCheckInterval) clearInterval(bookingCheckInterval);
             bookingCheckInterval = setInterval(async () => {
@@ -531,7 +565,6 @@
                         const approvedBooking = data.bookings.find(b => b.status === 'approved');
                         if (approvedBooking && !document.getElementById('video-call-screen').classList.contains('active')) {
                             const handledKey = 'handled_call_' + approvedBooking.booking_id;
-                            // Check if this booking was already handled/rung on this device
                             if (!localStorage.getItem(handledKey)) {
                                 pendingApprovedBooking = approvedBooking;
                                 showWhatsAppIncomingCall(approvedBooking);
@@ -558,10 +591,8 @@
         function answerWhatsAppCall() {
             document.getElementById('whatsapp-call-screen').classList.remove('active');
             if (pendingApprovedBooking) {
-                // Mark as handled so it never rings again for this booking
                 localStorage.setItem('handled_call_' + pendingApprovedBooking.booking_id, 'answered');
                 
-                // Timer starts precisely when call is answered & joined
                 startCallWithTimer(
                     pendingApprovedBooking.channel_name || ("private_call_" + userId),
                     pendingApprovedBooking.host_name,
@@ -723,7 +754,6 @@
             }
         }
 
-        // TIMER STARTS EXPLICITLY WHEN CALL IS ACCEPTED & CONNECTED
         function startCallWithTimer(channelName, peerName, peerImg, durationMins, role) {
             document.getElementById('whatsapp-call-screen').classList.remove('active');
             closeModal('host-bookings-modal');
