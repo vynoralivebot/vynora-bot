@@ -1,7 +1,10 @@
 import os
 import random
-from fastapi import FastAPI, HTTPException, Request
+import shutil
+import uuid
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from pymongo import MongoClient
 import requests
@@ -16,6 +19,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Static folder for direct image uploads
+UPLOAD_DIR = "uploads"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+
 # MongoDB Connection
 MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://cluster0.xxx.mongodb.net/?retryWrites=true&w=majority")
 client = MongoClient(MONGO_URI)
@@ -25,16 +33,12 @@ db = client["vynora_live"]
 ADMIN_IDS = [7001825467, 1108685585]
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "YOUR_BOT_TOKEN")
 TELEGRAM_GROUP_ID = os.getenv("TELEGRAM_GROUP_ID", "YOUR_GROUP_ID")
-WEBAPP_URL = os.getenv("WEBAPP_URL", "https://your-render-url.onrender.com") # Apna WebApp URL yahan daalein
+WEBAPP_URL = os.getenv("WEBAPP_URL", "https://your-render-url.onrender.com")
 
 class UserRegister(BaseModel):
     user_id: int
     username: str
     full_name: str
-
-class DpUpdate(BaseModel):
-    user_id: int
-    dp_url: str
 
 class GameBet(BaseModel):
     user_id: int
@@ -71,14 +75,24 @@ def register_user(data: UserRegister):
         "can_create_room": user.get("can_create_room", False) or user.get("user_id") in ADMIN_IDS
     }
 
+# --- 2. DIRECT FILE UPLOAD DP API ---
 @app.post("/api/update-dp")
-def update_dp(data: DpUpdate):
-    result = db.users.update_one({"user_id": data.user_id}, {"$set": {"dp_url": data.dp_url}})
+async def update_dp(user_id: int = Form(...), file: UploadFile = File(...)):
+    ext = file.filename.split(".")[-1]
+    filename = f"{uuid.uuid4()}.{ext}"
+    filepath = os.path.join(UPLOAD_DIR, filename)
+    
+    with open(filepath, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    dp_url = f"/uploads/{filename}"
+    
+    result = db.users.update_one({"user_id": user_id}, {"$set": {"dp_url": dp_url}})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="User not found")
-    return {"status": "success", "dp_url": data.dp_url}
+    return {"status": "success", "dp_url": dp_url}
 
-# --- 2. 1V1 VIDEO CALL & GROUP NOTIFICATION API ---
+# --- 3. 1V1 VIDEO CALL & GROUP NOTIFICATION API ---
 @app.post("/api/book-call")
 def book_call(data: CallBooking):
     user = db.users.find_one({"user_id": data.user_id})
@@ -113,7 +127,7 @@ def book_call(data: CallBooking):
         
     return {"status": "success", "message": "Call request sent!"}
 
-# --- 3. MINI GAMES API ---
+# --- 4. MINI GAMES API ---
 @app.post("/api/game/play")
 def play_game(data: GameBet):
     user = db.users.find_one({"user_id": data.user_id})
@@ -131,12 +145,11 @@ def play_game(data: GameBet):
     updated_user = db.users.find_one({"user_id": data.user_id})
     return {"won": won, "payout": payout, "new_balance": updated_user["tokens"]}
 
-# --- 4. TELEGRAM BOT WEBHOOK (Start Command, Call Approvals & Admin Controls) ---
+# --- 5. TELEGRAM BOT WEBHOOK ---
 @app.post("/telegram-webhook")
 async def telegram_webhook(request: Request):
     body = await request.json()
     
-    # Handle Callback Queries (Inline buttons like Accept Call)
     if "callback_query" in body:
         cq = body["callback_query"]
         data = cq["data"]
@@ -152,7 +165,6 @@ async def telegram_webhook(request: Request):
             })
         return {"status": "ok"}
 
-    # Handle Text Messages (/start and Admin Commands)
     if "message" in body:
         msg = body["message"]
         chat_id = msg["chat"]["id"]
@@ -162,11 +174,10 @@ async def telegram_webhook(request: Request):
         parts = text.split()
         cmd = parts[0] if parts else ""
         
-        # /start Command (Bot reply with WebApp button)
         if cmd == "/start":
             requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage", json={
                 "chat_id": chat_id,
-                "text": "✨ Welcome to **Vynora Live**! Click the button below to open the app and start exploring live rooms and games:",
+                "text": "✨ Welcome to **Vynora Live**! Click the button below to open the app:",
                 "parse_mode": "Markdown",
                 "reply_markup": {
                     "inline_keyboard": [[
@@ -176,7 +187,6 @@ async def telegram_webhook(request: Request):
             })
             return {"status": "ok"}
         
-        # Admin Commands (Dual Admins Only)
         if user_id in ADMIN_IDS:
             if cmd == "/giveroom" and len(parts) > 1:
                 target_id = int(parts[1])
