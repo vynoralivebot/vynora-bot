@@ -1,267 +1,433 @@
 import os
-import random
-import shutil
+import time
 import uuid
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, UploadFile, File, Form, Request
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from pymongo import MongoClient
 import requests
+import razorpay  # <-- Razorpay imported
+from agora_token_builder import RtcTokenBuilder
+from database import users_col, hosts_col, bookings_col, recharges_col, withdrawals_col, chats_col
 
 app = FastAPI()
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Static folder for direct profile DP uploads
-UPLOAD_DIR = "uploads"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN")
+GROUP_1_ID = os.getenv("GROUP_1_ID", "-100XXXXXXXXXX") 
+GROUP_2_ID = os.getenv("GROUP_2_ID", "-100XXXXXXXXXX") 
+GROUP_3_ID = os.getenv("GROUP_3_ID", "-100XXXXXXXXXX") 
 
-# MongoDB Connection
-MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://cluster0.xxx.mongodb.net/?retryWrites=true&w=majority")
-client = MongoClient(MONGO_URI)
-db = client["vynora_live"]
+# Razorpay Keys (Render Environment Variables mein set karein)
+RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "YOUR_RAZORPAY_KEY_ID")
+RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "YOUR_RAZORPAY_KEY_SECRET")
 
-# Dual Admins Configuration
-ADMIN_IDS = [7001825467, 1108685585]
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "YOUR_BOT_TOKEN")
-TELEGRAM_GROUP_ID = os.getenv("TELEGRAM_GROUP_ID", "YOUR_GROUP_ID")
-WEBAPP_URL = os.getenv("WEBAPP_URL", "https://your-render-url.onrender.com")
+razorpay_client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
 
-# --- AUTOMATIC WEBHOOK SETUP (No manual browser setup needed) ---
+AGORA_APP_ID = os.getenv("AGORA_APP_ID", "YOUR_AGORA_APP_ID")
+AGORA_APP_CERTIFICATE = os.getenv("AGORA_APP_CERTIFICATE", "YOUR_AGORA_CERTIFICATE")
+
+TELEGRAM_API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
+
+def send_telegram_message(chat_id, text, reply_markup=None):
+    payload = {"chat_id": int(chat_id), "text": text, "parse_mode": "HTML"}
+    if reply_markup:
+        payload["reply_markup"] = reply_markup
+    try:
+        res = requests.post(f"{TELEGRAM_API_URL}/sendMessage", json=payload)
+        print("Telegram Response:", res.json())
+    except Exception as e:
+        print("Telegram Error:", e)
+
 @app.on_event("startup")
-def startup_event():
-    if TELEGRAM_BOT_TOKEN and WEBAPP_URL and "your-render-url" not in WEBAPP_URL:
-        webhook_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/setWebhook?url={WEBAPP_URL}/telegram-webhook"
-        try:
-            res = requests.get(webhook_url)
-            print("Automatic Webhook Registration Response:", res.json())
-        except Exception as e:
-            print("Webhook auto-setup error:", e)
+def set_webhook_on_startup():
+    render_url = "https://vynora-bot.onrender.com/telegram-webhook"
+    webhook_api = f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook?url={render_url}"
+    try:
+        requests.get(webhook_api)
+    except Exception as e:
+        print("Webhook setup error:", e)
 
-class GameBet(BaseModel):
+class HostRegisterModel(BaseModel):
     user_id: int
-    bet_amount: int
-    game_type: str
-    choice: str
+    name: str
+    age: int
+    rate: int
+    lang: str
+    loc: str
+    bio: str
 
-class CallBooking(BaseModel):
+class UpdateRateModel(BaseModel):
     user_id: int
-    host_id: int
+    rate: int
 
-class RechargeRequest(BaseModel):
+class BookingModel(BaseModel):
     user_id: int
-    amount: int
-    payment_method: str
+    host_id: str
+    host_name: str
+    duration_mins: int
+    token_cost: int
 
-# --- 1. USER REGISTRATION & HOST LISTING API ---
-@app.post("/api/register")
-async def register_user(request: Request):
-    data = await request.json()
-    user_id = data.get("user_id")
-    username = data.get("username", "user")
-    full_name = data.get("full_name", "User")
-    
-    user = db.users.find_one({"user_id": user_id})
+class ActionBookingModel(BaseModel):
+    booking_id: str
+
+class CompleteBookingModel(BaseModel):
+    booking_id: str
+
+class GiftModel(BaseModel):
+    user_id: int
+    host_id: str
+    gift_cost: int
+    gift_name: str
+    channel: str
+    sender_name: str
+
+class ChatModel(BaseModel):
+    channel: str
+    sender: str
+    text: str
+    type: str = "chat"
+
+class WithdrawModel(BaseModel):
+    user_id: int
+    upi_id: str
+    tokens: int
+
+@app.get("/api/user/{user_id}")
+def get_user(user_id: int):
+    user = users_col.find_one({"user_id": int(user_id)})
+    if user and user.get("is_banned", False):
+        return {"tokens": 0, "earnings": 0, "net_earnings_tokens": 0, "net_earnings_inr": 0, "avatar": "", "is_banned": True}
+        
     if not user:
-        new_user = {
-            "user_id": user_id,
-            "username": username,
-            "full_name": full_name,
-            "tokens": 0,  # Join bonus strictly 0
-            "dp_url": "https://via.placeholder.com/150",
-            "is_banned": False,
-            "is_host": user_id in ADMIN_IDS,
-            "can_create_room": user_id in ADMIN_IDS
-        }
-        db.users.insert_one(new_user)
-        return {"status": "registered", "tokens": 0, "can_create_room": new_user["can_create_room"], "dp_url": new_user["dp_url"], "is_host": new_user["is_host"]}
+        user = {"user_id": int(user_id), "tokens": 0, "earnings": 0, "avatar": "", "is_banned": False}
+        users_col.insert_one(user)
+        send_telegram_message(GROUP_2_ID, f"👤 <b>New User Started Bot!</b>\nID: <code>{user_id}</code>")
     
+    raw_earnings = user.get("earnings", 0)
+    net_earnings_tokens = int(raw_earnings * 0.7)
+    net_earnings_inr = net_earnings_tokens
+
     return {
-        "status": "exists", 
         "tokens": user.get("tokens", 0), 
-        "dp_url": user.get("dp_url", "https://via.placeholder.com/150"), 
-        "can_create_room": user.get("can_create_room", False) or user.get("user_id") in ADMIN_IDS,
-        "is_host": user.get("is_host", False)
+        "earnings": raw_earnings,
+        "net_earnings_tokens": net_earnings_tokens,
+        "net_earnings_inr": net_earnings_inr,
+        "avatar": user.get("avatar", ""),
+        "is_banned": False
     }
+
+@app.get("/api/host/status/{user_id}")
+def get_host_status(user_id: int):
+    host = hosts_col.find_one({
+        "$or": [
+            {"user_id": int(user_id)},
+            {"id": str(user_id)},
+            {"id": f"h_{user_id}"},
+            {"_id": f"host_{user_id}"}
+        ]
+    })
+    if host:
+        return {"is_host": True, "status": host.get("status", "pending"), "is_online": host.get("is_online", False)}
+    return {"is_host": False, "status": "none", "is_online": False}
+
+@app.post("/api/host/toggle-live/{user_id}")
+def toggle_host_live(user_id: int):
+    host = hosts_col.find_one({
+        "$or": [
+            {"user_id": int(user_id)},
+            {"id": str(user_id)},
+            {"id": f"h_{user_id}"},
+            {"_id": f"host_{user_id}"}
+        ]
+    })
+    if not host or host.get("status") != "approved":
+        return {"status": "error", "message": "Host not found or not approved"}
+    new_status = not host.get("is_online", False)
+    hosts_col.update_one({"_id": host["_id"]}, {"$set": {"is_online": new_status}})
+    return {"status": "success", "is_online": new_status}
+
+@app.post("/api/host/update-rate")
+def update_host_rate(data: UpdateRateModel):
+    host = hosts_col.find_one({"user_id": int(data.user_id), "status": "approved"})
+    if not host:
+        return {"status": "error", "message": "Approved host not found"}
+    hosts_col.update_one({"user_id": int(data.user_id)}, {"$set": {"rate": data.rate}})
+    return {"status": "success", "message": "Call rate updated successfully!"}
 
 @app.get("/api/hosts")
 def get_hosts():
-    real_hosts = list(db.users.find({"is_host": True}, {"_id": 0, "user_id": 1, "full_name": 1, "dp_url": 1}))
+    db_hosts = list(hosts_col.find({"status": "approved"}, {"_id": 0}))
     dummy_hosts = [
-        {"user_id": 9991, "full_name": "Pooja Sharma (Dummy)", "dp_url": "https://via.placeholder.com/150", "offline": True},
-        {"user_id": 9992, "full_name": "Anjali Sen (Dummy)", "dp_url": "https://via.placeholder.com/150", "offline": True}
+        {"id": "dummy_1", "user_id": 9991, "name": "Sophia 💎", "age": 22, "rate": 40, "lang": "English", "loc": "UK", "img": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&auto=format&fit=crop", "bio": "International VIP Model ✨", "is_online": True, "is_dummy": True},
+        {"id": "dummy_2", "user_id": 9992, "name": "Ananya 🔥", "age": 21, "rate": 50, "lang": "Hindi", "loc": "Mumbai", "img": "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400&auto=format&fit=crop", "bio": "Bollywood dancer & host 💃", "is_online": True, "is_dummy": True},
+        {"id": "dummy_3", "user_id": 9993, "name": "Elena 👑", "age": 23, "rate": 60, "lang": "French", "loc": "France", "img": "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&auto=format&fit=crop", "bio": "Parisian fashion enthusiast 🌸", "is_online": True, "is_dummy": True},
+        {"id": "dummy_4", "user_id": 9994, "name": "Natasha ✨", "age": 20, "rate": 45, "lang": "Russian", "loc": "Russia", "img": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop", "bio": "Professional singer & artist 🎶", "is_online": True, "is_dummy": True},
+        {"id": "dummy_5", "user_id": 9995, "name": "Priya 💫", "age": 22, "rate": 35, "lang": "Hindi", "loc": "Delhi", "img": "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=400&auto=format&fit=crop", "bio": "Friendly companion & gamer 🎮", "is_online": True, "is_dummy": True}
     ]
-    return {"hosts": real_hosts + dummy_hosts}
+    all_hosts = dummy_hosts + db_hosts
+    for h in all_hosts:
+        if not h.get("id"):
+            h["id"] = f"h_{h.get('user_id')}"
+    return {"hosts": all_hosts}
 
-# --- 2. DIRECT FILE UPLOAD DP API ---
-@app.post("/api/update-dp")
-async def update_dp(user_id: int = Form(...), file: UploadFile = File(...)):
-    ext = file.filename.split(".")[-1]
-    filename = f"{uuid.uuid4()}.{ext}"
-    filepath = os.path.join(UPLOAD_DIR, filename)
-    
-    with open(filepath, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-        
-    dp_url = f"/uploads/{filename}"
-    
-    result = db.users.update_one({"user_id": user_id}, {"$set": {"dp_url": dp_url}})
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="User not found")
-    return {"status": "success", "dp_url": dp_url}
-
-# --- 3. 1V1 VIDEO CALL & GROUP NOTIFICATION API ---
-@app.post("/api/book-call")
-def book_call(data: CallBooking):
-    user = db.users.find_one({"user_id": data.user_id})
-    host = db.users.find_one({"user_id": data.host_id})
-    
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    if user.get("tokens", 0) < 50:
-        raise HTTPException(status_code=400, detail="Insufficient tokens for call (Min 50 required)")
-    
-    host_name = host.get("full_name", "Host") if host else "Host"
-    
-    notification_text = (
-        f"🚨 **New 1v1 Call Request!**\n\n"
-        f"👤 User: {user.get('full_name')} (ID: {data.user_id})\n"
-        f"🎯 Target Host: {host_name} (ID: {data.host_id})\n\n"
-        f"Host please accept the request to start the session."
+@app.get("/api/agora-token")
+def get_agora_token(channelName: str, uid: int, role: str):
+    privilege_expired_ts = int(time.time()) + 3600
+    rtc_role = 1 if role == "publisher" else 2
+    token = RtcTokenBuilder.buildTokenWithUid(
+        AGORA_APP_ID, AGORA_APP_CERTIFICATE, channelName, int(uid), rtc_role, privilege_expired_ts
     )
-    
+    return {"status": "success", "token": token, "appId": AGORA_APP_ID, "channel": channelName, "uid": int(uid)}
+
+# --- RAZORPAY ORDER CREATION ---
+@app.post("/api/create-razorpay-order")
+def create_razorpay_order(data: dict):
+    amount_inr = int(data.get("amount_inr", 50))
+    tokens_expected = amount_inr if amount_inr < 500 else amount_inr + 50
+    amount_paise = amount_inr * 100  # Razorpay accepts amount in paise
+
     try:
-        if TELEGRAM_GROUP_ID and "YOUR_GROUP_ID" not in TELEGRAM_GROUP_ID:
-            requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage", json={
-                "chat_id": TELEGRAM_GROUP_ID,
-                "text": notification_text,
-                "parse_mode": "Markdown",
-                "reply_markup": {
-                    "inline_keyboard": [[
-                        {"text": "✅ Accept Call", "callback_data": f"accept_call_{data.host_id}_{data.user_id}"}
-                    ]]
-                }
-            })
+        order_data = {
+            "amount": amount_paise,
+            "currency": "INR",
+            "payment_capture": 1
+        }
+        order = razorpay_client.order.create(data=order_data)
+        return {
+            "status": "success",
+            "order_id": order["id"],
+            "amount": amount_paise,
+            "key_id": RAZORPAY_KEY_ID,
+            "tokens": tokens_expected
+        }
     except Exception as e:
-        print("Notification error:", e)
-        
-    return {"status": "success", "message": "Call request sent & group notified!"}
+        return {"status": "error", "message": str(e)}
 
-# --- 4. RECHARGE API (UPI & QR) ---
-@app.post("/api/recharge")
-def process_recharge(data: RechargeRequest):
-    tokens_to_add = data.amount * 10
-    db.users.update_one({"user_id": data.user_id}, {"$inc": {"tokens": tokens_to_add}}, upsert=True)
-    updated_user = db.users.find_one({"user_id": data.user_id})
-    return {"status": "success", "new_balance": updated_user["tokens"], "message": f"Successfully recharged via {data.payment_method.upper()}!"}
+# --- RAZORPAY PAYMENT VERIFICATION & TOKEN ADDING ---
+@app.post("/api/verify-razorpay-payment")
+def verify_razorpay_payment(data: dict):
+    user_id = int(data.get("user_id"))
+    tokens = int(data.get("tokens"))
+    payment_id = data.get("payment_id")
+    order_id = data.get("order_id")
 
-# --- 5. MINI GAMES API (Ludo, Car Racing, Spin Wheel, Dice Roll) ---
-@app.post("/api/game/play")
-def play_game(data: GameBet):
-    user = db.users.find_one({"user_id": data.user_id})
-    if not user or user.get("tokens", 0) < data.bet_amount:
-        raise HTTPException(status_code=400, detail="Insufficient tokens")
+    # Add tokens automatically to user account
+    users_col.update_one({"user_id": user_id}, {"$inc": {"tokens": tokens}}, upsert=True)
     
-    db.users.update_one({"user_id": data.user_id}, {"$inc": {"tokens": -data.bet_amount}})
-    
-    won = random.choice([True, False])
-    payout = 0
-    if won:
-        payout = data.bet_amount * 2
-        db.users.update_one({"user_id": data.user_id}, {"$inc": {"tokens": payout}})
-        
-    updated_user = db.users.find_one({"user_id": data.user_id})
-    return {"won": won, "payout": payout, "new_balance": updated_user["tokens"]}
+    # Log recharge in recharges collection
+    recharges_col.insert_one({
+        "recharge_id": order_id,
+        "user_id": user_id,
+        "tokens_expected": tokens,
+        "payment_id": payment_id,
+        "status": "approved_razorpay"
+    })
 
-# --- 6. TELEGRAM BOT WEBHOOK & ADMIN COMMANDS ---
-@app.post("/telegram-webhook")
-async def telegram_webhook(request: Request):
-    body = await request.json()
-    
-    if "callback_query" in body:
-        cq = body["callback_query"]
-        data = cq["data"]
-        chat_id = cq["message"]["chat"]["id"]
-        
-        if data.startswith("accept_call_"):
-            parts = data.split("_")
-            host_id = parts[2]
-            user_id = parts[3]
-            requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage", json={
-                "chat_id": chat_id, 
-                "text": f"✅ Host {host_id} has accepted the call with user {user_id}! Session connected."
+    # Send success notification to user & group 3
+    send_telegram_message(user_id, f"🎉 <b>Recharge Successful!</b> +{tokens} Tokens added to your wallet automatically via Razorpay.")
+    send_telegram_message(GROUP_3_ID, f"💳 <b>Razorpay Auto-Recharge Verified!</b>\nUser ID: <code>{user_id}</code>\nTokens Added: +{tokens}\nPayment ID: <code>{payment_id}</code>")
+
+    return {"status": "success", "message": "Payment verified and tokens added!"}
+
+@app.post("/api/book-slot")
+def book_slot(data: BookingModel):
+    if str(data.host_id).startswith("dummy_"):
+        return {"status": "error", "message": "✨ Host is currently busy in a private international session. Please try another host!"}
+
+    user = users_col.find_one({"user_id": int(data.user_id)})
+    if not user or user.get("tokens", 0) < data.token_cost:
+        return {"status": "error", "message": f"Insufficient tokens! You need {data.token_cost} tokens. Please recharge."}
+
+    users_col.update_one({"user_id": int(data.user_id)}, {"$inc": {"tokens": -data.token_cost}})
+
+    booking_id = str(uuid.uuid4())[:8]
+    clean_host_id = str(data.host_id).replace("h_", "").replace("host_", "")
+    channel_name = f"private_call_{clean_host_id}_{data.user_id}"
+
+    current_time = time.time()
+    booking_doc = {
+        "booking_id": booking_id,
+        "user_id": int(data.user_id),
+        "host_id": data.host_id,
+        "host_name": data.host_name,
+        "duration_mins": data.duration_mins,
+        "token_cost": data.token_cost,
+        "channel_name": channel_name,
+        "status": "pending",
+        "time": current_time,
+        "call_started_at": current_time
+    }
+    bookings_col.insert_one(booking_doc)
+    return {"status": "success", "booking_id": booking_id}
+
+@app.get("/api/host/bookings/{user_id}")
+def get_host_bookings(user_id: int):
+    try:
+        host = hosts_col.find_one({
+            "$or": [
+                {"user_id": int(user_id)},
+                {"id": str(user_id)},
+                {"id": f"h_{user_id}"},
+                {"_id": f"host_{user_id}"}
+            ]
+        })
+        if not host:
+            return {"bookings": []}
+        h_ids = [str(user_id), f"h_{user_id}", f"host_{user_id}"]
+        bookings_cursor = bookings_col.find({"host_id": {"$in": list(set(h_ids))}}).sort("time", -1)
+        host_bookings = []
+        for b in bookings_cursor:
+            host_bookings.append({
+                "booking_id": str(b.get("booking_id") or b.get("_id")),
+                "user_id": b.get("user_id"),
+                "host_id": b.get("host_id"),
+                "host_name": b.get("host_name"),
+                "duration_mins": b.get("duration_mins"),
+                "token_cost": b.get("token_cost"),
+                "channel_name": b.get("channel_name"),
+                "status": b.get("status", "pending"),
+                "call_started_at": b.get("call_started_at", b.get("time", time.time())),
+                "formatted_time": time.strftime('%Y-%m-%d %H:%M', time.localtime(b.get("time", time.time())))
             })
-        return {"status": "ok"}
+        return {"bookings": host_bookings}
+    except Exception:
+        return {"bookings": []}
 
+@app.post("/api/host/accept-booking")
+def accept_booking(data: ActionBookingModel):
+    booking = bookings_col.find_one({"booking_id": data.booking_id})
+    if not booking or booking.get("status") != "pending":
+        return {"status": "error", "message": "Booking not found"}
+    current_time = time.time()
+    bookings_col.update_one({"_id": booking["_id"]}, {"$set": {"status": "approved", "call_started_at": current_time}})
+    return {"status": "success", "channel_name": booking.get("channel_name"), "call_started_at": current_time}
+
+@app.post("/api/host/reject-booking")
+def reject_booking(data: ActionBookingModel):
+    booking = bookings_col.find_one({"booking_id": data.booking_id})
+    if booking:
+        bookings_col.update_one({"_id": booking["_id"]}, {"$set": {"status": "rejected"}})
+        users_col.update_one({"user_id": int(booking["user_id"])}, {"$inc": {"tokens": booking["token_cost"]}})
+    return {"status": "success"}
+
+@app.post("/api/complete-booking")
+def complete_booking(data: CompleteBookingModel):
+    bookings_col.update_one({"booking_id": data.booking_id}, {"$set": {"status": "completed"}})
+    return {"status": "success"}
+
+@app.get("/api/user/bookings/{user_id}")
+def get_user_bookings(user_id: int):
+    cursor = bookings_col.find({"user_id": int(user_id)}, {"_id": 0}).sort("time", -1)
+    return {"bookings": list(cursor)}
+
+@app.post("/api/register-host")
+def register_host(data: HostRegisterModel):
+    host_data = data.dict()
+    host_data["status"] = "pending"
+    host_data["id"] = f"h_{data.user_id}"
+    host_data["_id"] = f"host_{data.user_id}"
+    host_data["user_id"] = int(data.user_id)
+    host_data["is_online"] = False
+    host_data["img"] = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop"
+    hosts_col.update_one({"user_id": int(data.user_id)}, {"$set": host_data}, upsert=True)
+    send_telegram_message(GROUP_1_ID, f"📹 <b>New Host Application!</b>\nName: {data.name}\nID: <code>{data.user_id}</code>")
+    return {"status": "success", "message": "Registered successfully!"}
+
+@app.post("/api/withdraw")
+def withdraw_earnings(data: WithdrawModel):
+    host = hosts_col.find_one({"user_id": int(data.user_id), "status": "approved"})
+    if not host:
+        return {"status": "error", "message": "Only approved hosts can withdraw!"}
+    users_col.update_one({"user_id": int(data.user_id)}, {"$inc": {"earnings": -int(data.tokens / 0.7)}})
+    withdrawals_col.insert_one({"user_id": int(data.user_id), "upi_id": data.upi_id, "tokens": data.tokens, "status": "pending"})
+    send_telegram_message(GROUP_3_ID, f"💸 <b>Withdrawal Request!</b> Host ID: <code>{data.user_id}</code> | Tokens: {data.tokens}")
+    return {"status": "success", "message": "Withdrawal requested!"}
+
+@app.post("/api/update-profile-photo")
+async def update_profile_photo(user_id: int = Form(...), avatar: UploadFile = File(...)):
+    os.makedirs("static/uploads", exist_ok=True)
+    file_path = os.path.join("static/uploads", avatar.filename)
+    with open(file_path, "wb") as buffer:
+        buffer.write(await avatar.read())
+    avatar_url = f"https://vynora-bot.onrender.com/static/uploads/{avatar.filename}"
+    users_col.update_one({"user_id": int(user_id)}, {"$set": {"avatar": avatar_url}}, upsert=True)
+    hosts_col.update_one({"user_id": int(user_id)}, {"$set": {"img": avatar_url}}, upsert=True)
+    return {"status": "success", "avatar_url": avatar_url}
+
+@app.post("/api/send-gift")
+def send_gift(data: GiftModel):
+    user = users_col.find_one({"user_id": int(data.user_id)})
+    if not user or user.get("tokens", 0) < data.gift_cost:
+        return {"status": "error", "message": "Not enough tokens"}
+    users_col.update_one({"user_id": int(data.user_id)}, {"$inc": {"tokens": -data.gift_cost}})
+    chats_col.insert_one({"channel": data.channel, "sender": data.sender_name, "text": f"sent gift {data.gift_name} (🪙 {data.gift_cost})", "type": "gift", "time": time.time()})
+    return {"status": "success"}
+
+@app.post("/api/send-chat")
+def send_chat(data: ChatModel):
+    chats_col.insert_one({"channel": data.channel, "sender": data.sender, "text": data.text, "type": data.type, "time": time.time()})
+    return {"status": "success"}
+
+@app.get("/api/get-chat/{channel}")
+def get_chat(channel: str):
+    return {"messages": list(chats_col.find({"channel": channel}, {"_id": 0}).sort("time", 1).limit(50))}
+
+@app.post("/telegram-webhook")
+async def telegram_webhook(req: Request):
+    body = await req.json()
     if "message" in body:
         msg = body["message"]
         chat_id = msg["chat"]["id"]
         user_id = msg["from"]["id"]
-        text = msg.get("text", "")
-        
-        parts = text.split()
-        cmd = parts[0] if parts else ""
-        
-        if cmd == "/start":
-            requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage", json={
-                "chat_id": chat_id,
-                "text": "✨ Welcome to **Vynora Live**! Click the button below to open the app:",
-                "parse_mode": "Markdown",
-                "reply_markup": {
-                    "inline_keyboard": [[
-                        {"text": "🚀 Open Vynora Live App", "web_app": {"url": WEBAPP_URL}}
-                    ]]
-                }
-            })
-            return {"status": "ok"}
-        
-        if user_id in ADMIN_IDS:
-            if cmd == "/giveroom" and len(parts) > 1:
-                target_id = int(parts[1])
-                db.users.update_one({"user_id": target_id}, {"$set": {"can_create_room": True, "is_host": True}})
-                requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage", json={
-                    "chat_id": chat_id, "text": f"✅ User {target_id} ko 3-Seat Audio Room aur Host permissions mil gayi hain!"
-                })
-            elif cmd == "/revokeroom" and len(parts) > 1:
-                target_id = int(parts[1])
-                db.users.update_one({"user_id": target_id}, {"$set": {"can_create_room": False, "is_host": False}})
-                requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage", json={
-                    "chat_id": chat_id, "text": f"❌ User {target_id} se room & host permissions wapas le li gayi hain."
-                })
-            elif cmd == "/addtokens" and len(parts) > 2:
-                target_id = int(parts[1])
-                amount = int(parts[2])
-                db.users.update_one({"user_id": target_id}, {"$inc": {"tokens": amount}}, upsert=True)
-                requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage", json={
-                    "chat_id": chat_id, "text": f"🪙 Added {amount} tokens to user {target_id}."
-                })
-            elif cmd == "/cuttokens" and len(parts) > 2:
-                target_id = int(parts[1])
-                amount = int(parts[2])
-                db.users.update_one({"user_id": target_id}, {"$inc": {"tokens": -amount}})
-                requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage", json={
-                    "chat_id": chat_id, "text": f"⚠️ Cut {amount} tokens from user {target_id}."
-                })
-            elif cmd == "/ban" and len(parts) > 1:
-                target_id = int(parts[1])
-                db.users.update_one({"user_id": target_id}, {"$set": {"is_banned": True}})
-                requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage", json={
-                    "chat_id": chat_id, "text": f"🚫 User {target_id} has been banned."
-                })
-            elif cmd == "/unban" and len(parts) > 1:
-                target_id = int(parts[1])
-                db.users.update_one({"user_id": target_id}, {"$set": {"is_banned": False}})
-                requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage", json={
-                    "chat_id": chat_id, "text": f"✅ User {target_id} has been unbanned."
-                })
+        text = msg.get("text", "").strip()
 
-    return {"status": "ok"}
+        if text.startswith("/ban "):
+            target_id = int(text.replace("/ban ", "").strip())
+            users_col.update_one({"user_id": target_id}, {"$set": {"is_banned": True}}, upsert=True)
+            send_telegram_message(chat_id, f"🚫 User <code>{target_id}</code> banned.")
+            return {"ok": True}
+        elif text.startswith("/unban "):
+            target_id = int(text.replace("/unban ", "").strip())
+            users_col.update_one({"user_id": target_id}, {"$set": {"is_banned": False}}, upsert=True)
+            send_telegram_message(chat_id, f"✅ User <code>{target_id}</code> unbanned.")
+            return {"ok": True}
+        elif text.startswith("/addtokens "):
+            parts = text.replace("/addtokens ", "").strip().split()
+            users_col.update_one({"user_id": int(parts[0])}, {"$inc": {"tokens": int(parts[1])}}, upsert=True)
+            send_telegram_message(chat_id, f"🪙 Added tokens.")
+            return {"ok": True}
+        elif text.startswith("/cuttokens "):
+            parts = text.replace("/cuttokens ", "").strip().split()
+            users_col.update_one({"user_id": int(parts[0])}, {"$inc": {"tokens": -int(parts[1])}}, upsert=True)
+            send_telegram_message(chat_id, f"✂️ Deducted tokens.")
+            return {"ok": True}
+        elif text.startswith("/start"):
+            user = users_col.find_one({"user_id": int(user_id)})
+            if user and user.get("is_banned", False):
+                send_telegram_message(chat_id, "🚫 Account suspended.")
+                return {"ok": True}
+            if not user:
+                users_col.insert_one({"user_id": int(user_id), "tokens": 0, "earnings": 0, "avatar": "", "is_banned": False})
+            webapp_url = "https://vynora-bot.onrender.com/static/index.html"
+            send_telegram_message(chat_id, "✨ <b>Welcome to Vynora Live 1v1!</b>", reply_markup={"inline_keyboard": [[{"text": "🚀 Open Vynora Live App", "web_app": {"url": webapp_url}}]]})
+
+    elif "callback_query" in body:
+        callback = body["callback_query"]
+        data_str = callback["data"]
+        message_id = callback["message"]["message_id"]
+        chat_id = callback["message"]["chat"]["id"]
+        if data_str.startswith("approve_host_"):
+            host_user_id = int(data_str.replace("approve_host_", ""))
+            hosts_col.update_one({"user_id": host_user_id}, {"$set": {"status": "approved", "is_online": True}})
+            send_telegram_message(host_user_id, "🎉 Host approved!")
+            requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": "✅ Host Approved"})
+        elif data_str.startswith("accept_bk_"):
+            booking_id = data_str.replace("accept_bk_", "")
+            booking = bookings_col.find_one({"booking_id": booking_id})
+            if booking:
+                bookings_col.update_one({"booking_id": booking_id}, {"$set": {"status": "approved", "call_started_at": time.time()}})
+                send_telegram_message(int(booking["user_id"]), "📞 Call accepted! Open app to join.", reply_markup={"inline_keyboard": [[{"text": "📞 Answer Call", "web_app": {"url": "https://vynora-bot.onrender.com/static/index.html"}}]]})
+                requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": "✅ Accepted"})
+
+    return {"ok": True}
