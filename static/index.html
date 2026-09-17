@@ -1,1711 +1,1201 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Vynora Live 1v1</title>
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.20.0.js"></script>
-<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-<style>
-:root {
-  --bg-dark: #06040C;
-  --card-bg: rgba(255, 255, 255, 0.04);
-  --card-border: rgba(255, 255, 255, 0.08);
-  --primary-gradient: linear-gradient(135deg, #FF007A 0%, #7928CA 100%);
-  --banner-pink: linear-gradient(135deg, #FF007A 0%, #FF5500 100%);
-  --accent-cyan: #00F5D4;
-  --text-main: #FFFFFF;
-  --text-muted: #94A3B8;
-  --gold: #FFD700;
-}
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  -webkit-tap-highlight-color: transparent;
-}
-body {
-  background-color: var(--bg-dark);
-  color: var(--text-main);
-  min-height: 100vh;
-  padding-bottom: 75px;
-  overflow-x: hidden;
-}
-.app-header {
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  background: rgba(6, 4, 12, 0.95);
-  backdrop-filter: blur(12px);
-  padding: 10px 16px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid var(--card-border);
-}
-.brand-logo {
-  font-weight: 800;
-  font-size: 1.15rem;
-  background: var(--primary-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.wallet-badge {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(255, 215, 0, 0.12);
-  border: 1px solid rgba(255, 215, 0, 0.3);
-  padding: 5px 12px;
-  border-radius: 20px;
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: var(--gold);
-  cursor: pointer;
-}
-.profile-btn {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  background: var(--primary-gradient);
-  border: 2px solid var(--card-border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  cursor: pointer;
-  color: white;
-  overflow: hidden;
-}
-.profile-btn img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.top-app-banner {
-  margin: 12px 16px;
-  background: linear-gradient(135deg, #1f0b24 0%, #2e082f 50%, #10061e 100%);
-  border: 1px solid rgba(255, 0, 122, 0.3);
-  border-radius: 16px;
-  padding: 14px 18px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  box-shadow: 0 4px 20px rgba(255, 0, 122, 0.2);
-}
-.top-app-banner h2 {
-  font-size: 1.1rem;
-  font-weight: 800;
-  background: var(--primary-gradient);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-.top-app-banner p {
-  font-size: 0.72rem;
-  color: var(--text-muted);
-  margin-top: 2px;
-}
-.promo-banner {
-  margin: 12px 16px;
-  background: var(--banner-pink);
-  border-radius: 16px;
-  padding: 16px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  color: white;
-  box-shadow: 0 4px 15px rgba(255, 0, 122, 0.4);
-}
-.promo-banner h3 {
-  font-size: 1.05rem;
-  font-weight: 800;
-  margin-bottom: 4px;
-}
-.promo-banner p {
-  font-size: 0.75rem;
-  opacity: 0.9;
-}
-.get-btn {
-  background: white;
-  color: #FF007A;
-  font-weight: 800;
-  border: none;
-  padding: 6px 14px;
-  border-radius: 14px;
-  font-size: 0.8rem;
-  cursor: pointer;
-}
-.filter-container {
-  display: flex;
-  gap: 8px;
-  padding: 0 16px 12px 16px;
-  overflow-x: auto;
-}
-.filter-pill {
-  background: rgba(255,255,255,0.05);
-  border: 1px solid var(--card-border);
-  padding: 6px 14px;
-  border-radius: 20px;
-  font-size: 0.78rem;
-  color: var(--text-muted);
-  cursor: pointer;
-  white-space: nowrap;
-}
-.filter-pill.active {
-  background: #FF007A;
-  color: white;
-  border-color: #FF007A;
-  font-weight: 700;
-}
-.section-header {
-  padding: 4px 16px 8px 16px;
-  font-size: 0.9rem;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.host-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-  padding: 0 16px;
-}
-.host-card {
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: 16px;
-  overflow: hidden;
-  position: relative;
-  cursor: pointer;
-}
-.host-thumb {
-  width: 100%;
-  height: 185px;
-  object-fit: cover;
-}
-.badge-live {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  background: rgba(0, 0, 0, 0.65);
-  padding: 3px 8px;
-  border-radius: 12px;
-  font-size: 0.65rem;
-  color: var(--accent-cyan);
-  font-weight: 700;
-}
-.badge-rate {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  background: rgba(0, 0, 0, 0.65);
-  padding: 3px 8px;
-  border-radius: 12px;
-  font-size: 0.7rem;
-  color: var(--gold);
-  font-weight: 700;
-}
-.host-info {
-  padding: 10px;
-  background: linear-gradient(180deg, rgba(6,4,12,0) 0%, rgba(6,4,12,0.95) 100%);
-  margin-top: -45px;
-  position: relative;
-}
-.host-name {
-  font-size: 0.88rem;
-  font-weight: 700;
-  margin-bottom: 4px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.call-btn {
-  width: 100%;
-  background: var(--primary-gradient);
-  border: none;
-  color: white;
-  padding: 8px;
-  border-radius: 10px;
-  font-weight: 700;
-  font-size: 0.82rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  cursor: pointer;
-}
-.profile-container {
-  display: none;
-  padding: 16px;
-}
-.profile-container.active {
-  display: block;
-}
-.profile-header-card {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 20px;
-}
-.profile-avatar-wrapper {
-  position: relative;
-  width: 75px;
-  height: 75px;
-  border-radius: 50%;
-  overflow: hidden;
-  border: 2px solid #FF007A;
-}
-.profile-avatar-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.cam-edit-icon {
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  background: #FF007A;
-  color: white;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.65rem;
-  cursor: pointer;
-}
-.user-meta h2 {
-  font-size: 1.1rem;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.user-id-text {
-  font-size: 0.78rem;
-  color: var(--text-muted);
-  margin-top: 2px;
-}
-.wallet-banner-row {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
-  margin-bottom: 16px;
-}
-.wallet-box {
-  background: rgba(255,255,255,0.04);
-  border: 1px solid var(--card-border);
-  padding: 12px;
-  border-radius: 14px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  cursor: pointer;
-}
-.action-icon-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-  text-align: center;
-  margin-bottom: 20px;
-}
-.icon-card {
-  background: rgba(255,255,255,0.04);
-  border: 1px solid var(--card-border);
-  padding: 12px 6px;
-  border-radius: 14px;
-  cursor: pointer;
-}
-.icon-card i {
-  font-size: 1.4rem;
-  margin-bottom: 6px;
-}
-.icon-card p {
-  font-size: 0.72rem;
-  color: var(--text-muted);
-}
-.plan-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  margin: 12px 0;
-  max-height: 180px;
-  overflow-y: auto;
-}
-.plan-card {
-  background: rgba(255,255,255,0.05);
-  border: 1px solid var(--card-border);
-  padding: 10px 6px;
-  border-radius: 12px;
-  text-align: center;
-  cursor: pointer;
-}
-.plan-card.active {
-  border-color: #FF007A;
-  background: rgba(255,0,122,0.15);
-}
-.plan-amount {
-  font-weight: 800;
-  font-size: 0.95rem;
-  color: white;
-}
-.plan-tokens {
-  font-size: 0.7rem;
-  color: var(--gold);
-}
-.qr-box {
-  text-align: center;
-  background: white;
-  padding: 10px;
-  border-radius: 12px;
-  margin: 12px 0;
-}
-.qr-box img {
-  width: 140px;
-  height: 140px;
-}
-.bottom-nav {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 60px;
-  background: rgba(6, 4, 12, 0.95);
-  backdrop-filter: blur(16px);
-  border-top: 1px solid var(--card-border);
-  display: flex;
-  justify-content: space-around;
-  align-items: center;
-  z-index: 150;
-}
-.nav-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  color: var(--text-muted);
-  font-size: 0.7rem;
-  cursor: pointer;
-}
-.nav-item.active {
-  color: #FF007A;
-  font-weight: 700;
-}
-.nav-item i {
-  font-size: 1.1rem;
-}
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.85);
-  backdrop-filter: blur(10px);
-  z-index: 9999 !important;
-  display: none;
-  justify-content: center;
-  align-items: flex-end;
-}
-.modal-overlay.active {
-  display: flex;
-}
-.modal-card {
-  background: #130E26;
-  border-top: 1px solid var(--card-border);
-  border-radius: 24px 24px 0 0;
-  width: 100%;
-  max-width: 480px;
-  padding: 20px;
-  max-height: 88vh;
-  overflow-y: auto;
-}
-.input-box {
-  width: 100%;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--card-border);
-  padding: 12px;
-  border-radius: 12px;
-  color: white;
-  margin-bottom: 10px;
-  outline: none;
-}
-#whatsapp-call-screen {
-  position: fixed;
-  inset: 0;
-  background: linear-gradient(135deg, #06040C 0%, #1a0b2e 100%);
-  z-index: 99999;
-  display: none;
-  flex-direction: column;
-  justify-content: space-between;
-  align-items: center;
-  padding: 50px 20px;
-  text-align: center;
-}
-#whatsapp-call-screen.active {
-  display: flex;
-}
-.wa-avatar {
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  border: 4px solid #00F5D4;
-  object-fit: cover;
-  margin-bottom: 20px;
-  animation: pulseRing 1.5s infinite;
-}
-@keyframes pulseRing {
-  0% { box-shadow: 0 0 0 0 rgba(0, 245, 212, 0.6); }
-  70% { box-shadow: 0 0 0 25px rgba(0, 245, 212, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(0, 245, 212, 0); }
-}
-#video-call-screen {
-  position: fixed;
-  inset: 0;
-  width: 100vw;
-  height: 100vh;
-  background: #000;
-  z-index: 999;
-  display: none;
-  flex-direction: column;
-}
-#video-call-screen.active {
-  display: flex;
-}
-#main-video-view {
-  position: absolute;
-  inset: 0;
-  width: 100vw;
-  height: 100vh;
-  object-fit: cover;
-  z-index: 1;
-}
-#pip-video-view {
-  position: absolute;
-  top: 70px;
-  right: 16px;
-  width: 100px;
-  height: 140px;
-  background: #111;
-  border-radius: 14px;
-  overflow: hidden;
-  border: 2px solid #FF007A;
-  z-index: 5;
-  cursor: pointer;
-  display: none;
-}
-.live-top-bar {
-  position: absolute;
-  top: 16px;
-  left: 16px;
-  right: 16px;
-  z-index: 10;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.live-host-pill {
-  background: rgba(0,0,0,0.6);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255,255,255,0.15);
-  padding: 4px 12px 4px 4px;
-  border-radius: 30px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: white;
-  font-size: 0.85rem;
-  font-weight: 700;
-}
-.live-host-pill img {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  object-fit: cover;
-}
-.live-viewer-count {
-  background: rgba(0,0,0,0.6);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255,255,255,0.15);
-  padding: 6px 12px;
-  border-radius: 20px;
-  font-size: 0.75rem;
-  color: var(--accent-cyan);
-  font-weight: 700;
-}
-.live-chat-messages {
-  position: absolute;
-  bottom: 120px;
-  left: 16px;
-  right: 100px;
-  max-height: 160px;
-  overflow-y: auto;
-  z-index: 10;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  pointer-events: none;
-}
-.chat-bubble {
-  background: rgba(0,0,0,0.6);
-  backdrop-filter: blur(6px);
-  padding: 6px 12px;
-  border-radius: 12px;
-  font-size: 0.8rem;
-  color: white;
-  width: fit-content;
-  max-width: 100%;
-  word-break: break-word;
-  pointer-events: auto;
-}
-.chat-bubble b {
-  color: var(--accent-cyan);
-  margin-right: 4px;
-}
-.chat-bubble.gift-announcement {
-  background: rgba(255, 0, 122, 0.4);
-  border: 1px solid #FF007A;
-  color: var(--gold);
-  font-weight: 700;
-}
-.filter-bar {
-  position: absolute;
-  bottom: 75px;
-  left: 16px;
-  right: 16px;
-  z-index: 10;
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding-bottom: 4px;
-}
-.cam-filter-btn {
-  background: rgba(0,0,0,0.6);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255,255,255,0.2);
-  color: white;
-  padding: 4px 10px;
-  border-radius: 15px;
-  font-size: 0.72rem;
-  cursor: pointer;
-  white-space: nowrap;
-  font-weight: 600;
-}
-.cam-filter-btn.active {
-  background: #FF007A;
-  border-color: #FF007A;
-}
-.live-bottom-bar {
-  position: absolute;
-  bottom: 20px;
-  left: 16px;
-  right: 16px;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.live-chat-input {
-  flex: 1;
-  background: rgba(0,0,0,0.6);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255,255,255,0.2);
-  padding: 10px 16px;
-  border-radius: 30px;
-  color: white;
-  font-size: 0.85rem;
-  outline: none;
-}
-.live-action-btn {
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  background: rgba(0,0,0,0.6);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255,255,255,0.2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-size: 1.1rem;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-.live-end-btn {
-  background: #FF0033;
-  border: none;
-}
-.gifts-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin: 15px 0;
-}
-.gift-item {
-  background: rgba(255,255,255,0.06);
-  border: 1px solid var(--card-border);
-  border-radius: 16px;
-  padding: 14px;
-  text-align: center;
-  cursor: pointer;
-}
-.gift-emoji {
-  font-size: 2rem;
-  margin-bottom: 6px;
-}
-.filter-normal { filter: none; }
-.filter-beauty { filter: brightness(1.15) contrast(1.05) saturate(1.1) drop-shadow(0 0 2px rgba(255,192,203,0.5)); }
-.filter-rosy { filter: sepia(0.2) hue-rotate(330deg) saturate(1.3) brightness(1.05); }
-.filter-cool { filter: hue-rotate(180deg) saturate(1.2) brightness(1.05); }
-.filter-cinematic { filter: contrast(1.25) saturate(0.85) brightness(0.95); }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Vynora Live 1v1</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.20.0.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #06040C;
+            --card-bg: rgba(255, 255, 255, 0.04);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --primary-gradient: linear-gradient(135deg, #FF007A 0%, #7928CA 100%);
+            --banner-pink: linear-gradient(135deg, #FF007A 0%, #FF5500 100%);
+            --accent-cyan: #00F5D4;
+            --text-main: #FFFFFF;
+            --text-muted: #94A3B8;
+            --gold: #FFD700;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { background-color: var(--bg-dark); color: var(--text-main); min-height: 100vh; padding-bottom: 75px; overflow-x: hidden; }
+
+        .app-header {
+            position: sticky; top: 0; z-index: 100; background: rgba(6, 4, 12, 0.95);
+            backdrop-filter: blur(12px); padding: 10px 16px; display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        .brand-logo { font-weight: 800; font-size: 1.15rem; background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: flex; align-items: center; gap: 6px; }
+        .header-right { display: flex; align-items: center; gap: 8px; }
+        
+        .wallet-badge { display: flex; align-items: center; gap: 6px; background: rgba(255, 215, 0, 0.12); border: 1px solid rgba(255, 215, 0, 0.3); padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 700; color: var(--gold); cursor: pointer; }
+        .profile-btn { width: 34px; height: 34px; border-radius: 50%; background: var(--primary-gradient); border: 2px solid var(--card-border); display: flex; align-items: center; justify-content: center; font-weight: 700; cursor: pointer; color: white; overflow: hidden; }
+        .profile-btn img { width: 100%; height: 100%; object-fit: cover; }
+
+        /* TOP BANNER */
+        .top-app-banner {
+            margin: 12px 16px; background: linear-gradient(135deg, #1f0b24 0%, #2e082f 50%, #10061e 100%);
+            border: 1px solid rgba(255, 0, 122, 0.3); border-radius: 16px; padding: 14px 18px;
+            display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 20px rgba(255, 0, 122, 0.2);
+        }
+        .top-app-banner h2 { font-size: 1.1rem; font-weight: 800; background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .top-app-banner p { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+
+        .promo-banner {
+            margin: 12px 16px; background: var(--banner-pink); border-radius: 16px; padding: 16px;
+            display: flex; justify-content: space-between; align-items: center; color: white; box-shadow: 0 4px 15px rgba(255, 0, 122, 0.4);
+        }
+        .promo-banner h3 { font-size: 1.05rem; font-weight: 800; margin-bottom: 4px; }
+        .promo-banner p { font-size: 0.75rem; opacity: 0.9; }
+        .get-btn { background: white; color: #FF007A; font-weight: 800; border: none; padding: 6px 14px; border-radius: 14px; font-size: 0.8rem; cursor: pointer; }
+
+        .filter-container { display: flex; gap: 8px; padding: 0 16px 12px 16px; overflow-x: auto; }
+        .filter-pill { background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); padding: 6px 14px; border-radius: 20px; font-size: 0.78rem; color: var(--text-muted); cursor: pointer; white-space: nowrap; }
+        .filter-pill.active { background: #FF007A; color: white; border-color: #FF007A; font-weight: 700; }
+
+        .section-header { padding: 4px 16px 8px 16px; font-size: 0.9rem; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+
+        .host-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; padding: 0 16px; }
+        .host-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 16px; overflow: hidden; position: relative; cursor: pointer; }
+        .host-thumb { width: 100%; height: 185px; object-fit: cover; }
+
+        .badge-live { position: absolute; top: 8px; left: 8px; background: rgba(0, 0, 0, 0.65); padding: 3px 8px; border-radius: 12px; font-size: 0.65rem; color: var(--accent-cyan); font-weight: 700; }
+        .badge-rate { position: absolute; top: 8px; right: 8px; background: rgba(0, 0, 0, 0.65); padding: 3px 8px; border-radius: 12px; font-size: 0.7rem; color: var(--gold); font-weight: 700; }
+        .host-info { padding: 10px; background: linear-gradient(180deg, rgba(6,4,12,0) 0%, rgba(6,4,12,0.95) 100%); margin-top: -45px; position: relative; }
+        .host-name { font-size: 0.88rem; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 4px; }
+
+        .call-btn { width: 100%; background: var(--primary-gradient); border: none; color: white; padding: 8px; border-radius: 10px; font-weight: 700; font-size: 0.82rem; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; }
+
+        .profile-container { display: none; padding: 16px; }
+        .profile-container.active { display: block; }
+
+        .profile-header-card { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+        .profile-avatar-wrapper { position: relative; width: 75px; height: 75px; border-radius: 50%; overflow: hidden; border: 2px solid #FF007A; }
+        .profile-avatar-img { width: 100%; height: 100%; object-fit: cover; }
+        .cam-edit-icon { position: absolute; bottom: 0; right: 0; background: #FF007A; color: white; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; cursor: pointer; }
+
+        .user-meta h2 { font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+        .user-id-text { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; }
+
+        .wallet-banner-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
+        .wallet-box { background: rgba(255,255,255,0.04); border: 1px solid var(--card-border); padding: 12px; border-radius: 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+
+        .action-icon-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; text-align: center; margin-bottom: 20px; }
+        .icon-card { background: rgba(255,255,255,0.04); border: 1px solid var(--card-border); padding: 12px 6px; border-radius: 14px; cursor: pointer; }
+        .icon-card i { font-size: 1.4rem; margin-bottom: 6px; }
+        .icon-card p { font-size: 0.72rem; color: var(--text-muted); }
+
+        .plan-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 12px 0; max-height: 180px; overflow-y: auto; }
+        .plan-card { background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); padding: 10px 6px; border-radius: 12px; text-align: center; cursor: pointer; }
+        .plan-card.active { border-color: #FF007A; background: rgba(255,0,122,0.15); }
+        .plan-amount { font-weight: 800; font-size: 0.95rem; color: white; }
+        .plan-tokens { font-size: 0.7rem; color: var(--gold); }
+
+        .qr-box { text-align: center; background: white; padding: 10px; border-radius: 12px; margin: 12px 0; }
+        .qr-box img { width: 140px; height: 140px; }
+
+        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background: rgba(6, 4, 12, 0.95); backdrop-filter: blur(16px); border-top: 1px solid var(--card-border); display: flex; justify-content: space-around; align-items: center; z-index: 150; }
+        .nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--text-muted); font-size: 0.7rem; cursor: pointer; }
+        .nav-item.active { color: #FF007A; font-weight: 700; }
+        .nav-item i { font-size: 1.1rem; }
+
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(10px); z-index: 9999 !important; display: none; justify-content: center; align-items: flex-end; }
+        .modal-overlay.active { display: flex; }
+        .modal-card { background: #130E26; border-top: 1px solid var(--card-border); border-radius: 24px 24px 0 0; width: 100%; max-width: 480px; padding: 20px; max-height: 88vh; overflow-y: auto; }
+        .input-box { width: 100%; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--card-border); padding: 12px; border-radius: 12px; color: white; margin-bottom: 10px; outline: none; }
+
+        /* WHATSAPP STYLE INCOMING CALL SCREEN */
+        #whatsapp-call-screen { position: fixed; inset: 0; background: linear-gradient(135deg, #06040C 0%, #1a0b2e 100%); z-index: 99999; display: none; flex-direction: column; justify-content: space-between; align-items: center; padding: 50px 20px; text-align: center; }
+        #whatsapp-call-screen.active { display: flex; }
+        .wa-avatar { width: 120px; height: 120px; border-radius: 50%; border: 4px solid #00F5D4; object-fit: cover; margin-bottom: 20px; animation: pulseRing 1.5s infinite; }
+        @keyframes pulseRing { 0% { box-shadow: 0 0 0 0 rgba(0, 245, 212, 0.6); } 70% { box-shadow: 0 0 0 25px rgba(0, 245, 212, 0); } 100% { box-shadow: 0 0 0 0 rgba(0, 245, 212, 0); } }
+
+        #video-call-screen { position: fixed; inset: 0; width: 100vw; height: 100vh; background: #000; z-index: 999; display: none; flex-direction: column; }
+        #video-call-screen.active { display: flex; }
+        #main-video-view { position: absolute; inset: 0; width: 100vw; height: 100vh; object-fit: cover; z-index: 1; }
+        #pip-video-view { position: absolute; top: 70px; right: 16px; width: 100px; height: 140px; background: #111; border-radius: 14px; overflow: hidden; border: 2px solid #FF007A; z-index: 5; cursor: pointer; display: none; }
+        
+        .live-top-bar { position: absolute; top: 16px; left: 16px; right: 16px; z-index: 10; display: flex; justify-content: space-between; align-items: center; }
+        .live-host-pill { background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.15); padding: 4px 12px 4px 4px; border-radius: 30px; display: flex; align-items: center; gap: 8px; color: white; font-size: 0.85rem; font-weight: 700; }
+        .live-host-pill img { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; }
+        .live-viewer-count { background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.15); padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; color: var(--accent-cyan); font-weight: 700; }
+        
+        .live-chat-messages { position: absolute; bottom: 120px; left: 16px; right: 100px; max-height: 160px; overflow-y: auto; z-index: 10; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+        .chat-bubble { background: rgba(0,0,0,0.6); backdrop-filter: blur(6px); padding: 6px 12px; border-radius: 12px; font-size: 0.8rem; color: white; width: fit-content; max-width: 100%; word-break: break-word; pointer-events: auto; }
+        .chat-bubble b { color: var(--accent-cyan); margin-right: 4px; }
+        .chat-bubble.gift-announcement { background: rgba(255, 0, 122, 0.4); border: 1px solid #FF007A; color: var(--gold); font-weight: 700; }
+
+        .filter-bar { position: absolute; bottom: 75px; left: 16px; right: 16px; z-index: 10; display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+        .cam-filter-btn { background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 4px 10px; border-radius: 15px; font-size: 0.72rem; cursor: pointer; white-space: nowrap; font-weight: 600; }
+        .cam-filter-btn.active { background: #FF007A; border-color: #FF007A; }
+
+        .live-bottom-bar { position: absolute; bottom: 20px; left: 16px; right: 16px; z-index: 10; display: flex; align-items: center; gap: 8px; }
+        .live-chat-input { flex: 1; background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); padding: 10px 16px; border-radius: 30px; color: white; font-size: 0.85rem; outline: none; }
+        .live-action-btn { width: 42px; height: 42px; border-radius: 50%; background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; color: white; font-size: 1.1rem; cursor: pointer; flex-shrink: 0; }
+        .live-end-btn { background: #FF0033; border: none; }
+        
+        .gifts-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 15px 0; }
+        .gift-item { background: rgba(255,255,255,0.06); border: 1px solid var(--card-border); border-radius: 16px; padding: 14px; text-align: center; cursor: pointer; }
+        .gift-emoji { font-size: 2rem; margin-bottom: 6px; }
+
+        .filter-normal { filter: none; }
+        .filter-beauty { filter: brightness(1.15) contrast(1.05) saturate(1.1) drop-shadow(0 0 2px rgba(255,192,203,0.5)); }
+        .filter-rosy { filter: sepia(0.2) hue-rotate(330deg) saturate(1.3) brightness(1.05); }
+        .filter-cool { filter: hue-rotate(180deg) saturate(1.2) brightness(1.05); }
+        .filter-cinematic { filter: contrast(1.25) saturate(0.85) brightness(0.95); }
+    </style>
 </head>
 <body>
 
-<div id="whatsapp-call-screen">
-  <div>
-    <p style="color: #00F5D4; font-size: 0.8rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 25px;">Incoming Video Call</p>
-    <img id="wa-caller-img" src="" class="wa-avatar">
-    <h2 id="wa-caller-name" style="font-size: 1.6rem; font-weight: 800; color: white; margin-bottom: 6px;">Host Name</h2>
-    <p style="font-size: 0.85rem; color: var(--text-muted);">Vynora Secure 1v1 Call...</p>
-  </div>
-  <div style="display: flex; gap: 50px; justify-content: center; margin-bottom: 40px; width: 100%;">
-    <div onclick="declineWhatsAppCall()" style="display:flex; flex-direction:column; align-items:center; gap:8px; cursor:pointer;">
-      <div style="width: 70px; height: 70px; background: #FF0033; border-radius: 50%; display: flex; align-items:center; justify-content:center; color:white; font-size:1.6rem; box-shadow: 0 4px 20px rgba(255,0,51,0.6);">
-        <i class="fa-solid fa-phone-slash"></i>
-      </div>
-      <span style="font-size:0.8em; color:white; font-weight:700;">Decline</span>
-    </div>
-    <div onclick="answerWhatsAppCall()" style="display:flex; flex-direction:column; align-items:center; gap:8px; cursor:pointer;">
-      <div style="width: 70px; height: 70px; background: #00F5D4; border-radius: 50%; display:flex; align-items:center; justify-content:center; color:#000; font-size:1.6rem; box-shadow: 0 4px 20px rgba(0,245,212,0.6); animation: pulseRing 1s infinite;">
-        <i class="fa-solid fa-phone"></i>
-      </div>
-      <span style="font-size:0.8em; color:white; font-weight:700;">Accept</span>
-    </div>
-  </div>
-</div>
-
-<header class="app-header">
-  <div class="brand-logo"><i class="fa-solid fa-bolt" style="color:#FF007A;"></i> Vynora Live</div>
-  <div class="header-right">
-    <div class="wallet-badge" onclick="openRechargeModal()">
-      <span>💎 <span id="user-token-bal">0</span></span>
-      <i class="fa-solid fa-plus-circle" style="color:#FF007A;"></i>
-    </div>
-    <div class="profile-btn" onclick="switchTab('profile')">
-      <img id="header-avatar-img" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop">
-    </div>
-  </div>
-</header>
-
-<div id="home-tab-view">
-  <div class="top-app-banner">
-    <div>
-      <h2>🔥 Vynora Live 1v1</h2>
-      <p>Connect with Verified Global Streamers</p>
-    </div>
-    <i class="fa-solid fa-crown" style="font-size: 1.8rem; color: var(--gold);"></i>
-  </div>
-  
-  <div class="promo-banner" id="promo-banner-card">
-    <div>
-      <h3>👑 VIP Creator Lounge</h3>
-      <p>Earn coins by hosting 1v1 private calls!</p>
-    </div>
-    <button class="get-btn" onclick="openHostRegistrationModal()" id="become-host-banner-btn">Become Host</button>
-  </div>
-  
-  <div class="filter-container">
-    <div class="filter-pill active" onclick="filterHosts('all', this)">🌟 All Hosts</div>
-    <div class="filter-pill" onclick="filterHosts('verified', this)">🛡️ Verified Only</div>
-    <div class="filter-pill" onclick="filterHosts('private', this)">🔒 Private Calls</div>
-    <div class="filter-pill" onclick="filterHosts('budget', this)">💎 Under 50</div>
-  </div>
-  
-  <div class="section-header"><i class="fa-solid fa-video" style="color:#FF007A;"></i> Public Live Streams & Streamers</div>
-  <div class="host-grid" id="hosts-container"></div>
-</div>
-
-<div class="profile-container" id="profile-tab-view">
-  <div class="profile-header-card">
-    <div class="profile-avatar-wrapper">
-      <img id="profile-avatar-img" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop" class="profile-avatar-img">
-      <div class="cam-edit-icon" onclick="promptPhotoUpdate()"><i class="fa-solid fa-camera"></i></div>
-      <input type="file" id="profile-file-input" style="display: none;" accept="image/*" onchange="uploadProfilePhoto(this)">
-    </div>
-    <div class="user-meta">
-      <h2 id="profile-user-name">Vynora Live User</h2>
-      <div class="user-id-text">ID: <span id="profile-user-id">7001825467</span> • 🇮🇳 India</div>
-    </div>
-  </div>
-  
-  <div class="wallet-banner-row">
-    <div class="wallet-box" onclick="openRechargeModal()">
-      <div><div style="font-size:0.75rem; color:var(--text-muted);">Tokens Earned</div><b style="color:var(--gold);">💎 <span id="profile-tokens-count">0</span></b></div>
-      <i class="fa-solid fa-chevron-right" style="font-size:0.8rem; color:var(--text-muted);"></i>
-    </div>
-    <div class="wallet-box" onclick="openWithdrawModal()" id="earnings-box" style="display:none;">
-      <div><div style="font-size:0.75rem; color:var(--text-muted);">Net Payout (70%)</div><b style="color:var(--accent-cyan);">₹ <span id="profile-earnings-count">0</span></b></div>
-      <i class="fa-solid fa-chevron-right" style="font-size:0.8rem; color:var(--text-muted);"></i>
-    </div>
-  </div>
-  
-  <div style="margin-bottom: 16px; display:none; background:rgba(255,255,255,0.04); border:1px solid var(--card-border); padding: 14px; border-radius:14px;" id="host-rate-container">
-    <h4 style="font-size:0.9rem; margin-bottom:8px; color:var(--gold);">💎 Manage Call Rate</h4>
-    <div style="display: flex; gap:10px;">
-      <input type="number" id="new-call-rate-input" class="input-box" placeholder="New Rate (Tokens/min)" style="margin-bottom:0;">
-      <button class="get-btn" style="background:var(--accent-cyan); color:#000; font-weight:700; white-space:nowrap;" onclick="updateHostRate()">Update Rate</button>
-    </div>
-  </div>
-  
-  <div style="margin-bottom: 20px; display:none;" id="withdraw-btn-container">
-    <button class="call-btn" style="background: linear-gradient(135deg, #00F5D4 0%, #00B2FF 100%); color: #000;" onclick="openWithdrawModal()">
-      <i class="fa-solid fa-wallet"></i> Withdraw Earnings (UPI)
-    </button>
-  </div>
-  
-  <div class="action-icon-grid" id="profile-action-grid"></div>
-</div>
-
-<div class="modal-overlay" id="host-bookings-modal">
-  <div class="modal-card">
-    <div style="display: flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-      <h3>📋 Recent Booking Requests</h3>
-      <button style="background:none; border:none; color:white; font-size:1.2rem;" onclick="closeModal('host-bookings-modal')">✕</button>
-    </div>
-    <div id="host-bookings-list" style="max-height: 300px; overflow-y: auto;">
-      <p style="text-align:center; color:var(--text-muted);">Loading bookings...</p>
-    </div>
-  </div>
-</div>
-
-<div class="modal-overlay" id="user-bookings-modal">
-  <div class="modal-card">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-      <h3>📋 My Bookings & Sessions</h3>
-      <button style="background:none; border:none; color:white; font-size:1.2rem;" onclick="closeModal('user-bookings-modal')">✕</button>
-    </div>
-    <div id="user-bookings-list" style="max-height: 320px; overflow-y: auto;">
-      <p style="text-align:center; color:var(--text-muted);">Loading your bookings...</p>
-    </div>
-  </div>
-</div>
-
-<div class="modal-overlay" id="history-modal">
-  <div class="modal-card">
-    <div style="display: flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-      <h3>🕒 Recent Call History</h3>
-      <button style="background:none; border:none; color:white; font-size:1.2rem;" onclick="closeModal('history-modal')">✕</button>
-    </div>
-    <div id="history-list-container" style="max-height: 320px; overflow-y: auto;">
-      <p style="text-align:center; color:var(--text-muted);">Loading history...</p>
-    </div>
-  </div>
-</div>
-
-<div class="modal-overlay" id="withdraw-modal">
-  <div class="modal-card">
-    <div style="display: flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-      <h3>🏦 Withdraw Earnings</h3>
-      <button style="background:none; border:none; color:white; font-size:1.2rem;" onclick="closeModal('withdraw-modal')">✕</button>
-    </div>
-    <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:10px;">Available Net Payout (70%): <span id="withdraw-available-bal">0</span></p>
-    <input type="text" id="withdraw-upi-input" class="input-box" placeholder="Enter your UPI ID (e.g. okaxis@paytm)">
-    <input type="number" id="withdraw-amount-input" class="input-box" placeholder="Enter Tokens to Withdraw">
-    <button class="call-btn" style="padding:12px;" onclick="submitWithdrawalRequest()">Submit Withdrawal Request</button>
-  </div>
-</div>
-
-<nav class="bottom-nav">
-  <div class="nav-item active" id="nav-home" onclick="switchTab('home')"><i class="fa-solid fa-house"></i><span>Home</span></div>
-  <div class="nav-item" onclick="openRechargeModal()"><i class="fa-solid fa-wallet"></i><span>Recharge</span></div>
-  <div class="nav-item" onclick="openSupportLink()"><i class="fa-solid fa-headset"></i><span>Support</span></div>
-  <div class="nav-item" id="nav-profile" onclick="switchTab('profile')"><i class="fa-solid fa-user"></i><span>Profile</span></div>
-</nav>
-
-<div class="modal-overlay" id="host-booking-modal">
-  <div class="modal-card">
-    <div style="display: flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-      <h3 id="bk-host-name">Host Profile</h3>
-      <button style="background:none; border:none; color:white; font-size:1.2rem;" onclick="closeModal('host-booking-modal')">✕</button>
-    </div>
-    <img id="drawer-host-img" src="" style="width:100%; height:180px; object-fit:cover; border-radius:16px; margin-bottom:10px;">
-    <div style="display: flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-      <div>
-        <h4 id="drawer-name-title" style="font-size:1rem;">Host Name</h4>
-        <p id="drawer-bio" style="font-size:0.75rem; color:var(--text-muted);">Verified Host 🛡️</p>
-      </div>
-      <div style="background:rgba(255,215,0,0.1); border:1px solid rgba(255,215,0,0.3); padding:4px 10px; border-radius:12px; color:var(--gold); font-size:0.8rem; font-weight:700;">
-        💎 <span id="drawer-rate">50</span>/min
-      </div>
-    </div>
-    
-    <div class="booking-option-card" style="background:rgba(0,245,212,0.08); border-color:var(--accent-cyan); display: flex; justify-content:space-between; align-items:center; padding: 12px; border-radius:14px; margin-bottom:10px;">
-      <div><b>📹 Watch Public Stream</b><p style="font-size:0.7rem; color:var(--text-muted);">Join live stream free</p></div>
-      <button class="call-btn" style="width:auto; padding:6px 12px; background:var(--accent-cyan); color:#000;" onclick="joinPublicStream()">Watch Live</button>
-    </div>
-    
-    <div style="font-size:0.8rem; font-weight:700; margin: 10px 0 6px 0;">🔒 Private Slot Booking (1m - 30m):</div>
-    <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:6px; max-height:160px; overflow-y:auto; padding-right:4px;">
-      <div class="plan-card" onclick="confirmBooking(1)"><div class="plan-amount">1 Min</div><div class="plan-tokens" id="cost-1">💎 50</div></div>
-      <div class="plan-card" onclick="confirmBooking(5)"><div class="plan-amount">5 Mins</div><div class="plan-tokens" id="cost-5">💎 250</div></div>
-      <div class="plan-card" onclick="confirmBooking(10)"><div class="plan-amount">10 Mins</div><div class="plan-tokens" id="cost-10">💎 500</div></div>
-      <div class="plan-card" onclick="confirmBooking(15)"><div class="plan-amount">15 Mins</div><div class="plan-tokens" id="cost-15">💎 750</div></div>
-      <div class="plan-card" onclick="confirmBooking(20)"><div class="plan-amount">20 Mins</div><div class="plan-tokens" id="cost-20">💎 1000</div></div>
-      <div class="plan-card" onclick="confirmBooking(30)"><div class="plan-amount">30 Mins</div><div class="plan-tokens" id="cost-30">💎 1500</div></div>
-    </div>
-  </div>
-</div>
-
-<div id="video-call-screen">
-  <div id="main-video-view"></div>
-  <div id="pip-video-view" onclick="swapVideoLayouts()" title="Tap to Swap View"></div>
-  
-  <div class="live-top-bar">
-    <div class="live-host-pill">
-      <img id="live-active-img" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop">
-      <div>
-        <div id="live-active-name" style="font-size:0.8em; line-height: 1;">Streamer</div>
-        <div style="font-size:0.65rem; color:var(--gold);">💎 <span id="live-host-rate">50</span>/m</div>
-      </div>
-    </div>
-    <div class="live-viewer-count">👀 <span id="viewer-count">1</span> Watching</div>
-  </div>
-  
-  <div class="live-chat-messages" id="chat-messages-container"></div>
-  
-  <div class="filter-bar">
-    <div class="cam-filter-btn active" onclick="applyCameraFilter('filter-normal', this)">Normal</div>
-    <div class="cam-filter-btn" onclick="applyCameraFilter('filter-beauty', this)">✨ Glow</div>
-    <div class="cam-filter-btn" onclick="applyCameraFilter('filter-rosy', this)">🌸 Rosy Pink</div>
-    <div class="cam-filter-btn" onclick="applyCameraFilter('filter-cool', this)">❄️ Cool Blue</div>
-    <div class="cam-filter-btn" onclick="applyCameraFilter('filter-cinematic', this)">🎬 Cinematic</div>
-  </div>
-  
-  <div class="live-bottom-bar">
-    <input type="text" class="live-chat-input" placeholder="Say something nice..." id="chat-input" onkeypress="handleChatKey(event)">
-    <div class="live-action-btn" onclick="sendChatMessage()" title="Send SMS"><i class="fa-solid fa-paper-plane" style="color:var(--accent-cyan);"></i></div>
-    <div class="live-action-btn" onclick="openGiftModal()" title="Send Gift">🎁</div>
-    <div class="live-action-btn live-end-btn" onclick="leaveCall()" title="End Call"><i class="fa-solid fa-phone-slash"></i></div>
-  </div>
-</div>
-
-<div class="modal-overlay" id="gift-modal">
-  <div class="modal-card">
-    <div style="display: flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-      <h3>🎁 Send Gift to Streamer</h3>
-      <button style="background:none; border:none; color:white; font-size:1.2rem;" onclick="closeModal('gift-modal')">✕</button>
-    </div>
-    <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:10px;">Your Tokens: 💎 <span id="gift-user-tokens">0</span></p>
-    <div class="gifts-grid">
-      <div class="gift-item" onclick="sendGift(10, 'Rose')"><div class="gift-emoji">🌹</div><div style="font-size:0.8rem; font-weight:700;">Rose</div><div style="font-size:0.7rem; color:var(--gold);">💎 10</div></div>
-      <div class="gift-item" onclick="sendGift(50, 'Heart')"><div class="gift-emoji">❤️</div><div style="font-size:0.8rem; font-weight:700;">Heart</div><div style="font-size:0.7rem; color:var(--gold);">💎 50</div></div>
-      <div class="gift-item" onclick="sendGift(100, 'Ring')"><div class="gift-emoji">💍</div><div style="font-size:0.8em; font-weight:700;">Ring</div><div style="font-size:0.7rem; color:var(--gold);">💎 100</div></div>
-      <div class="gift-item" onclick="sendGift(250, 'Crown')"><div class="gift-emoji">👑</div><div style="font-size:0.8rem; font-weight:700;">Crown</div><div style="font-size:0.7rem; color:var(--gold);">💎 250</div></div>
-      <div class="gift-item" onclick="sendGift(500, 'Car')"><div class="gift-emoji">🏎️</div><div style="font-size:0.8rem; font-weight:700;">Car</div><div style="font-size:0.7rem; color:var(--gold);">💎 500</div></div>
-      <div class="gift-item" onclick="sendGift(1000, 'Castle')"><div class="gift-emoji">🏰</div><div style="font-size:0.8em; font-weight:700;">Castle</div><div style="font-size:0.7rem; color:var(--gold);">💎 1000</div></div>
-    </div>
-  </div>
-</div>
-
-<div class="modal-overlay" id="recharge-modal">
-  <div class="modal-card">
-    <div style="display: flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-      <h3>💳 Select Recharge Plan</h3>
-      <button style="background:none; border:none; color:white; font-size:1.2rem;" onclick="closeModal('recharge-modal')">✕</button>
-    </div>
-    <div class="plan-grid">
-      <div class="plan-card active" onclick="selectPlan(50, this)"><div class="plan-amount">₹50</div><div class="plan-tokens">50 Tokens</div></div>
-      <div class="plan-card" onclick="selectPlan(100, this)"><div class="plan-amount">₹100</div><div class="plan-tokens">100 Tokens</div></div>
-      <div class="plan-card" onclick="selectPlan(200, this)"><div class="plan-amount">₹200</div><div class="plan-tokens">200 Tokens</div></div>
-      <div class="plan-card" onclick="selectPlan(500, this)"><div class="plan-amount">₹500</div><div class="plan-tokens">550 Tokens</div></div>
-      <div class="plan-card" onclick="selectPlan(1000, this)"><div class="plan-amount">₹1000</div><div class="plan-tokens">1150 Tokens</div></div>
-      <div class="plan-card" onclick="selectPlan(2000, this)"><div class="plan-amount">₹2000</div><div class="plan-tokens">2400 Tokens</div></div>
-    </div>
-    <div class="qr-box">
-      <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=vynoralive@slc&pn=RajnishKumar&am=50" id="upi-qr-img">
-      <p style="font-size:0.75rem; color:#666; margin-top:4px;">UPI ID: <b>vynoralive@slc</b></p>
-    </div>
-    <div style="text-align: left; margin-bottom: 4px;">
-      <label style="font-size: 0.75rem; color: var(--text-muted);">Upload Payment Screenshot:</label>
-    </div>
-    <input type="file" id="recharge-screenshot" class="input-box" accept="image/*">
-    <input type="text" id="recharge-utr" class="input-box" placeholder="Enter 12-Digit UTR / Ref Number">
-    <button class="call-btn" style="padding:12px;" onclick="submitRecharge()">Submit For Approval</button>
-  </div>
-</div>
-
-<div class="modal-overlay" id="host-reg-modal">
-  <div class="modal-card">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-      <h3>⭐ Host Registration</h3>
-      <button style="background:none; border:none; color:white;" onclick="closeModal('host-reg-modal')">✕</button>
-    </div>
-    <input type="text" id="host-name-input" class="input-box" placeholder="Your Full Name">
-    <input type="number" id="host-age-input" class="input-box" placeholder="Age">
-    <input type="number" id="host-rate-input" class="input-box" placeholder="Call Rate (Tokens/min)">
-    <input type="text" id="host-lang-input" class="input-box" placeholder="Languages">
-    <input type="text" id="host-loc-input" class="input-box" placeholder="Location">
-    <input type="text" id="host-bio-input" class="input-box" placeholder="Short Bio">
-    <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:8px;">* Note: After approval, you can upload your profile photo directly from your profile settings.</p>
-    <button class="call-btn" style="padding:12px;" onclick="submitHostRegistration()">Submit For Approval</button>
-  </div>
-</div>
-
-<script>
-const tg = window.Telegram?.WebApp;
-if (tg) tg.expand();
-const userId = tg?.initDataUnsafe?.user?.id ? Math.abs(parseInt(tg.initDataUnsafe.user.id)) : 7001825467;
-const userName = tg?.initDataUnsafe?.user?.first_name || "Vynora Live User";
-const telegramPhoto = tg?.initDataUnsafe?.user?.photo_url || "";
-let userTokens = 0;
-let selectedAmount = 50;
-let selectedHostObj = null;
-let allHostsList = [];
-let agoraClient = null;
-let localTracks = { audioTrack: null, videoTrack: null };
-let chatInterval = null;
-let bookingCheckInterval = null;
-let isMainViewLocal = false;
-let callTimerInterval = null;
-let pendingApprovedBooking = null;
-
-async function initData() {
-  try {
-    const res = await fetch(`/api/user/${userId}`);
-    const data = await res.json();
-    if (data.is_banned) {
-      document.body.innerHTML = `<div style="display: flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; text-align:center; padding:20px; background:#06040C; color:white;"><h2 style="color:#FF0033; margin-bottom:10px;">🚫 Account Suspended</h2><p style="color:#94A3B8; font-size:0.9rem;">Your account has been suspended by the admin. Please contact support @VynoraSupport</p></div>`;
-      return;
-    }
-    userTokens = data.tokens || 0;
-    document.getElementById('user-token-bal').innerText = userTokens;
-    document.getElementById('profile-tokens-count').innerText = data.earnings || 0;
-    document.getElementById('profile-earnings-count').innerText = data.net_earnings_inr || 0;
-    document.getElementById('profile-user-name').innerText = userName;
-    document.getElementById('profile-user-id').innerText = userId;
-    const avatarImg = data.avatar || telegramPhoto || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop";
-    document.getElementById('profile-avatar-img').src = avatarImg;
-    document.getElementById('header-avatar-img').src = avatarImg;
-  } catch(e) {}
-
-  try {
-    const hostRes = await fetch(`/api/host/status/${userId}`);
-    const hostData = await hostRes.json();
-    const actionGrid = document.getElementById('profile-action-grid');
-    const earningsBox = document.getElementById('earnings-box');
-    const withdrawBtnContainer = document.getElementById('withdraw-btn-container');
-    const promoBannerCard = document.getElementById('promo-banner-card');
-    const hostRateContainer = document.getElementById('host-rate-container');
-
-    if (hostData.is_host && hostData.status === "approved") {
-      earningsBox.style.display = 'flex';
-      withdrawBtnContainer.style.display = 'block';
-      hostRateContainer.style.display = 'block';
-      promoBannerCard.style.display = 'none';
-      const isOnline = hostData.is_online;
-      actionGrid.innerHTML = `
-        <div class="icon-card" style="background: rgba(255,0,122,0.25); border-color: #FF007A;" onclick="startMyLiveStream()">
-          <i class="fa-solid fa-tower-broadcast" style="color:#FF007A;"></i>
-          <p style="color:white; font-weight:700;">Go Live</p>
+    <!-- WHATSAPP STYLE INCOMING CALL SCREEN -->
+    <div id="whatsapp-call-screen">
+        <div>
+            <p style="color: #00F5D4; font-size: 0.8rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 25px;">Incoming Video Call</p>
+            <img id="wa-caller-img" src="" class="wa-avatar">
+            <h2 id="wa-caller-name" style="font-size: 1.6rem; font-weight: 800; color: white; margin-bottom: 6px;">Host Name</h2>
+            <p style="font-size: 0.85rem; color: var(--text-muted);">Vynora Secure 1v1 Call...</p>
         </div>
-        <div class="icon-card" style="background: rgba(0,245,212,0.15); border-color: var(--accent-cyan);" onclick="openHostBookingsModal()">
-          <i class="fa-solid fa-clipboard-list" style="color:var(--accent-cyan);"></i>
-          <p style="color:white; font-weight:700;">Bookings</p>
+        <div style="display: flex; gap: 50px; justify-content: center; margin-bottom: 40px; width: 100%;">
+            <div onclick="declineWhatsAppCall()" style="display:flex; flex-direction:column; align-items:center; gap:8px; cursor:pointer;">
+                <div style="width: 70px; height: 70px; background: #FF0033; border-radius: 50%; display:flex; align-items:center; justify-content:center; color:white; font-size:1.6rem; box-shadow: 0 4px 20px rgba(255,0,51,0.6);">
+                    <i class="fa-solid fa-phone-slash"></i>
+                </div>
+                <span style="font-size:0.8rem; color:white; font-weight:700;">Decline</span>
+            </div>
+            <div onclick="answerWhatsAppCall()" style="display:flex; flex-direction:column; align-items:center; gap:8px; cursor:pointer;">
+                <div style="width: 70px; height: 70px; background: #00F5D4; border-radius: 50%; display:flex; align-items:center; justify-content:center; color:#000; font-size:1.6rem; box-shadow: 0 4px 20px rgba(0,245,212,0.6); animation: pulseRing 1s infinite;">
+                    <i class="fa-solid fa-phone"></i>
+                </div>
+                <span style="font-size:0.8rem; color:white; font-weight:700;">Accept</span>
+            </div>
         </div>
-        <div class="icon-card" style="background: rgba(0,245,212,0.15); border-color: var(--accent-cyan);" onclick="toggleHostOnlineStatus()">
-          <i class="fa-solid fa-power-off" style="color:var(--accent-cyan);"></i>
-          <p style="color:white; font-weight:700;">${isOnline ? "Online" : "Offline"}</p>
+    </div>
+
+    <header class="app-header">
+        <div class="brand-logo"><i class="fa-solid fa-bolt" style="color:#FF007A;"></i> Vynora Live</div>
+        <div class="header-right">
+            <div class="wallet-badge" onclick="openRechargeModal()">
+                <span>🪙 <span id="user-token-bal">0</span></span>
+                <i class="fa-solid fa-plus-circle" style="color:#FF007A;"></i>
+            </div>
+            <div class="profile-btn" onclick="switchTab('profile')">
+                <img id="header-avatar-img" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop">
+            </div>
         </div>
-        <div class="icon-card" style="background: rgba(255,215,0,0.15); border-color: var(--gold);" onclick="openHistoryModal()">
-          <i class="fa-solid fa-clock-rotate-left" style="color:var(--gold);"></i>
-          <p style="color:white; font-weight:700;">History</p>
-        </div>`;
-    } else {
-      earningsBox.style.display = 'none';
-      withdrawBtnContainer.style.display = 'none';
-      hostRateContainer.style.display = 'none';
-      promoBannerCard.style.display = 'flex';
-      actionGrid.innerHTML = `
-        <div class="icon-card" style="background: rgba(255,215,0,0.15); border-color: var(--gold);" onclick="openHistoryModal()">
-          <i class="fa-solid fa-clock-rotate-left" style="color:var(--gold);"></i>
-          <p style="color:white; font-weight:700;">History</p>
+    </header>
+
+    <div id="home-tab-view">
+        <!-- TOP BANNER -->
+        <div class="top-app-banner">
+            <div>
+                <h2>✨ Vynora Live 1v1</h2>
+                <p>Connect with Verified Global Streamers</p>
+            </div>
+            <i class="fa-solid fa-crown" style="font-size: 1.8rem; color: var(--gold);"></i>
         </div>
-        <div class="icon-card" onclick="openHostRegistrationModal()">
-          <i class="fa-solid fa-video" style="color:#FF007A;"></i>
-          <p>Creator Center</p>
-        </div>`;
-    }
-  } catch(e) {}
 
-  fetchHosts();
-  startBookingStatusPoller();
-}
+        <div class="promo-banner" id="promo-banner-card">
+            <div>
+                <h3>💎 VIP Creator Lounge</h3>
+                <p>Earn coins by hosting 1v1 private calls!</p>
+            </div>
+            <button class="get-btn" onclick="openHostRegistrationModal()" id="become-host-banner-btn">Become Host</button>
+        </div>
 
-async function updateHostRate() {
-  const newRate = parseInt(document.getElementById('new-call-rate-input').value);
-  if (!newRate || newRate <= 0) return alert("Please enter a valid call rate!");
-  try {
-    const res = await fetch('/api/host/update-rate', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ user_id: parseInt(userId), rate: newRate })
-    });
-    const data = await res.json();
-    if (data.status === 'success') {
-      alert('✨ Call rate updated successfully!');
-      document.getElementById('new-call-rate-input').value = "";
-      fetchHosts();
-    } else {
-      alert('❌ ' + (data.message || 'Failed to update rate.'));
-    }
-  } catch(e) {
-    alert('⚠️ Network error while updating rate.');
-  }
-}
+        <div class="filter-container">
+            <div class="filter-pill active" onclick="filterHosts('all', this)">🔥 All Hosts</div>
+            <div class="filter-pill" onclick="filterHosts('verified', this)">💎 Verified Only</div>
+            <div class="filter-pill" onclick="filterHosts('private', this)">👑 Private Calls</div>
+            <div class="filter-pill" onclick="filterHosts('budget', this)">⚡ Under 50🪙</div>
+        </div>
 
-function startBookingStatusPoller() {
-  if (bookingCheckInterval) clearInterval(bookingCheckInterval);
-  bookingCheckInterval = setInterval(async () => {
-    try {
-      const res = await fetch(`/api/user/bookings/${userId}`);
-      const data = await res.json();
-      if (data.bookings) {
-        const approvedBooking = data.bookings.find(b => b.status === 'approved');
-        if (approvedBooking && !document.getElementById('video-call-screen').classList.contains('active')) {
-          const handledKey = 'handled_call_' + approvedBooking.booking_id;
-          if (!localStorage.getItem(handledKey)) {
-            pendingApprovedBooking = approvedBooking;
-            showWhatsAppIncomingCall(approvedBooking);
-          }
+        <div class="section-header"><i class="fa-solid fa-video" style="color:#FF007A;"></i> Public Live Streams & Streamers</div>
+        <div class="host-grid" id="hosts-container"></div>
+    </div>
+
+    <div class="profile-container" id="profile-tab-view">
+        <div class="profile-header-card">
+            <div class="profile-avatar-wrapper">
+                <img id="profile-avatar-img" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop" class="profile-avatar-img">
+                <div class="cam-edit-icon" onclick="promptPhotoUpdate()"><i class="fa-solid fa-camera"></i></div>
+                <input type="file" id="profile-file-input" style="display: none;" accept="image/*" onchange="uploadProfilePhoto(this)">
+            </div>
+            <div class="user-meta">
+                <h2 id="profile-user-name">Vynora Live 👑</h2>
+                <div class="user-id-text">ID: <span id="profile-user-id">7001825467</span> • 🇮🇳 India</div>
+            </div>
+        </div>
+
+        <div class="wallet-banner-row">
+            <div class="wallet-box" onclick="openRechargeModal()">
+                <div><div style="font-size:0.75rem; color:var(--text-muted);">Tokens Earned</div><b style="color:var(--gold);">🪙 <span id="profile-tokens-count">0</span></b></div>
+                <i class="fa-solid fa-chevron-right" style="font-size:0.8rem; color:var(--text-muted);"></i>
+            </div>
+            <div class="wallet-box" onclick="openWithdrawModal()" id="earnings-box" style="display:none;">
+                <div><div style="font-size:0.75rem; color:var(--text-muted);">Net Payout (70%)</div><b style="color:var(--accent-cyan);">💰 ₹<span id="profile-earnings-count">0</span></b></div>
+                <i class="fa-solid fa-chevron-right" style="font-size:0.8rem; color:var(--text-muted);"></i>
+            </div>
+        </div>
+
+        <!-- HOST RATE CHANGE SECTION -->
+        <div style="margin-bottom: 16px; display:none; background:rgba(255,255,255,0.04); border:1px solid var(--card-border); padding:14px; border-radius:14px;" id="host-rate-container">
+            <h4 style="font-size:0.9rem; margin-bottom:8px; color:var(--gold);">⚙️ Manage Call Rate</h4>
+            <div style="display:flex; gap:10px;">
+                <input type="number" id="new-call-rate-input" class="input-box" placeholder="New Rate (Tokens/min)" style="margin-bottom:0;">
+                <button class="get-btn" style="background:var(--accent-cyan); color:#000; font-weight:700; white-space:nowrap;" onclick="updateHostRate()">Update Rate</button>
+            </div>
+        </div>
+
+        <div style="margin-bottom: 20px; display:none;" id="withdraw-btn-container">
+            <button class="call-btn" style="background: linear-gradient(135deg, #00F5D4 0%, #00B2FF 100%); color: #000;" onclick="openWithdrawModal()">
+                <i class="fa-solid fa-wallet"></i> Withdraw Earnings (UPI)
+            </button>
+        </div>
+
+        <div class="action-icon-grid" id="profile-action-grid"></div>
+    </div>
+
+    <!-- HOST BOOKINGS MODAL -->
+    <div class="modal-overlay" id="host-bookings-modal">
+        <div class="modal-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h3>📋 Recent Booking Requests</h3>
+                <button style="background:none; border:none; color:white; font-size:1.2rem;" onclick="closeModal('host-bookings-modal')">✕</button>
+            </div>
+            <div id="host-bookings-list" style="max-height: 300px; overflow-y: auto;">
+                <p style="text-align:center; color:var(--text-muted);">Loading bookings...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- USER BOOKINGS MODAL -->
+    <div class="modal-overlay" id="user-bookings-modal">
+        <div class="modal-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h3>📅 My Bookings & Sessions</h3>
+                <button style="background:none; border:none; color:white; font-size:1.2rem;" onclick="closeModal('user-bookings-modal')">✕</button>
+            </div>
+            <div id="user-bookings-list" style="max-height: 320px; overflow-y: auto;">
+                <p style="text-align:center; color:var(--text-muted);">Loading your bookings...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- HISTORY / CALL LOGS MODAL -->
+    <div class="modal-overlay" id="history-modal">
+        <div class="modal-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h3>📜 Recent Call History</h3>
+                <button style="background:none; border:none; color:white; font-size:1.2rem;" onclick="closeModal('history-modal')">✕</button>
+            </div>
+            <div id="history-list-container" style="max-height: 320px; overflow-y: auto;">
+                <p style="text-align:center; color:var(--text-muted);">Loading history...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- WITHDRAWAL MODAL -->
+    <div class="modal-overlay" id="withdraw-modal">
+        <div class="modal-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h3>💸 Withdraw Earnings</h3>
+                <button style="background:none; border:none; color:white; font-size:1.2rem;" onclick="closeModal('withdraw-modal')">✕</button>
+            </div>
+            <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:10px;">Available Net Payout (70%): ₹<span id="withdraw-available-bal">0</span></p>
+            <input type="text" id="withdraw-upi-input" class="input-box" placeholder="Enter your UPI ID (e.g. okaxis@paytm)">
+            <input type="number" id="withdraw-amount-input" class="input-box" placeholder="Enter Tokens to Withdraw">
+            <button class="call-btn" style="padding:12px;" onclick="submitWithdrawalRequest()">🚀 Submit Withdrawal Request</button>
+        </div>
+    </div>
+
+    <nav class="bottom-nav">
+        <div class="nav-item active" id="nav-home" onclick="switchTab('home')"><i class="fa-solid fa-house"></i><span>Home</span></div>
+        <div class="nav-item" onclick="openRechargeModal()"><i class="fa-solid fa-wallet"></i><span>Recharge</span></div>
+        <div class="nav-item" onclick="openSupportLink()"><i class="fa-solid fa-headset"></i><span>Support</span></div>
+        <div class="nav-item" id="nav-profile" onclick="switchTab('profile')"><i class="fa-solid fa-user"></i><span>Profile</span></div>
+    </nav>
+
+    <!-- HOST PROFILE DRAWER -->
+    <div class="modal-overlay" id="host-booking-modal">
+        <div class="modal-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h3 id="bk-host-name">Host Profile</h3>
+                <button style="background:none; border:none; color:white; font-size:1.2rem;" onclick="closeModal('host-booking-modal')">✕</button>
+            </div>
+            <img id="drawer-host-img" src="" style="width:100%; height:180px; object-fit:cover; border-radius:16px; margin-bottom:10px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <div>
+                    <h4 id="drawer-name-title" style="font-size:1rem;">Host Name</h4>
+                    <p id="drawer-bio" style="font-size:0.75rem; color:var(--text-muted);">Verified Host 👑</p>
+                </div>
+                <div style="background:rgba(255,215,0,0.1); border:1px solid rgba(255,215,0,0.3); padding:4px 10px; border-radius:12px; color:var(--gold); font-size:0.8rem; font-weight:700;">
+                    🪙 <span id="drawer-rate">50</span>/min
+                </div>
+            </div>
+
+            <div class="booking-option-card" style="background:rgba(0,245,212,0.08); border-color:var(--accent-cyan); display:flex; justify-content:space-between; align-items:center; padding:12px; border-radius:14px; margin-bottom:10px;">
+                <div><b>⚡ Watch Public Stream</b><p style="font-size:0.7rem; color:var(--text-muted);">Join live stream free</p></div>
+                <button class="call-btn" style="width:auto; padding:6px 12px; background:var(--accent-cyan); color:#000;" onclick="joinPublicStream()">👀 Watch Live</button>
+            </div>
+
+            <div style="font-size:0.8rem; font-weight:700; margin: 10px 0 6px 0;">⏱️ Private Slot Booking (1m - 30m):</div>
+            <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:6px; max-height:160px; overflow-y:auto; padding-right:4px;">
+                <div class="plan-card" onclick="confirmBooking(1)"><div class="plan-amount">1 Min</div><div class="plan-tokens" id="cost-1">🪙 50</div></div>
+                <div class="plan-card" onclick="confirmBooking(5)"><div class="plan-amount">5 Mins</div><div class="plan-tokens" id="cost-5">🪙 250</div></div>
+                <div class="plan-card" onclick="confirmBooking(10)"><div class="plan-amount">10 Mins</div><div class="plan-tokens" id="cost-10">🪙 500</div></div>
+                <div class="plan-card" onclick="confirmBooking(15)"><div class="plan-amount">15 Mins</div><div class="plan-tokens" id="cost-15">🪙 750</div></div>
+                <div class="plan-card" onclick="confirmBooking(20)"><div class="plan-amount">20 Mins</div><div class="plan-tokens" id="cost-20">🪙 1000</div></div>
+                <div class="plan-card" onclick="confirmBooking(30)"><div class="plan-amount">30 Mins</div><div class="plan-tokens" id="cost-30">🪙 1500</div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- VIDEO CALL SCREEN -->
+    <div id="video-call-screen">
+        <div id="main-video-view"></div>
+        <div id="pip-video-view" onclick="swapVideoLayouts()" title="Tap to Swap View"></div>
+        
+        <div class="live-top-bar">
+            <div class="live-host-pill">
+                <img id="live-active-img" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop">
+                <div>
+                    <div id="live-active-name" style="font-size:0.8rem; line-height:1;">Streamer</div>
+                    <div style="font-size:0.65rem; color:var(--gold);">🪙 <span id="live-host-rate">50</span>/m</div>
+                </div>
+            </div>
+            <div class="live-viewer-count">👁️ <span id="viewer-count">1</span> Watching</div>
+        </div>
+
+        <div class="live-chat-messages" id="chat-messages-container"></div>
+
+        <div class="filter-bar">
+            <div class="cam-filter-btn active" onclick="applyCameraFilter('filter-normal', this)">✨ Normal</div>
+            <div class="cam-filter-btn" onclick="applyCameraFilter('filter-beauty', this)">🌟 Beauty Glow</div>
+            <div class="cam-filter-btn" onclick="applyCameraFilter('filter-rosy', this)">🌸 Rosy Pink</div>
+            <div class="cam-filter-btn" onclick="applyCameraFilter('filter-cool', this)">🧊 Cool Blue</div>
+            <div class="cam-filter-btn" onclick="applyCameraFilter('filter-cinematic', this)">🕶️ Cinematic</div>
+        </div>
+
+        <div class="live-bottom-bar">
+            <input type="text" class="live-chat-input" placeholder="Say something nice..." id="chat-input" onkeypress="handleChatKey(event)">
+            <div class="live-action-btn" onclick="sendChatMessage()" title="Send SMS"><i class="fa-solid fa-paper-plane" style="color:var(--accent-cyan);"></i></div>
+            <div class="live-action-btn" onclick="openGiftModal()" title="Send Gift">🎁</div>
+            <div class="live-action-btn live-end-btn" onclick="leaveCall()" title="End Call"><i class="fa-solid fa-phone-slash"></i></div>
+        </div>
+    </div>
+
+    <!-- GIFT MODAL -->
+    <div class="modal-overlay" id="gift-modal">
+        <div class="modal-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h3>🎁 Send Gift to Streamer</h3>
+                <button style="background:none; border:none; color:white; font-size:1.2rem;" onclick="closeModal('gift-modal')">✕</button>
+            </div>
+            <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:10px;">Your Tokens: 🪙 <span id="gift-user-tokens">0</span></p>
+            <div class="gifts-grid">
+                <div class="gift-item" onclick="sendGift(10, 'Rose 🌹')"><div class="gift-emoji">🌹</div><div style="font-size:0.8rem; font-weight:700;">Rose</div><div style="font-size:0.7rem; color:var(--gold);">🪙 10</div></div>
+                <div class="gift-item" onclick="sendGift(50, 'Heart ❤️')"><div class="gift-emoji">❤️</div><div style="font-size:0.8rem; font-weight:700;">Heart</div><div style="font-size:0.7rem; color:var(--gold);">🪙 50</div></div>
+                <div class="gift-item" onclick="sendGift(100, 'Ring 💍')"><div class="gift-emoji">💍</div><div style="font-size:0.8rem; font-weight:700;">Ring</div><div style="font-size:0.7rem; color:var(--gold);">🪙 100</div></div>
+                <div class="gift-item" onclick="sendGift(250, 'Crown 👑')"><div class="gift-emoji">👑</div><div style="font-size:0.8rem; font-weight:700;">Crown</div><div style="font-size:0.7rem; color:var(--gold);">🪙 250</div></div>
+                <div class="gift-item" onclick="sendGift(500, 'Car 🏎️')"><div class="gift-emoji">🏎️</div><div style="font-size:0.8rem; font-weight:700;">Car</div><div style="font-size:0.7rem; color:var(--gold);">🪙 500</div></div>
+                <div class="gift-item" onclick="sendGift(1000, 'Castle 🏰')"><div class="gift-emoji">🏰</div><div style="font-size:0.8rem; font-weight:700;">Castle</div><div style="font-size:0.7rem; color:var(--gold);">🪙 1000</div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- RECHARGE MODAL -->
+    <div class="modal-overlay" id="recharge-modal">
+        <div class="modal-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h3>💳 Select Recharge Plan</h3>
+                <button style="background:none; border:none; color:white; font-size:1.2rem;" onclick="closeModal('recharge-modal')">✕</button>
+            </div>
+            <div class="plan-grid">
+                <div class="plan-card active" onclick="selectPlan(50, this)"><div class="plan-amount">₹50</div><div class="plan-tokens">50 Tokens</div></div>
+                <div class="plan-card" onclick="selectPlan(100, this)"><div class="plan-amount">₹100</div><div class="plan-tokens">100 Tokens</div></div>
+                <div class="plan-card" onclick="selectPlan(200, this)"><div class="plan-amount">₹200</div><div class="plan-tokens">200 Tokens</div></div>
+                <div class="plan-card" onclick="selectPlan(500, this)"><div class="plan-amount">₹500</div><div class="plan-tokens">550 Tokens</div></div>
+                <div class="plan-card" onclick="selectPlan(1000, this)"><div class="plan-amount">₹1000</div><div class="plan-tokens">1150 Tokens</div></div>
+                <div class="plan-card" onclick="selectPlan(2000, this)"><div class="plan-amount">₹2000</div><div class="plan-tokens">2400 Tokens</div></div>
+            </div>
+            <div class="qr-box">
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=vynoralive@slc&pn=RajnishKumar&am=50" id="upi-qr-img">
+                <p style="font-size:0.75rem; color:#666; margin-top:4px;">UPI ID: <b>vynoralive@slc</b></p>
+            </div>
+            
+            <div style="text-align: left; margin-bottom: 4px;">
+                <label style="font-size: 0.75rem; color: var(--text-muted);">Upload Payment Screenshot:</label>
+            </div>
+            <input type="file" id="recharge-screenshot" class="input-box" accept="image/*">
+            
+            <input type="text" id="recharge-utr" class="input-box" placeholder="Enter 12-Digit UTR / Ref Number">
+            <button class="call-btn" style="padding:12px;" onclick="submitRecharge()">🚀 Submit For Approval</button>
+        </div>
+    </div>
+
+    <!-- HOST REGISTRATION MODAL (URL REMOVED) -->
+    <div class="modal-overlay" id="host-reg-modal">
+        <div class="modal-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                <h3>📹 Host Registration</h3>
+                <button style="background:none; border:none; color:white;" onclick="closeModal('host-reg-modal')">✕</button>
+            </div>
+            <input type="text" id="host-name-input" class="input-box" placeholder="Your Full Name">
+            <input type="number" id="host-age-input" class="input-box" placeholder="Age">
+            <input type="number" id="host-rate-input" class="input-box" placeholder="Call Rate (Tokens/min)">
+            <input type="text" id="host-lang-input" class="input-box" placeholder="Languages">
+            <input type="text" id="host-loc-input" class="input-box" placeholder="Location">
+            <input type="text" id="host-bio-input" class="input-box" placeholder="Short Bio">
+            <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:8px;">* Note: After approval, you can upload your profile photo directly from your profile settings.</p>
+            <button class="call-btn" style="padding:12px;" onclick="submitHostRegistration()">🚀 Submit For Approval</button>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram?.WebApp;
+        if (tg) tg.expand();
+
+        const userId = tg?.initDataUnsafe?.user?.id ? Math.abs(parseInt(tg.initDataUnsafe.user.id)) : 7001825467;
+        const userName = tg?.initDataUnsafe?.user?.first_name || "Vynora Live";
+        const telegramPhoto = tg?.initDataUnsafe?.user?.photo_url || "";
+        
+        let userTokens = 0;
+        let selectedAmount = 50;
+        let selectedHostObj = null;
+        let allHostsList = [];
+
+        let agoraClient = null;
+        let localTracks = { audioTrack: null, videoTrack: null };
+        let chatInterval = null;
+        let bookingCheckInterval = null;
+        let isMainViewLocal = false;
+        let callTimerInterval = null;
+        let pendingApprovedBooking = null;
+
+        async function initData() {
+            try {
+                const res = await fetch(`/api/user/${userId}`);
+                const data = await res.json();
+                
+                if (data.is_banned) {
+                    document.body.innerHTML = `<div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; text-align:center; padding:20px; background:#06040C; color:white;"><h2 style="color:#FF0033; margin-bottom:10px;">🚫 Account Suspended</h2><p style="color:#94A3B8; font-size:0.9rem;">Your account has been suspended by the admin. Please contact support @VynoraSupport</p></div>`;
+                    return;
+                }
+
+                userTokens = data.tokens || 0;
+                document.getElementById('user-token-bal').innerText = userTokens;
+                document.getElementById('profile-tokens-count').innerText = data.earnings || 0;
+                document.getElementById('profile-earnings-count').innerText = data.net_earnings_inr || 0;
+
+                document.getElementById('profile-user-name').innerText = `${userName} 👑`;
+                document.getElementById('profile-user-id').innerText = userId;
+
+                const avatarImg = data.avatar || telegramPhoto || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop";
+                document.getElementById('profile-avatar-img').src = avatarImg;
+                document.getElementById('header-avatar-img').src = avatarImg;
+            } catch(e) {}
+
+            try {
+                const hostRes = await fetch(`/api/host/status/${userId}`);
+                const hostData = await hostRes.json();
+                
+                const actionGrid = document.getElementById('profile-action-grid');
+                const earningsBox = document.getElementById('earnings-box');
+                const withdrawBtnContainer = document.getElementById('withdraw-btn-container');
+                const promoBannerCard = document.getElementById('promo-banner-card');
+                const hostRateContainer = document.getElementById('host-rate-container');
+
+                if (hostData.is_host && hostData.status === "approved") {
+                    earningsBox.style.display = 'flex';
+                    withdrawBtnContainer.style.display = 'block';
+                    hostRateContainer.style.display = 'block';
+                    promoBannerCard.style.display = 'none';
+
+                    const isOnline = hostData.is_online;
+                    actionGrid.innerHTML = `
+                        <div class="icon-card" style="background: rgba(255,0,122,0.25); border-color: #FF007A;" onclick="startMyLiveStream()">
+                            <i class="fa-solid fa-tower-broadcast" style="color:#FF007A;"></i>
+                            <p style="color:white; font-weight:700;">Go Live 🔴</p>
+                        </div>
+                        <div class="icon-card" style="background: rgba(0,245,212,0.15); border-color: var(--accent-cyan);" onclick="openHostBookingsModal()">
+                            <i class="fa-solid fa-clipboard-list" style="color:var(--accent-cyan);"></i>
+                            <p style="color:white; font-weight:700;">Bookings</p>
+                        </div>
+                        <div class="icon-card" style="background: rgba(0,245,212,0.15); border-color: var(--accent-cyan);" onclick="toggleHostOnlineStatus()">
+                            <i class="fa-solid fa-power-off" style="color:var(--accent-cyan);"></i>
+                            <p style="color:white; font-weight:700;">${isOnline ? "Online 🟢" : "Offline 🔴"}</p>
+                        </div>
+                        <div class="icon-card" style="background: rgba(255,215,0,0.15); border-color: var(--gold);" onclick="openHistoryModal()">
+                            <i class="fa-solid fa-clock-rotate-left" style="color:var(--gold);"></i>
+                            <p style="color:white; font-weight:700;">History</p>
+                        </div>
+                    `;
+                } else {
+                    earningsBox.style.display = 'none';
+                    withdrawBtnContainer.style.display = 'none';
+                    hostRateContainer.style.display = 'none';
+                    promoBannerCard.style.display = 'flex';
+
+                    actionGrid.innerHTML = `
+                        <div class="icon-card" style="background: rgba(255,215,0,0.15); border-color: var(--gold);" onclick="openHistoryModal()">
+                            <i class="fa-solid fa-clock-rotate-left" style="color:var(--gold);"></i>
+                            <p style="color:white; font-weight:700;">History</p>
+                        </div>
+                        <div class="icon-card" onclick="openHostRegistrationModal()">
+                            <i class="fa-solid fa-video" style="color:#FF007A;"></i>
+                            <p>Creator Center</p>
+                        </div>
+                    `;
+                }
+            } catch(e) {}
+
+            fetchHosts();
+            startBookingStatusPoller();
         }
-      }
-    } catch(e) {}
-  }, 3000);
-}
 
-function showWhatsAppIncomingCall(b) {
-  document.getElementById('wa-caller-name').innerText = b.host_name;
-  document.getElementById('wa-caller-img').src = b.host_img || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop";
-  document.getElementById('whatsapp-call-screen').classList.add('active');
-}
+        async function updateHostRate() {
+            const newRate = parseInt(document.getElementById('new-call-rate-input').value);
+            if (!newRate || newRate <= 0) return alert("Please enter a valid call rate!");
 
-function declineWhatsAppCall() {
-  document.getElementById('whatsapp-call-screen').classList.remove('active');
-  if (pendingApprovedBooking) {
-    localStorage.setItem('handled_call_' + pendingApprovedBooking.booking_id, 'declined');
-  }
-}
+            try {
+                const res = await fetch('/api/host/update-rate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ user_id: parseInt(userId), rate: newRate })
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    alert('✅ Call rate updated successfully!');
+                    document.getElementById('new-call-rate-input').value = '';
+                    fetchHosts();
+                } else {
+                    alert('❌ ' + (data.message || 'Failed to update rate.'));
+                }
+            } catch(e) {
+                alert('❌ Network error while updating rate.');
+            }
+        }
 
-function answerWhatsAppCall() {
-  document.getElementById('whatsapp-call-screen').classList.remove('active');
-  if (pendingApprovedBooking) {
-    localStorage.setItem('handled_call_' + pendingApprovedBooking.booking_id, 'answered');
-    startCallWithTimer(
-      pendingApprovedBooking.channel_name || ("private_call_" + userId),
-      pendingApprovedBooking.host_name,
-      pendingApprovedBooking.host_img,
-      pendingApprovedBooking.duration_mins,
-      "publisher",
-      pendingApprovedBooking.call_started_at
-    );
-  }
-}
+        function startBookingStatusPoller() {
+            if (bookingCheckInterval) clearInterval(bookingCheckInterval);
+            bookingCheckInterval = setInterval(async () => {
+                try {
+                    const res = await fetch(`/api/user/bookings/${userId}`);
+                    const data = await res.json();
+                    if (data.bookings) {
+                        const approvedBooking = data.bookings.find(b => b.status === 'approved');
+                        if (approvedBooking && !document.getElementById('video-call-screen').classList.contains('active')) {
+                            const handledKey = 'handled_call_' + approvedBooking.booking_id;
+                            if (!localStorage.getItem(handledKey)) {
+                                pendingApprovedBooking = approvedBooking;
+                                showWhatsAppIncomingCall(approvedBooking);
+                            }
+                        }
+                    }
+                } catch(e) {}
+            }, 3000);
+        }
 
-async function fetchHosts() {
-  try {
-    const res = await fetch('/api/hosts');
-    const data = await res.json();
-    allHostsList = data.hosts || [];
-    renderHosts(allHostsList);
-  } catch(e) {
-    renderHosts([]);
-  }
-}
+        function showWhatsAppIncomingCall(b) {
+            document.getElementById('wa-caller-name').innerText = b.host_name;
+            document.getElementById('wa-caller-img').src = b.host_img || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop";
+            document.getElementById('whatsapp-call-screen').classList.add('active');
+        }
 
-function renderHosts(list) {
-  const container = document.getElementById('hosts-container');
-  if(list.length === 0) {
-    container.innerHTML = `<p style="grid-column: span 2; text-align:center; color:var(--text-muted); padding:20px;">No online streams available.</p>`;
-    return;
-  }
-  container.innerHTML = list.map(h => `
-    <div class="host-card" onclick="openBookingDrawer('${h.id}', '${h.user_id || h.id}', '${h.name}', '${h.img}', '${h.bio || 'Live Stream'}', ${h.rate || 50})">
-      <img src="${h.img}" class="host-thumb">
-      <div class="badge-live">${h.is_online ? '🟢 LIVE' : '⚪ OFFLINE'}</div>
-      <div class="badge-rate">💎 ${h.rate || 50}/m</div>
-      <div class="host-info">
-        <div class="host-name">${h.name} <i class="fa-solid fa-circle-check" style="color:#00B2FF;"></i></div>
-        <button class="call-btn"><i class="fa-solid fa-eye"></i> Watch / Book</button>
-      </div>
-    </div>
-  `).join("");
-}
+        function declineWhatsAppCall() {
+            document.getElementById('whatsapp-call-screen').classList.remove('active');
+            if (pendingApprovedBooking) {
+                localStorage.setItem('handled_call_' + pendingApprovedBooking.booking_id, 'declined');
+            }
+        }
 
-function filterHosts(type, el) {
-  document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
-  el.classList.add('active');
-  if (type === 'all') renderHosts(allHostsList);
-  else if (type === 'verified') renderHosts(allHostsList.filter(h => h.isVerified));
-  else if (type === 'private') renderHosts(allHostsList.filter(h => h.isPrivate));
-  else if (type === 'budget') renderHosts(allHostsList.filter(h => (h.rate || 50) <= 50));
-}
+        function answerWhatsAppCall() {
+            document.getElementById('whatsapp-call-screen').classList.remove('active');
+            if (pendingApprovedBooking) {
+                localStorage.setItem('handled_call_' + pendingApprovedBooking.booking_id, 'answered');
+                
+                startCallWithTimer(
+                    pendingApprovedBooking.channel_name || ("private_call_" + userId),
+                    pendingApprovedBooking.host_name,
+                    pendingApprovedBooking.host_img,
+                    pendingApprovedBooking.duration_mins,
+                    "publisher",
+                    pendingApprovedBooking.call_started_at
+                );
+            }
+        }
 
-function openBookingDrawer(id, hostUserId, name, img, bio, rate) {
-  selectedHostObj = { id, hostUserId, name, img, rate };
-  document.getElementById('bk-host-name').innerText = `${name} Profile`;
-  document.getElementById('drawer-host-img').src = img;
-  document.getElementById('drawer-name-title').innerText = name;
-  document.getElementById('drawer-bio').innerText = bio;
-  document.getElementById('drawer-rate').innerText = rate;
-  document.getElementById('cost-1').innerText = `💎 ${rate * 1}`;
-  document.getElementById('cost-5').innerText = `💎 ${rate * 5}`;
-  document.getElementById('cost-10').innerText = `💎 ${rate * 10}`;
-  document.getElementById('cost-15').innerText = `💎 ${rate * 15}`;
-  document.getElementById('cost-20').innerText = `💎 ${rate * 20}`;
-  document.getElementById('cost-30').innerText = `💎 ${rate * 30}`;
-  document.getElementById('host-booking-modal').classList.add('active');
-}
+        async function fetchHosts() {
+            try {
+                const res = await fetch('/api/hosts');
+                const data = await res.json();
+                allHostsList = data.hosts || [];
+                renderHosts(allHostsList);
+            } catch(e) { renderHosts([]); }
+        }
 
-async function openHostBookingsModal() {
-  document.getElementById('host-bookings-modal').classList.add('active');
-  const listContainer = document.getElementById('host-bookings-list');
-  listContainer.innerHTML = `<p style="text-align:center; color:var(--text-muted);">Loading bookings...</p>`;
-  try {
-    const res = await fetch(`/api/host/bookings/${userId}`);
-    const data = await res.json();
-    if(data.bookings && data.bookings.length > 0) {
-      listContainer.innerHTML = data.bookings.map(b => `
-        <div style="background:rgba(255,255,255,0.05); padding:12px; border-radius: 12px; margin-bottom:8px; display: flex; justify-content:space-between; align-items:center;">
-          <div>
-            <p style="font-size:0.85rem; font-weight:700; color:white;">User ID: ${b.user_id}</p>
-            <p style="font-size:0.75rem; color:var(--gold);">⏱️ ${b.duration_mins} Mins | 💎 ${b.token_cost} Tokens</p>
-            <p style="font-size:0.7rem; color:var(--text-muted);">📅 ${b.formatted_time}</p>
-            <p style="font-size:0.75rem; color:${b.status === 'approved' ? 'var(--accent-cyan)' : b.status === 'rejected' ? '#FF0033' : b.status === 'expired' ? '#FFA500' : 'var(--text-muted)'}; font-weight:700;">Status: ${b.status.toUpperCase()}</p>
-          </div>
-          <div style="display:flex; gap:6px;">
-            ${b.status === 'pending' ? `
-              <button onclick="hostActionBooking('${b.booking_id}', 'accept')" style="background:#00F5D4; color:#000; border:none; padding:6px 10px; border-radius:8px; font-weight:700; cursor:pointer;">Accept</button>
-              <button onclick="hostActionBooking('${b.booking_id}', 'reject')" style="background:#FF0033; color:#fff; border:none; padding:6px 10px; border-radius:8px; font-weight:700; cursor:pointer;">Reject</button>
-            ` : ""}
-            ${b.status === 'approved' ? `
-              <button onclick="pendingApprovedBooking = {booking_id: '${b.booking_id}', channel_name: '${b.channel_name}', host_name: 'User #${b.user_id}', host_img: '', duration_mins: ${b.duration_mins}, call_started_at:${b.call_started_at}}; startCallWithTimer('${b.channel_name}', 'User #${b.user_id}', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop', ${b.duration_mins}, 'publisher',${b.call_started_at})" style="background:var(--accent-cyan); color:#000; border:none; padding:6px 10px; border-radius:8px; font-weight:800; cursor:pointer;">Call Now</button>
-            ` : `<span style="font-size:0.75rem; color:var(--text-muted);">${b.status.charAt(0).toUpperCase() + b.status.slice(1)}</span>`}
-          </div>
-        </div>
-      `).join("");
-    } else {
-      listContainer.innerHTML = `<p style="text-align:center; color:var(--text-muted);">No booking requests found.</p>`;
-    }
-  } catch(e) {
-    listContainer.innerHTML = `<p style="text-align:center; color:#FF0033;">Failed to load bookings.</p>`;
-  }
-}
+        function renderHosts(list) {
+            const container = document.getElementById('hosts-container');
+            if(list.length === 0) {
+                container.innerHTML = `<p style="grid-column: span 2; text-align:center; color:var(--text-muted); padding:20px;">No online streams available.</p>`;
+                return;
+            }
+            container.innerHTML = list.map(h => `
+                <div class="host-card" onclick="openBookingDrawer('${h.id}', '${h.user_id || h.id}', '${h.name}', '${h.img}', '${h.bio || 'Live Stream'}', ${h.rate || 50})">
+                    <img src="${h.img}" class="host-thumb">
+                    <div class="badge-live">${h.is_online ? 'LIVE 🔴' : 'OFFLINE ⚪'}</div>
+                    <div class="badge-rate">🪙 ${h.rate || 50}/m</div>
+                    <div class="host-info">
+                        <div class="host-name">${h.name} <i class="fa-solid fa-circle-check" style="color:#00B2FF;"></i></div>
+                        <button class="call-btn"><i class="fa-solid fa-eye"></i> Watch / Book</button>
+                    </div>
+                </div>
+            `).join('');
+        }
 
-async function hostActionBooking(bookingId, action) {
-  try {
-    const endpoint = action === 'accept' ? '/api/host/accept-booking' : '/api/host/reject-booking';
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ booking_id: bookingId })
-    });
-    const data = await res.json();
-    alert(data.message);
-    openHostBookingsModal();
-    if (action === 'accept' && data.channel_name) {
-      closeModal('host-bookings-modal');
-      pendingApprovedBooking = {
-        booking_id: bookingId,
-        channel_name: data.channel_name,
-        host_name: "User Private Call",
-        host_img: "",
-        duration_mins: 10,
-        call_started_at: data.call_started_at
-      };
-      startCallWithTimer(data.channel_name, "User Private Call", "", 10, "publisher", data.call_started_at);
-    }
-  } catch(e) {
-    alert("Action failed due to network error.");
-  }
-}
+        function filterHosts(type, el) {
+            document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+            el.classList.add('active');
 
-function openHistoryModal() {
-  document.getElementById('history-modal').classList.add('active');
-  loadHistoryData();
-}
+            if (type === 'all') renderHosts(allHostsList);
+            else if (type === 'verified') renderHosts(allHostsList.filter(h => h.isVerified));
+            else if (type === 'private') renderHosts(allHostsList.filter(h => h.isPrivate));
+            else if (type === 'budget') renderHosts(allHostsList.filter(h => (h.rate || 50) <= 50));
+        }
 
-async function loadHistoryData() {
-  const container = document.getElementById('history-list-container');
-  container.innerHTML = `<p style="text-align:center; color:var(--text-muted);">Loading history...</p>`;
-  try {
-    const res = await fetch(`/api/user/bookings/${userId}`);
-    const data = await res.json();
-    let hostRes = await fetch(`/api/host/bookings/${userId}`);
-    let hostData = await hostRes.json();
-    let combinedBookings = [...(data.bookings || []), ...(hostData.bookings || [])];
-    let uniqueMap = new Map();
-    combinedBookings.forEach(b => uniqueMap.set(b.booking_id || b._id, b));
-    let allHistory = Array.from(uniqueMap.values());
-    
-    if (allHistory.length > 0) {
-      container.innerHTML = allHistory.map(h => `
-        <div style="background:rgba(255,255,255,0.04); border:1px solid var(--card-border); padding: 12px; border-radius:12px; margin-bottom:10px; display: flex; justify-content:space-between; align-items:center;">
-          <div>
-            <p style="font-size:0.88rem; font-weight:700; color:white;">Call with: ${h.host_name || ('User #' + h.user_id)}</p>
-            <p style="font-size:0.75rem; color:var(--gold);">⏱️ Duration: ${h.duration_mins} Mins | 💎 Cost: ${h.token_cost} Tokens</p>
-            <p style="font-size:0.7rem; color:var(--text-muted);">📅 ${h.formatted_time}</p>
-            <p style="font-size:0.72rem; color:${h.status === 'approved' ? 'var(--accent-cyan)' : h.status === 'rejected' ? '#FF0033' : h.status === 'expired' ? '#FFA500' : 'var(--text-muted)'}; font-weight:700;">Status: ${h.status.toUpperCase()}</p>
-          </div>
-          ${h.status === 'approved' ? `
-            <button onclick="pendingApprovedBooking = {booking_id: '${h.booking_id || h._id}', channel_name: '${h.channel_name}', host_name: '${h.host_name || 'Partner'}', host_img: '${h.host_img \vert{}\vert{} ''}', duration_mins:${h.duration_mins}, call_started_at: ${h.call_started_at \vert{}\vert{} h.time}}; startCallWithTimer('${h.channel_name}', '${h.host_name \vert{}\vert{} 'Partner'}', '${h.host_img || ''}', ${h.duration_mins}, 'publisher',${h.call_started_at || h.time})" style="background:rgba(0,245,212,0.15); border:1px solid var(--accent-cyan); color:var(--accent-cyan); padding:6px 10px; border-radius:8px; font-weight:700; cursor:pointer;">Rejoin</button>
-          ` : `<span style="font-size:0.75rem; color:var(--text-muted);">${h.status.charAt(0).toUpperCase() + h.status.slice(1)}</span>`}
-        </div>
-      `).join("");
-    } else {
-      container.innerHTML = `<p style="text-align:center; color:var(--text-muted);">No history records found.</p>`;
-    }
-  } catch(e) {
-    container.innerHTML = `<p style="text-align:center; color:#FF0033;">Failed to load history.</p>`;
-  }
-}
+        function openBookingDrawer(id, hostUserId, name, img, bio, rate) {
+            selectedHostObj = { id, hostUserId, name, img, rate };
+            document.getElementById('bk-host-name').innerText = `${name} Profile`;
+            document.getElementById('drawer-host-img').src = img;
+            document.getElementById('drawer-name-title').innerText = name;
+            document.getElementById('drawer-bio').innerText = bio;
+            document.getElementById('drawer-rate').innerText = rate;
 
-function startCallWithTimer(channelName, peerName, peerImg, durationMins, role, callStartedAt) {
-  document.getElementById('whatsapp-call-screen').classList.remove('active');
-  closeModal('host-bookings-modal');
-  closeModal('user-bookings-modal');
-  closeModal('history-modal');
-  
-  document.getElementById('live-active-name').innerText = peerName;
-  document.getElementById('live-active-img').src = peerImg || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop";
-  document.getElementById('live-host-rate').innerText = "Private Call";
-  
-  startVideoCall(channelName, userId % 2147483647, role);
-  
-  if (callTimerInterval) clearInterval(callTimerInterval);
-  let timerBadge = document.getElementById('call-timer-badge');
-  if (!timerBadge) {
-    timerBadge = document.createElement('div');
-    timerBadge.id = 'call-timer-badge';
-    timerBadge.style = "position:absolute; top:16px; left:50%; transform:translateX(-50%); background:rgba(255,0,122,0.8); padding:6px 14px; border-radius: 20px; font-weight:800; font-size:0.9rem; color:white; z-index:20;";
-    document.getElementById('video-call-screen').appendChild(timerBadge);
-  }
-  
-  callTimerInterval = setInterval(() => {
-    let nowSecs = Date.now() / 1000;
-    let startSecs = callStartedAt || nowSecs;
-    let elapsed = Math.floor(nowSecs - startSecs);
-    let totalAllowedSeconds = durationMins * 60;
-    let remainingSeconds = totalAllowedSeconds - elapsed;
-    
-    if (remainingSeconds <= 0) {
-      clearInterval(callTimerInterval);
-      timerBadge.innerText = "Time Left: 0:00";
-      alert("⚠️ Your booked slot time is over! Call ending automatically.");
-      leaveCall();
-    } else {
-      let mins = Math.floor(remainingSeconds / 60);
-      let secs = remainingSeconds % 60;
-      timerBadge.innerText = `⏱️ Time Left: ${mins}:${secs < 10 ? '0' : ''}${secs}`;
-    }
-  }, 1000);
-}
+            document.getElementById('cost-1').innerText = `🪙 ${rate * 1}`;
+            document.getElementById('cost-5').innerText = `🪙 ${rate * 5}`;
+            document.getElementById('cost-10').innerText = `🪙 ${rate * 10}`;
+            document.getElementById('cost-15').innerText = `🪙 ${rate * 15}`;
+            document.getElementById('cost-20').innerText = `🪙 ${rate * 20}`;
+            document.getElementById('cost-30').innerText = `🪙 ${rate * 30}`;
 
-function openWithdrawModal() {
-  document.getElementById('withdraw-available-bal').innerText = document.getElementById('profile-earnings-count').innerText;
-  document.getElementById('withdraw-modal').classList.add('active');
-}
+            document.getElementById('host-booking-modal').classList.add('active');
+        }
 
-async function submitWithdrawalRequest() {
-  const upiId = document.getElementById('withdraw-upi-input').value.trim();
-  const tokens = parseInt(document.getElementById('withdraw-amount-input').value);
-  if (!upiId || !tokens) return alert("Please enter UPI ID and token amount!");
-  try {
-    const res = await fetch('/api/withdraw', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ user_id: parseInt(userId), upi_id: upiId, tokens: tokens })
-    });
-    const data = await res.json();
-    alert(data.message);
-    closeModal('withdraw-modal');
-    initData();
-  } catch(e) {
-    alert("Withdrawal request failed");
-  }
-}
+        async function openHostBookingsModal() {
+            document.getElementById('host-bookings-modal').classList.add('active');
+            const listContainer = document.getElementById('host-bookings-list');
+            listContainer.innerHTML = `<p style="text-align:center; color:var(--text-muted);">Loading bookings...</p>`;
+            try {
+                const res = await fetch(`/api/host/bookings/${userId}`);
+                const data = await res.json();
+                if(data.bookings && data.bookings.length > 0) {
+                    listContainer.innerHTML = data.bookings.map(b => `
+                        <div style="background:rgba(255,255,255,0.05); padding:12px; border-radius:12px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <p style="font-size:0.85rem; font-weight:700; color:white;">User ID: ${b.user_id}</p>
+                                <p style="font-size:0.75rem; color:var(--gold);">⏱️ ${b.duration_mins} Mins | 🪙 ${b.token_cost} Tokens</p>
+                                <p style="font-size:0.7rem; color:var(--text-muted);">📅 ${b.formatted_time || ''}</p>
+                                <p style="font-size:0.75rem; color:${b.status === 'approved' ? 'var(--accent-cyan)' : b.status === 'rejected' ? '#FF0033' : b.status === 'expired' ? '#FFA500' : 'var(--text-muted)'}; font-weight:700;">Status: ${b.status.toUpperCase()}</p>
+                            </div>
+                            <div style="display:flex; gap:6px;">
+                                ${b.status === 'pending' ? `
+                                    <button onclick="hostActionBooking('${b.booking_id}', 'accept')" style="background:#00F5D4; color:#000; border:none; padding:6px 10px; border-radius:8px; font-weight:700; cursor:pointer;">Accept</button>
+                                    <button onclick="hostActionBooking('${b.booking_id}', 'reject')" style="background:#FF0033; color:#fff; border:none; padding:6px 10px; border-radius:8px; font-weight:700; cursor:pointer;">Reject</button>
+                                ` : ''}
+                                ${b.status === 'approved' ? `
+                                    <button onclick="pendingApprovedBooking = {booking_id: '${b.booking_id}', channel_name: '${b.channel_name}', host_name: 'User #${b.user_id}', host_img: '', duration_mins: ${b.duration_mins}, call_started_at: ${b.call_started_at}}; startCallWithTimer('${b.channel_name}', 'User #${b.user_id}', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop', ${b.duration_mins}, 'publisher', ${b.call_started_at})" style="background:var(--accent-cyan); color:#000; border:none; padding:6px 10px; border-radius:8px; font-weight:800; cursor:pointer;">🚀 Call Now</button>
+                                ` : `<span style="font-size:0.75rem; color:var(--text-muted);">${b.status.charAt(0).toUpperCase() + b.status.slice(1)}</span>`}
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    listContainer.innerHTML = `<p style="text-align:center; color:var(--text-muted);">No booking requests found.</p>`;
+                }
+            } catch(e) {
+                listContainer.innerHTML = `<p style="text-align:center; color:#FF0033;">Failed to load bookings.</p>`;
+            }
+        }
 
-async function toggleHostOnlineStatus() {
-  try {
-    const res = await fetch(`/api/host/toggle-live/${userId}`, { method: 'POST' });
-    const data = await res.json();
-    if(data.status === "success") {
-      alert(`Status changed to: ${data.is_online ? "Online" : "Offline"}`);
-      initData();
-    }
-  } catch(e) {
-    alert("Failed to change status");
-  }
-}
+        async function hostActionBooking(bookingId, action) {
+            try {
+                const endpoint = action === 'accept' ? '/api/host/accept-booking' : '/api/host/reject-booking';
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ booking_id: bookingId })
+                });
+                const data = await res.json();
+                alert(data.message);
+                openHostBookingsModal();
+                if (action === 'accept' && data.channel_name) {
+                    closeModal('host-bookings-modal');
+                    pendingApprovedBooking = { booking_id: bookingId, channel_name: data.channel_name, host_name: "User Private Call", host_img: "", duration_mins: 10, call_started_at: data.call_started_at };
+                    startCallWithTimer(data.channel_name, "User Private Call", "", 10, "publisher", data.call_started_at);
+                }
+            } catch(e) {
+                alert("Action failed due to network error.");
+            }
+        }
 
-function joinPublicStream() {
-  closeModal('host-booking-modal');
-  document.getElementById('live-active-name').innerText = selectedHostObj.name;
-  document.getElementById('live-active-img').src = selectedHostObj.img;
-  document.getElementById('live-host-rate').innerText = selectedHostObj.rate;
-  const channelName = "host_live_" + selectedHostObj.hostUserId;
-  startVideoCall(channelName, userId % 2147483647, "subscriber");
-}
+        function openHistoryModal() {
+            document.getElementById('history-modal').classList.add('active');
+            loadHistoryData();
+        }
 
-function startMyLiveStream() {
-  document.getElementById('live-active-name').innerText = userName;
-  document.getElementById('live-active-img').src = telegramPhoto || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop";
-  document.getElementById('live-host-rate').innerText = "50";
-  const channelName = "host_live_" + userId;
-  startVideoCall(channelName, userId % 2147483647, "publisher");
-}
+        async function loadHistoryData() {
+            const container = document.getElementById('history-list-container');
+            container.innerHTML = `<p style="text-align:center; color:var(--text-muted);">Loading history...</p>`;
+            try {
+                const res = await fetch(`/api/user/bookings/${userId}`);
+                const data = await res.json();
+                
+                let hostRes = await fetch(`/api/host/bookings/${userId}`);
+                let hostData = await hostRes.json();
+                let combinedBookings = [...(data.bookings || []), ...(hostData.bookings || [])];
 
-async function startVideoCall(channelName, safeUid, role) {
-  document.getElementById('video-call-screen').classList.add('active');
-  document.getElementById('chat-messages-container').innerHTML = "";
-  document.getElementById('pip-video-view').style.display = 'none';
-  try {
-    const res = await fetch(`/api/agora-token?channelName=${channelName}&uid=${safeUid}&role=${role}`);
-    const data = await res.json();
-    if (data.status !== "success") {
-      alert("Token error: " + data.message);
-      document.getElementById('video-call-screen').classList.remove('active');
-      return;
-    }
-    if (agoraClient) await agoraClient.leave().catch(() => {});
-    agoraClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
-    
-    agoraClient.on("user-published", async (user, mediaType) => {
-      await agoraClient.subscribe(user, mediaType);
-      if (mediaType === "video") {
-        user.videoTrack.play("main-video-view");
-        document.getElementById('pip-video-view').style.display = 'block';
-      }
-      if (mediaType === "audio") {
-        user.audioTrack.play();
-      }
-    });
-    
-    await agoraClient.join(data.appId, data.channel, data.token, data.uid);
-    for (let user of agoraClient.remoteUsers) {
-      if (user.hasVideo) {
-        await agoraClient.subscribe(user, "video");
-        user.videoTrack.play("main-video-view");
-        document.getElementById('pip-video-view').style.display = 'block';
-      }
-      if (user.hasAudio) {
-        await agoraClient.subscribe(user, "audio");
-        user.audioTrack.play();
-      }
-    }
-    
-    if (role === "publisher") {
-      localTracks.audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
-      localTracks.videoTrack = await AgoraRTC.createCameraVideoTrack();
-      localTracks.videoTrack.play("main-video-view");
-      isMainViewLocal = true;
-      await agoraClient.publish([localTracks.audioTrack, localTracks.videoTrack]);
-    }
-    startChatPolling(channelName);
-  } catch (error) {
-    console.error("Agora join failed:", error);
-    alert("Agora Error: " + error.message);
-    document.getElementById('video-call-screen').classList.remove('active');
-  }
-}
+                let uniqueMap = new Map();
+                combinedBookings.forEach(b => uniqueMap.set(b.booking_id || b._id, b));
+                let allHistory = Array.from(uniqueMap.values());
 
-function swapVideoLayouts() {
-  isMainViewLocal = !isMainViewLocal;
-  if (localTracks.videoTrack) {
-    if (isMainViewLocal) {
-      localTracks.videoTrack.play("main-video-view");
-    } else {
-      localTracks.videoTrack.play("pip-video-view");
-    }
-  }
-}
+                if (allHistory.length > 0) {
+                    container.innerHTML = allHistory.map(h => `
+                        <div style="background:rgba(255,255,255,0.04); border:1px solid var(--card-border); padding:12px; border-radius:12px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <p style="font-size:0.88rem; font-weight:700; color:white;">Call with: ${h.host_name || 'User #' + h.user_id}</p>
+                                <p style="font-size:0.75rem; color:var(--gold);">⏱️ Duration: ${h.duration_mins} Mins | 🪙 Cost: ${h.token_cost} Tokens</p>
+                                <p style="font-size:0.7rem; color:var(--text-muted);">📅 ${h.formatted_time || ''}</p>
+                                <p style="font-size:0.72rem; color:${h.status === 'approved' ? 'var(--accent-cyan)' : h.status === 'rejected' ? '#FF0033' : h.status === 'expired' ? '#FFA500' : 'var(--text-muted)'}; font-weight:700;">Status: ${h.status.toUpperCase()}</p>
+                            </div>
+                            ${h.status === 'approved' ? `
+                                <button onclick="pendingApprovedBooking = {booking_id: '${h.booking_id || h._id}', channel_name: '${h.channel_name}', host_name: '${h.host_name || 'Partner'}', host_img: '${h.host_img \vert{}\vert{} ''}', duration_mins:${h.duration_mins}, call_started_at: ${h.call_started_at \vert{}\vert{} h.time}}; startCallWithTimer('${h.channel_name}', '${h.host_name \vert{}\vert{} 'Partner'}', '${h.host_img || ''}', ${h.duration_mins}, 'publisher',${h.call_started_at || h.time})" style="background:rgba(0,245,212,0.15); border:1px solid var(--accent-cyan); color:var(--accent-cyan); padding:6px 10px; border-radius:8px; font-weight:700; cursor:pointer;">Rejoin</button>
+                            ` : `<span style="font-size:0.75rem; color:var(--text-muted);">${h.status.charAt(0).toUpperCase() + h.status.slice(1)}</span>`}
+                        </div>
+                    `).join('');
+                } else {
+                    container.innerHTML = `<p style="text-align:center; color:var(--text-muted);">No history records found.</p>`;
+                }
+            } catch(e) {
+                container.innerHTML = `<p style="text-align:center; color:#FF0033;">Failed to load history.</p>`;
+            }
+        }
 
-function applyCameraFilter(filterClass, el) {
-  document.querySelectorAll('.cam-filter-btn').forEach(b => b.classList.remove('active'));
-  el.classList.add('active');
-  const mainVideo = document.getElementById('main-video-view');
-  const pipVideo = document.getElementById('pip-video-view');
-  mainVideo.className = "";
-  pipVideo.className = "";
-  mainVideo.classList.add(filterClass);
-  pipVideo.classList.add(filterClass);
-}
+        function startCallWithTimer(channelName, peerName, peerImg, durationMins, role, callStartedAt) {
+            document.getElementById('whatsapp-call-screen').classList.remove('active');
+            closeModal('host-bookings-modal');
+            closeModal('user-bookings-modal');
+            closeModal('history-modal');
 
-async function leaveCall() {
-  if (chatInterval) clearInterval(chatInterval);
-  if (callTimerInterval) clearInterval(callTimerInterval);
-  const timerBadge = document.getElementById('call-timer-badge');
-  if (timerBadge) timerBadge.remove();
-  
-  if (pendingApprovedBooking && pendingApprovedBooking.booking_id) {
-    try {
-      await fetch('/api/complete-booking', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ booking_id: pendingApprovedBooking.booking_id })
-      });
-    } catch(e) {}
-  }
-  
-  if (localTracks.audioTrack) localTracks.audioTrack.close();
-  if (localTracks.videoTrack) localTracks.videoTrack.close();
-  if (agoraClient) await agoraClient.leave();
-  
-  document.getElementById('video-call-screen').classList.remove('active');
-  document.getElementById('pip-video-view').style.display = 'none';
-  pendingApprovedBooking = null;
-  initData();
-}
+            document.getElementById('live-active-name').innerText = peerName;
+            document.getElementById('live-active-img').src = peerImg || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop";
+            document.getElementById('live-host-rate').innerText = "Private Call";
 
-function startChatPolling(channelName) {
-  if (chatInterval) clearInterval(chatInterval);
-  chatInterval = setInterval(async () => {
-    try {
-      const res = await fetch(`/api/get-chat/${channelName}`);
-      const data = await res.json();
-      if (data.messages) {
-        const container = document.getElementById('chat-messages-container');
-        container.innerHTML = data.messages.map(m => `
-          <div class="chat-bubble ${m.type === 'gift' ? 'gift-announcement' : ''}">
-            <b>${m.sender}:</b> ${m.text}
-          </div>
-        `).join("");
-        container.scrollTop = container.scrollHeight;
-      }
-    } catch(e) {}
-  }, 2000);
-}
+            startVideoCall(channelName, userId % 2147483647, role);
 
-async function sendChatMessage() {
-  const input = document.getElementById('chat-input');
-  const text = input.value.trim();
-  if(!text) return;
-  const channelName = selectedHostObj ? "host_live_" + selectedHostObj.hostUserId : "host_live_" + userId;
-  try {
-    await fetch('/api/send-chat', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ channel: channelName, sender: userName, text: text, type: 'chat' })
-    });
-    input.value = "";
-  } catch(e) {
-    alert("Failed to send message");
-  }
-}
+            if (callTimerInterval) clearInterval(callTimerInterval);
 
-function handleChatKey(e) {
-  if (e.key === 'Enter') {
-    sendChatMessage();
-  }
-}
+            let timerBadge = document.getElementById('call-timer-badge');
+            if (!timerBadge) {
+                timerBadge = document.createElement('div');
+                timerBadge.id = 'call-timer-badge';
+                timerBadge.style = "position:absolute; top:16px; left:50%; transform:translateX(-50%); background:rgba(255,0,122,0.8); padding:6px 14px; border-radius:20px; font-weight:800; font-size:0.9rem; color:white; z-index:20;";
+                document.getElementById('video-call-screen').appendChild(timerBadge);
+            }
 
-function openGiftModal() {
-  document.getElementById('gift-user-tokens').innerText = userTokens;
-  document.getElementById('gift-modal').classList.add('active');
-}
+            callTimerInterval = setInterval(() => {
+                let nowSecs = Date.now() / 1000;
+                let startSecs = callStartedAt || nowSecs;
+                let elapsed = Math.floor(nowSecs - startSecs);
+                let totalAllowedSeconds = durationMins * 60;
+                let remainingSeconds = totalAllowedSeconds - elapsed;
 
-async function sendGift(cost, giftName) {
-  if (userTokens < cost) {
-    alert("⚠️ Low balance! Please recharge to send gifts.");
-    closeModal('gift-modal');
-    openRechargeModal();
-    return;
-  }
-  try {
-    const hostId = selectedHostObj ? selectedHostObj.id : "h1";
-    const channelName = selectedHostObj ? "host_live_" + selectedHostObj.hostUserId : "host_live_" + userId;
-    const res = await fetch('/api/send-gift', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        user_id: parseInt(userId),
-        host_id: hostId,
-        gift_cost: cost,
-        gift_name: giftName,
-        channel: channelName,
-        sender_name: userName
-      })
-    });
-    const data = await res.json();
-    if (data.status === "success") {
-      userTokens -= cost;
-      document.getElementById('user-token-bal').innerText = userTokens;
-      alert(`🎁 You sent ${giftName} successfully!`);
-      closeModal('gift-modal');
-      initData();
-    } else {
-      alert(data.message);
-    }
-  } catch(e) {
-    alert("Failed to send gift");
-  }
-}
+                if (remainingSeconds <= 0) {
+                    clearInterval(callTimerInterval);
+                    timerBadge.innerText = `⏱️ Time Left: 0:00`;
+                    alert("⏰ Your booked slot time is over! Call ending automatically.");
+                    leaveCall();
+                } else {
+                    let mins = Math.floor(remainingSeconds / 60);
+                    let secs = remainingSeconds % 60;
+                    timerBadge.innerText = `⏱️ Time Left: ${mins}:${secs < 10 ? '0' : ''}${secs}`;
+                }
+            }, 1000);
+        }
 
-async function confirmBooking(mins) {
-  const cost = selectedHostObj.rate * mins;
-  if (userTokens < cost) {
-    alert(`⚠️ Balance Low! You need ${cost} Tokens for ${mins} mins. Please recharge first.`);
-    closeModal('host-booking-modal');
-    openRechargeModal();
-    return;
-  }
-  try {
-    const res = await fetch('/api/book-slot', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        user_id: parseInt(userId),
-        host_id: selectedHostObj.id,
-        host_name: selectedHostObj.name,
-        duration_mins: mins,
-        token_cost: cost
-      })
-    });
-    const data = await res.json();
-    if(data.status === "success") {
-      closeModal('host-booking-modal');
-      alert("✅ Booking request sent! Tokens deducted. Check 'History' for status.");
-      initData();
-    } else {
-      alert(data.message);
-    }
-  } catch(e) {
-    alert("Booking failed");
-  }
-}
+        function openWithdrawModal() {
+            document.getElementById('withdraw-available-bal').innerText = document.getElementById('profile-earnings-count').innerText;
+            document.getElementById('withdraw-modal').classList.add('active');
+        }
 
-function promptPhotoUpdate() {
-  document.getElementById('profile-file-input').click();
-}
+        async function submitWithdrawalRequest() {
+            const upiId = document.getElementById('withdraw-upi-input').value.trim();
+            const tokens = parseInt(document.getElementById('withdraw-amount-input').value);
 
-async function uploadProfilePhoto(input) {
-  if (input.files && input.files[0]) {
-    const formData = new FormData();
-    formData.append('user_id', parseInt(userId));
-    formData.append('avatar', input.files[0]);
-    try {
-      const res = await fetch('/api/update-profile-photo', {
-        method: 'POST',
-        body: formData
-      });
-      const data = await res.json();
-      if(data.status === "success" && data.avatar_url) {
-        document.getElementById('profile-avatar-img').src = data.avatar_url;
-        document.getElementById('header-avatar-img').src = data.avatar_url;
-        alert("✅ Profile photo updated successfully!");
-        fetchHosts();
-      } else {
-        alert(data.message || "Error updating photo");
-      }
-    } catch(e) {
-      alert("Error uploading photo");
-    }
-  }
-}
+            if (!upiId || !tokens) return alert("Please enter UPI ID and token amount!");
 
-function switchTab(tab) {
-  document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-  if (tab === 'home') {
-    document.getElementById('home-tab-view').style.display = 'block';
-    document.getElementById('profile-tab-view').classList.remove('active');
-    document.getElementById('nav-home').classList.add('active');
-  } else {
-    document.getElementById('home-tab-view').style.display = 'none';
-    document.getElementById('profile-tab-view').classList.add('active');
-    document.getElementById('nav-profile').classList.add('active');
-  }
-}
+            try {
+                const res = await fetch('/api/withdraw', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ user_id: parseInt(userId), upi_id: upiId, tokens: tokens })
+                });
+                const data = await res.json();
+                alert(data.message);
+                closeModal('withdraw-modal');
+                initData();
+            } catch(e) { alert("Withdrawal request failed"); }
+        }
 
-function selectPlan(amt, el) {
-  selectedAmount = amt;
-  document.querySelectorAll('.plan-card').forEach(c => c.classList.remove('active'));
-  el.classList.add('active');
-  document.getElementById('upi-qr-img').src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=vynoralive@slc&pn=RajnishKumar&am=${amt}`;
-}
+        async function toggleHostOnlineStatus() {
+            try {
+                const res = await fetch(`/api/host/toggle-live/${userId}`, { method: 'POST' });
+                const data = await res.json();
+                if(data.status === "success") {
+                    alert(`Status changed to: ${data.is_online ? "Online 🟢" : "Offline 🔴"}`);
+                    initData();
+                }
+            } catch(e) { alert("Failed to change status"); }
+        }
 
-function openRechargeModal() {
-  document.getElementById('recharge-modal').classList.add('active');
-}
+        function joinPublicStream() {
+            closeModal('host-booking-modal');
+            document.getElementById('live-active-name').innerText = selectedHostObj.name;
+            document.getElementById('live-active-img').src = selectedHostObj.img;
+            document.getElementById('live-host-rate').innerText = selectedHostObj.rate;
+            
+            const channelName = "host_live_" + selectedHostObj.hostUserId;
+            startVideoCall(channelName, userId % 2147483647, "subscriber");
+        }
 
-function closeModal(id) {
-  document.getElementById(id).classList.remove('active');
-}
+        function startMyLiveStream() {
+            document.getElementById('live-active-name').innerText = userName;
+            document.getElementById('live-active-img').src = telegramPhoto || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop";
+            document.getElementById('live-host-rate').innerText = "50";
+            
+            const channelName = "host_live_" + userId;
+            startVideoCall(channelName, userId % 2147483647, "publisher");
+        }
 
-function openHostRegistrationModal() {
-  document.getElementById('host-reg-modal').classList.add('active');
-}
+        async function startVideoCall(channelName, safeUid, role) {
+            document.getElementById('video-call-screen').classList.add('active');
+            document.getElementById('chat-messages-container').innerHTML = '';
+            document.getElementById('pip-video-view').style.display = 'none';
+            
+            try {
+                const res = await fetch(`/api/agora-token?channelName=${channelName}&uid=${safeUid}&role=${role}`);
+                const data = await res.json();
 
-function openSupportLink() {
-  alert("✨ VYNORA LIVE OFFICIAL POLICIES & SUPPORT:\n\n1. USER RECHARGE POLICY:\n• New users start with 0 tokens and must complete a UPI recharge (₹50+) to book 1v1 private calls.\n• Upload correct 12-digit UTR and payment screenshot for instant approval.\n\n2. HOST LIVE & CONDUCT RULES:\n• Approved hosts must stay online and accept incoming private call requests within 10 minutes.\n• Failing to accept requests repeatedly will result in temporary suspension.\n\n3. PAYOUT & WITHDRAWAL POLICY:\n• Hosts earn tokens per minute of call duration.\n• 30% platform fee is deducted automatically, and net payout (70%) can be withdrawn via UPI anytime.\n\nNeed urgent help? Contact Official Admin Support: @VynoraSupport");
-  window.open("https://t.me/VynoraSupport", "_blank");
-}
+                if (data.status !== "success") {
+                    alert("Token error: " + data.message);
+                    document.getElementById('video-call-screen').classList.remove('active');
+                    return;
+                }
 
-async function submitHostRegistration() {
-  const name = document.getElementById('host-name-input').value.trim();
-  const age = parseInt(document.getElementById('host-age-input').value) || 20;
-  const rate = parseInt(document.getElementById('host-rate-input').value) || 50;
-  const lang = document.getElementById('host-lang-input').value.trim() || "Hindi";
-  const loc = document.getElementById('host-loc-input').value.trim() || "India";
-  const bio = document.getElementById('host-bio-input').value.trim();
-  if (!name || !rate) return alert("Please fill Name and Call Rate!");
-  try {
-    const res = await fetch('/api/register-host', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ user_id: parseInt(userId), name, age, rate, lang, loc, bio })
-    });
-    const data = await res.json();
-    alert(data.message);
-    closeModal('host-reg-modal');
-    initData();
-  } catch(e) {
-    alert("Registration error");
-  }
-}
+                if (agoraClient) await agoraClient.leave().catch(() => {});
 
-async function submitRecharge() {
-  const utr = document.getElementById('recharge-utr').value.trim();
-  const fileInput = document.getElementById('recharge-screenshot');
-  if (!utr) return alert("Enter UTR number!");
-  if (fileInput.files.length === 0) return alert("Please select payment screenshot image!");
-  const formData = new FormData();
-  formData.append('user_id', parseInt(userId));
-  formData.append('amount_inr', selectedAmount);
-  formData.append('utr_number', utr);
-  formData.append('screenshot', fileInput.files[0]);
-  try {
-    const res = await fetch('/api/recharge', { method: 'POST', body: formData });
-    const data = await res.json();
-    alert(data.message);
-    closeModal('recharge-modal');
-  } catch(e) {
-    alert("Connection Error");
-  }
-}
+                agoraClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
 
-initData();
-</script>
+                agoraClient.on("user-published", async (user, mediaType) => {
+                    await agoraClient.subscribe(user, mediaType);
+                    if (mediaType === "video") {
+                        user.videoTrack.play("main-video-view");
+                        document.getElementById('pip-video-view').style.display = 'block';
+                    }
+                    if (mediaType === "audio") {
+                        user.audioTrack.play();
+                    }
+                });
+
+                await agoraClient.join(data.appId, data.channel, data.token, data.uid);
+
+                for (let user of agoraClient.remoteUsers) {
+                    if (user.hasVideo) {
+                        await agoraClient.subscribe(user, "video");
+                        user.videoTrack.play("main-video-view");
+                        document.getElementById('pip-video-view').style.display = 'block';
+                    }
+                    if (user.hasAudio) {
+                        await agoraClient.subscribe(user, "audio");
+                        user.audioTrack.play();
+                    }
+                }
+
+                if (role === "publisher") {
+                    localTracks.audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+                    localTracks.videoTrack = await AgoraRTC.createCameraVideoTrack();
+                    localTracks.videoTrack.play("main-video-view");
+                    isMainViewLocal = true;
+                    await agoraClient.publish([localTracks.audioTrack, localTracks.videoTrack]);
+                }
+
+                startChatPolling(channelName);
+
+            } catch (error) {
+                console.error("Agora join failed:", error);
+                alert("Agora Error: " + error.message);
+                document.getElementById('video-call-screen').classList.remove('active');
+            }
+        }
+
+        function swapVideoLayouts() {
+            isMainViewLocal = !isMainViewLocal;
+            if (localTracks.videoTrack) {
+                if (isMainViewLocal) {
+                    localTracks.videoTrack.play("main-video-view");
+                } else {
+                    localTracks.videoTrack.play("pip-video-view");
+                }
+            }
+        }
+
+        function applyCameraFilter(filterClass, el) {
+            document.querySelectorAll('.cam-filter-btn').forEach(b => b.classList.remove('active'));
+            el.classList.add('active');
+
+            const mainVideo = document.getElementById('main-video-view');
+            const pipVideo = document.getElementById('pip-video-view');
+
+            mainVideo.className = '';
+            pipVideo.className = '';
+            mainVideo.classList.add(filterClass);
+            pipVideo.classList.add(filterClass);
+        }
+
+        async function leaveCall() {
+            if (chatInterval) clearInterval(chatInterval);
+            if (callTimerInterval) clearInterval(callTimerInterval);
+            const timerBadge = document.getElementById('call-timer-badge');
+            if (timerBadge) timerBadge.remove();
+
+            if (pendingApprovedBooking && pendingApprovedBooking.booking_id) {
+                try {
+                    await fetch('/api/complete-booking', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ booking_id: pendingApprovedBooking.booking_id })
+                    });
+                } catch(e) {}
+            }
+
+            if (localTracks.audioTrack) localTracks.audioTrack.close();
+            if (localTracks.videoTrack) localTracks.videoTrack.close();
+            if (agoraClient) await agoraClient.leave();
+            
+            document.getElementById('video-call-screen').classList.remove('active');
+            document.getElementById('pip-video-view').style.display = 'none';
+            pendingApprovedBooking = null;
+            initData();
+        }
+
+        function startChatPolling(channelName) {
+            if (chatInterval) clearInterval(chatInterval);
+            chatInterval = setInterval(async () => {
+                try {
+                    const res = await fetch(`/api/get-chat/${channelName}`);
+                    const data = await res.json();
+                    if (data.messages) {
+                        const container = document.getElementById('chat-messages-container');
+                        container.innerHTML = data.messages.map(m => `
+                            <div class="chat-bubble ${m.type === 'gift' ? 'gift-announcement' : ''}">
+                                <b>${m.sender}:</b> ${m.text}
+                            </div>
+                        `).join('');
+                        container.scrollTop = container.scrollHeight;
+                    }
+                } catch(e) {}
+            }, 2000);
+        }
+
+        async function sendChatMessage() {
+            const input = document.getElementById('chat-input');
+            const text = input.value.trim();
+            if(!text) return;
+
+            const channelName = selectedHostObj ? "host_live_" + selectedHostObj.hostUserId : "host_live_" + userId;
+            try {
+                await fetch('/api/send-chat', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ channel: channelName, sender: userName, text: text, type: 'chat' })
+                });
+                input.value = '';
+            } catch(e) { alert("Failed to send message"); }
+        }
+
+        function handleChatKey(e) {
+            if (e.key === 'Enter') {
+                sendChatMessage();
+            }
+        }
+
+        function openGiftModal() {
+            document.getElementById('gift-user-tokens').innerText = userTokens;
+            document.getElementById('gift-modal').classList.add('active');
+        }
+
+        async function sendGift(cost, giftName) {
+            if (userTokens < cost) {
+                alert("⚠️ Low balance! Please recharge to send gifts.");
+                closeModal('gift-modal');
+                openRechargeModal();
+                return;
+            }
+            try {
+                const hostId = selectedHostObj ? selectedHostObj.id : "h1";
+                const channelName = selectedHostObj ? "host_live_" + selectedHostObj.hostUserId : "host_live_" + userId;
+                
+                const res = await fetch('/api/send-gift', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ user_id: parseInt(userId), host_id: hostId, gift_cost: cost, gift_name: giftName, channel: channelName, sender_name: userName })
+                });
+                const data = await res.json();
+                if (data.status === "success") {
+                    userTokens -= cost;
+                    document.getElementById('user-token-bal').innerText = userTokens;
+                    alert(`🎁 You sent ${giftName} successfully!`);
+                    closeModal('gift-modal');
+                    initData(); 
+                } else {
+                    alert(data.message);
+                }
+            } catch(e) { alert("Failed to send gift"); }
+        }
+
+        async function confirmBooking(mins) {
+            const cost = selectedHostObj.rate * mins;
+            if (userTokens < cost) {
+                alert(`⚠️ Balance Low! You need ${cost} Tokens for ${mins} mins. Please recharge first.`);
+                closeModal('host-booking-modal');
+                openRechargeModal();
+                return;
+            }
+            try {
+                const res = await fetch('/api/book-slot', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        user_id: parseInt(userId), host_id: selectedHostObj.id,
+                        host_name: selectedHostObj.name, duration_mins: mins, token_cost: cost
+                    })
+                });
+                const data = await res.json();
+                if(data.status === "success") {
+                    closeModal('host-booking-modal');
+                    alert("Booking request sent! Tokens deducted. Check 'History' for status.");
+                    initData();
+                } else { alert(data.message); }
+            } catch(e) { alert("Booking failed"); }
+        }
+
+        function promptPhotoUpdate() {
+            document.getElementById('profile-file-input').click();
+        }
+
+        async function uploadProfilePhoto(input) {
+            if (input.files && input.files[0]) {
+                const formData = new FormData();
+                formData.append('user_id', parseInt(userId));
+                formData.append('avatar', input.files[0]);
+
+                try {
+                    const res = await fetch('/api/update-profile-photo', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const data = await res.json();
+                    if(data.status === "success" && data.avatar_url) {
+                        document.getElementById('profile-avatar-img').src = data.avatar_url;
+                        document.getElementById('header-avatar-img').src = data.avatar_url;
+                        alert("Profile photo updated successfully!");
+                        fetchHosts();
+                    } else {
+                        alert(data.message || "Error updating photo");
+                    }
+                } catch(e) { alert("Error uploading photo"); }
+            }
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+            if (tab === 'home') {
+                document.getElementById('home-tab-view').style.display = 'block';
+                document.getElementById('profile-tab-view').classList.remove('active');
+                document.getElementById('nav-home').classList.add('active');
+            } else {
+                document.getElementById('home-tab-view').style.display = 'none';
+                document.getElementById('profile-tab-view').classList.add('active');
+                document.getElementById('nav-profile').classList.add('active');
+            }
+        }
+
+        function selectPlan(amt, el) {
+            selectedAmount = amt;
+            document.querySelectorAll('.plan-card').forEach(c => c.classList.remove('active'));
+            el.classList.add('active');
+            document.getElementById('upi-qr-img').src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=vynoralive@slc&pn=RajnishKumar&am=${amt}`;
+        }
+
+        function openRechargeModal() { document.getElementById('recharge-modal').classList.add('active'); }
+        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+        function openHostRegistrationModal() { document.getElementById('host-reg-modal').classList.add('active'); }
+        
+        function openSupportLink() {
+            alert("📋 VYNORA LIVE OFFICIAL POLICIES & SUPPORT:\n\n1. 👤 USER RECHARGE POLICY:\n   • New users start with 0 tokens and must complete a UPI recharge (₹50+) to book 1v1 private calls.\n   • Upload correct 12-digit UTR and payment screenshot for instant approval.\n\n2. 🎥 HOST LIVE & CONDUCT RULES:\n   • Approved hosts must stay online and accept incoming private call requests within 10 minutes.\n   • Failing to accept requests repeatedly will result in temporary suspension.\n\n3. 💸 PAYOUT & WITHDRAWAL POLICY:\n   • Hosts earn tokens per minute of call duration.\n   • 30% platform fee is deducted automatically, and net payout (70%) can be withdrawn via UPI anytime.\n\nNeed urgent help? Contact Official Admin Support: @VynoraSupport");
+            window.open("https://t.me/VynoraSupport", "_blank");
+        }
+
+        async function submitHostRegistration() {
+            const name = document.getElementById('host-name-input').value.trim();
+            const age = parseInt(document.getElementById('host-age-input').value) || 20;
+            const rate = parseInt(document.getElementById('host-rate-input').value) || 50;
+            const lang = document.getElementById('host-lang-input').value.trim() || "Hindi";
+            const loc = document.getElementById('host-loc-input').value.trim() || "India";
+            const bio = document.getElementById('host-bio-input').value.trim();
+
+            if (!name || !rate) return alert("Please fill Name and Call Rate!");
+
+            try {
+                const res = await fetch('/api/register-host', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ user_id: parseInt(userId), name, age, rate, lang, loc, bio })
+                });
+                const data = await res.json();
+                alert(data.message);
+                closeModal('host-reg-modal');
+                initData();
+            } catch(e) { alert("Registration error"); }
+        }
+
+        async function submitRecharge() {
+            const utr = document.getElementById('recharge-utr').value.trim();
+            const fileInput = document.getElementById('recharge-screenshot');
+            
+            if (!utr) return alert("Enter UTR number!");
+            if (fileInput.files.length === 0) return alert("Please select payment screenshot image!");
+
+            const formData = new FormData();
+            formData.append('user_id', parseInt(userId));
+            formData.append('amount_inr', selectedAmount);
+            formData.append('utr_number', utr);
+            formData.append('screenshot', fileInput.files[0]);
+
+            try {
+                const res = await fetch('/api/recharge', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                alert(data.message);
+                closeModal('recharge-modal');
+            } catch(e) { alert("Connection Error"); }
+        }
+
+        initData();
+    </script>
 </body>
 </html>
