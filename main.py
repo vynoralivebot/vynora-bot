@@ -19,7 +19,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Static folder for direct image uploads
+# Static folder for direct profile DP uploads
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
@@ -35,16 +35,16 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "YOUR_BOT_TOKEN")
 TELEGRAM_GROUP_ID = os.getenv("TELEGRAM_GROUP_ID", "YOUR_GROUP_ID")
 WEBAPP_URL = os.getenv("WEBAPP_URL", "https://your-render-url.onrender.com")
 
-# --- AUTOMATIC WEBHOOK SETUP ON STARTUP ---
+# --- AUTOMATIC WEBHOOK SETUP (No manual browser setup needed) ---
 @app.on_event("startup")
 def startup_event():
     if TELEGRAM_BOT_TOKEN and WEBAPP_URL and "your-render-url" not in WEBAPP_URL:
         webhook_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/setWebhook?url={WEBAPP_URL}/telegram-webhook"
         try:
             res = requests.get(webhook_url)
-            print("Webhook Auto-Setup Response:", res.json())
+            print("Automatic Webhook Registration Response:", res.json())
         except Exception as e:
-            print("Webhook setup failed:", e)
+            print("Webhook auto-setup error:", e)
 
 class GameBet(BaseModel):
     user_id: int
@@ -59,7 +59,7 @@ class CallBooking(BaseModel):
 class RechargeRequest(BaseModel):
     user_id: int
     amount: int
-    payment_method: str # 'upi' or 'qr'
+    payment_method: str
 
 # --- 1. USER REGISTRATION & HOST LISTING API ---
 @app.post("/api/register")
@@ -78,7 +78,7 @@ async def register_user(request: Request):
             "tokens": 0,  # Join bonus strictly 0
             "dp_url": "https://via.placeholder.com/150",
             "is_banned": False,
-            "is_host": user_id in ADMIN_IDS, # Admins/Creators are hosts by default
+            "is_host": user_id in ADMIN_IDS,
             "can_create_room": user_id in ADMIN_IDS
         }
         db.users.insert_one(new_user)
@@ -94,13 +94,11 @@ async def register_user(request: Request):
 
 @app.get("/api/hosts")
 def get_hosts():
-    # Fetch real hosts from DB, fallback to dummy hosts if none
     real_hosts = list(db.users.find({"is_host": True}, {"_id": 0, "user_id": 1, "full_name": 1, "dp_url": 1}))
     dummy_hosts = [
         {"user_id": 9991, "full_name": "Pooja Sharma (Dummy)", "dp_url": "https://via.placeholder.com/150", "offline": True},
         {"user_id": 9992, "full_name": "Anjali Sen (Dummy)", "dp_url": "https://via.placeholder.com/150", "offline": True}
     ]
-    # Real hosts on top
     return {"hosts": real_hosts + dummy_hosts}
 
 # --- 2. DIRECT FILE UPLOAD DP API ---
@@ -132,7 +130,7 @@ def book_call(data: CallBooking):
     if user.get("tokens", 0) < 50:
         raise HTTPException(status_code=400, detail="Insufficient tokens for call (Min 50 required)")
     
-    host_name = host.get("full_name", "Host") if host else "Demo Host"
+    host_name = host.get("full_name", "Host") if host else "Host"
     
     notification_text = (
         f"🚨 **New 1v1 Call Request!**\n\n"
@@ -161,13 +159,12 @@ def book_call(data: CallBooking):
 # --- 4. RECHARGE API (UPI & QR) ---
 @app.post("/api/recharge")
 def process_recharge(data: RechargeRequest):
-    # Add tokens based on recharge amount
-    tokens_to_add = data.amount * 10 # e.g., ₹50 = 500 tokens
+    tokens_to_add = data.amount * 10
     db.users.update_one({"user_id": data.user_id}, {"$inc": {"tokens": tokens_to_add}}, upsert=True)
     updated_user = db.users.find_one({"user_id": data.user_id})
     return {"status": "success", "new_balance": updated_user["tokens"], "message": f"Successfully recharged via {data.payment_method.upper()}!"}
 
-# --- 5. MINI GAMES API ---
+# --- 5. MINI GAMES API (Ludo, Car Racing, Spin Wheel, Dice Roll) ---
 @app.post("/api/game/play")
 def play_game(data: GameBet):
     user = db.users.find_one({"user_id": data.user_id})
@@ -185,7 +182,7 @@ def play_game(data: GameBet):
     updated_user = db.users.find_one({"user_id": data.user_id})
     return {"won": won, "payout": payout, "new_balance": updated_user["tokens"]}
 
-# --- 6. TELEGRAM BOT WEBHOOK ---
+# --- 6. TELEGRAM BOT WEBHOOK & ADMIN COMMANDS ---
 @app.post("/telegram-webhook")
 async def telegram_webhook(request: Request):
     body = await request.json()
