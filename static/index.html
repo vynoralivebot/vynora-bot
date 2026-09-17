@@ -13,118 +13,41 @@
     --card-bg: rgba(255, 255, 255, 0.04);
     --card-border: rgba(255, 255, 255, 0.08);
     --primary-gradient: linear-gradient(135deg, #FF007A 0%, #7928CA 100%);
-    --banner-pink: linear-gradient(135deg, #FF007A 0%, #FF5500 100%);
     --accent-cyan: #00F5D4;
     --text-main: #FFFFFF;
     --text-muted: #94A3B8;
     --gold: #FFD700;
 }
-* { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
-body { background-color: var(--bg-dark); color: var(--text-main); min-height: 100vh; padding-bottom: 75px; overflow-x: hidden; }
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+body { background-color: var(--bg-dark); color: var(--text-main); min-height: 100vh; padding-bottom: 75px; }
 .app-header { position: sticky; top: 0; z-index: 100; background: rgba(6, 4, 12, 0.95); backdrop-filter: blur(12px); padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--card-border); }
-.brand-logo { font-weight: 800; font-size: 1.15rem; background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: flex; align-items: center; gap: 6px; }
-.header-right { display: flex; align-items: center; gap: 8px; }
+.brand-logo { font-weight: 800; font-size: 1.15rem; background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
 .wallet-badge { display: flex; align-items: center; gap: 6px; background: rgba(255, 215, 0, 0.12); border: 1px solid rgba(255, 215, 0, 0.3); padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 700; color: var(--gold); cursor: pointer; }
-.profile-btn { width: 34px; height: 34px; border-radius: 50%; background: var(--primary-gradient); border: 2px solid var(--card-border); display: flex; align-items: center; justify-content: center; font-weight: 700; cursor: pointer; color: white; overflow: hidden; }
-.profile-btn img { width: 100%; height: 100%; object-fit: cover; }
-.top-app-banner { margin: 12px 16px; background: linear-gradient(135deg, #1f0b24 0%, #2e082f 50%, #10061e 100%); border: 1px solid rgba(255, 0, 122, 0.3); border-radius: 16px; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 20px rgba(255, 0, 122, 0.2); }
-.top-app-banner h2 { font-size: 1.1rem; font-weight: 800; background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-.top-app-banner p { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
-.filter-container { display: flex; gap: 8px; padding: 0 16px 12px 16px; overflow-x: auto; }
-.filter-pill { background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); padding: 6px 14px; border-radius: 20px; font-size: 0.78rem; color: var(--text-muted); cursor: pointer; white-space: nowrap; }
-.filter-pill.active { background: #FF007A; color: white; border-color: #FF007A; font-weight: 700; }
-.section-header { padding: 4px 16px 8px 16px; font-size: 0.9rem; font-weight: 700; display: flex; align-items: center; gap: 6px; }
-.host-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; padding: 0 16px; }
+.host-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; padding: 16px; }
 .host-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 16px; overflow: hidden; position: relative; cursor: pointer; }
 .host-thumb { width: 100%; height: 185px; object-fit: cover; }
-.badge-live { position: absolute; top: 8px; left: 8px; background: rgba(0, 0, 0, 0.65); padding: 3px 8px; border-radius: 12px; font-size: 0.65rem; color: var(--accent-cyan); font-weight: 700; }
-.badge-rate { position: absolute; top: 8px; right: 8px; background: rgba(0, 0, 0, 0.65); padding: 3px 8px; border-radius: 12px; font-size: 0.7rem; color: var(--gold); font-weight: 700; }
-.host-info { padding: 10px; background: linear-gradient(180deg, rgba(6,4,12,0) 0%, rgba(6,4,12,0.95) 100%); margin-top: -45px; position: relative; }
-.host-name { font-size: 0.88rem; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 4px; }
-.call-btn { width: 100%; background: var(--primary-gradient); border: none; color: white; padding: 8px; border-radius: 10px; font-weight: 700; font-size: 0.82rem; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; }
-.profile-container { display: none; padding: 16px; }
-.profile-container.active { display: block; }
-.bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background: rgba(6, 4, 12, 0.95); backdrop-filter: blur(16px); border-top: 1px solid var(--card-border); display: flex; justify-content: space-around; align-items: center; z-index: 150; }
-.nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--text-muted); font-size: 0.7rem; cursor: pointer; }
-.nav-item.active { color: #FF007A; font-weight: 700; }
-.nav-item i { font-size: 1.1rem; }
-.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(10px); z-index: 9999 !important; display: none; justify-content: center; align-items: flex-end; }
-.modal-overlay.active { display: flex; }
-.modal-card { background: #130E26; border-top: 1px solid var(--card-border); border-radius: 24px 24px 0 0; width: 100%; max-width: 480px; padding: 20px; max-height: 88vh; overflow-y: auto; }
-.input-box { width: 100%; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--card-border); padding: 12px; border-radius: 12px; color: white; margin-bottom: 10px; outline: none; }
-/* WHATSAPP STYLE INCOMING CALL SCREEN */
-#whatsapp-call-screen { position: fixed; inset: 0; background: linear-gradient(135deg, #06040C 0%, #1a0b2e 100%); z-index: 99999; display: none; flex-direction: column; justify-content: space-between; align-items: center; padding: 50px 20px; text-align: center; }
-#whatsapp-call-screen.active { display: flex; }
-.wa-avatar { width: 120px; height: 120px; border-radius: 50%; border: 4px solid #00F5D4; object-fit: cover; margin-bottom: 20px; animation: pulseRing 1.5s infinite; }
-@keyframes pulseRing { 0% { box-shadow: 0 0 0 0 rgba(0, 245, 212, 0.6); } 70% { box-shadow: 0 0 0 25px rgba(0, 245, 212, 0); } 100% { box-shadow: 0 0 0 0 rgba(0, 245, 212, 0); } }
+.host-info { padding: 10px; }
+.call-btn { width: 100%; background: var(--primary-gradient); border: none; color: white; padding: 8px; border-radius: 10px; font-weight: 700; cursor: pointer; margin-top: 6px; }
 #video-call-screen { position: fixed; inset: 0; width: 100vw; height: 100vh; background: #000; z-index: 999; display: none; flex-direction: column; }
 #video-call-screen.active { display: flex; }
 #main-video-view { position: absolute; inset: 0; width: 100vw; height: 100vh; object-fit: cover; z-index: 1; }
-#pip-video-view { position: absolute; top: 70px; right: 16px; width: 100px; height: 140px; background: #111; border-radius: 14px; overflow: hidden; border: 2px solid #FF007A; z-index: 5; cursor: pointer; display: none; }
+#pip-video-view { position: absolute; top: 70px; right: 16px; width: 100px; height: 140px; background: #111; border-radius: 14px; overflow: hidden; border: 2px solid #FF007A; z-index: 5; }
 .live-top-bar { position: absolute; top: 16px; left: 16px; right: 16px; z-index: 10; display: flex; justify-content: space-between; align-items: center; }
-.call-timer-badge { background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 20px; font-weight: 700; color: #00F5D4; font-size: 0.9rem; }
+.call-timer-badge { background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 20px; font-weight: 700; color: #00F5D4; }
 </style>
 </head>
 <body>
 <div class="app-header">
     <div class="brand-logo"><i class="fa-solid fa-gem"></i> Vynora Live</div>
-    <div class="header-right">
-        <div class="wallet-badge" onclick="openRechargeModal()"><i class="fa-solid fa-coins"></i> <span id="user-token-count">0</span></div>
-        <div class="profile-btn" id="header-avatar-btn" onclick="switchTab('profile')"><i class="fa-solid fa-user"></i></div>
-    </div>
+    <div class="wallet-badge"><i class="fa-solid fa-coins"></i> <span id="user-token-count">0</span></div>
 </div>
 
-<div id="tab-home" class="profile-container active">
-    <div class="top-app-banner">
-        <div>
-            <h2>Vynora Live 1v1</h2>
-            <p>Connect with verified creators instantly ✨</p>
-        </div>
-        <button class="get-btn" onclick="openRechargeModal()">Recharge</button>
-    </div>
-    <div class="filter-container">
-        <div class="filter-pill active" onclick="filterHosts('all')">All Hosts</div>
-        <div class="filter-pill" onclick="filterHosts('online')">🟢 Online</div>
-        <div class="filter-pill" onclick="filterHosts('india')">🇮🇳 India</div>
-    </div>
-    <div class="section-header"><i class="fa-solid fa-fire text-pink"></i> Featured Creators</div>
-    <div class="host-grid" id="hosts-container"></div>
-</div>
-
-<div id="tab-profile" class="profile-container">
-    <div class="profile-header-card">
-        <div class="profile-avatar-wrapper">
-            <img id="profile-avatar-img" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop" class="profile-avatar-img">
-            <label class="cam-edit-icon"><i class="fa-solid fa-camera"></i><input type="file" id="avatar-file-input" style="display:none" onchange="uploadAvatar(this)"></label>
-        </div>
-        <div class="user-meta">
-            <h2><span id="profile-display-id">User</span></h2>
-            <p class="user-id-text">ID: <span id="profile-uid-text">000000</span></p>
-        </div>
-    </div>
-</div>
-
-<div class="bottom-nav">
-    <div class="nav-item active" onclick="switchTab('home')"><i class="fa-solid fa-compass"></i><span>Explore</span></div>
-    <div class="nav-item" onclick="switchTab('profile')"><i class="fa-solid fa-user"></i><span>Profile</span></div>
-</div>
-
-<div id="whatsapp-call-screen">
-    <div style="margin-top: 40px;">
-        <p style="color: #00F5D4; font-weight: 700; letter-spacing: 1px; font-size: 0.85rem;">INCOMING VIDEO CALL...</p>
-        <h2 id="wa-caller-name" style="font-size: 1.6rem; margin-top: 8px;">Host</h2>
-    </div>
-    <img id="wa-caller-avatar" src="" class="wa-avatar">
-    <div style="display: flex; gap: 40px; margin-bottom: 40px;">
-        <div onclick="rejectIncomingCall()" style="width: 65px; height: 65px; background: #FF3B30; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; cursor: pointer;"><i class="fa-solid fa-phone-slash"></i></div>
-        <div onclick="acceptIncomingCall()" style="width: 65px; height: 65px; background: #34C759; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; cursor: pointer;"><i class="fa-solid fa-phone"></i></div>
-    </div>
-</div>
+<div class="host-grid" id="hosts-container"></div>
 
 <div id="video-call-screen">
     <div class="live-top-bar">
-        <div class="call-timer-badge" id="call-timer-display">00:00</div>
-        <div onclick="endCallSession()" style="background: #FF3B30; color: white; padding: 6px 16px; border-radius: 20px; font-weight: 700; cursor: pointer;"><i class="fa-solid fa-phone-slash"></i> End</div>
+        <div class="call-timer-badge" id="call-timer-display">Connecting...</div>
+        <div onclick="endCallSession()" style="background: #FF3B30; color: white; padding: 6px 16px; border-radius: 20px; font-weight: 700; cursor: pointer;">End</div>
     </div>
     <div id="main-video-view"></div>
     <div id="pip-video-view"></div>
@@ -137,14 +60,14 @@ let currentUser = { user_id: tg?.initDataUnsafe?.user?.id || 123456789, tokens: 
 let currentBookingId = null;
 let callTimerInterval = null;
 let callDurationSecs = 0;
+let agoraClient = null;
+let localTracks = { videoTrack: null, audioTrack: null };
 
 async function initApp() {
     let res = await fetch(`/api/user/${currentUser.user_id}`);
     let data = await res.json();
     currentUser.tokens = data.tokens;
     document.getElementById('user-token-count').innerText = data.tokens;
-    document.getElementById('profile-uid-text').innerText = currentUser.user_id;
-    if(data.avatar) document.getElementById('profile-avatar-img').src = data.avatar;
     loadHosts();
 }
 
@@ -157,11 +80,10 @@ async function loadHosts() {
         container.innerHTML += `
             <div class="host-card" onclick="bookHost('${h.id}', '${h.name}', ${h.rate})">
                 <img src="${h.img}" class="host-thumb">
-                <div class="badge-live">🟢 ${h.loc}</div>
-                <div class="badge-rate">🪙 ${h.rate}/m</div>
                 <div class="host-info">
-                    <div class="host-name">${h.name}</div>
-                    <button class="call-btn"><i class="fa-solid fa-video"></i> Call Now</button>
+                    <div style="font-weight:700;">${h.name}</div>
+                    <div style="font-size:0.8rem; color:#94A3B8;">🪙 ${h.rate}/min</div>
+                    <button class="call-btn">Call Now</button>
                 </div>
             </div>
         `;
@@ -170,7 +92,7 @@ async function loadHosts() {
 
 async function bookHost(hostId, hostName, rate) {
     if(currentUser.tokens < rate) {
-        alert("Insufficient tokens! Please recharge your wallet.");
+        alert("Insufficient tokens! Please recharge.");
         return;
     }
     let res = await fetch('/api/book-slot', {
@@ -181,25 +103,44 @@ async function bookHost(hostId, hostName, rate) {
     let data = await res.json();
     if(data.status === 'success') {
         currentBookingId = data.booking_id;
-        alert("Booking request sent to host! Waiting for response...");
+        alert("Booking sent! Waiting for host to accept...");
     } else {
         alert(data.message);
     }
 }
 
-function acceptIncomingCall() {
-    document.getElementById('whatsapp-call-screen').classList.remove('active');
+async function startAgoraCall(channelName) {
     document.getElementById('video-call-screen').classList.add('active');
-    startCallTimer();
-}
+    document.getElementById('call-timer-display').innerText = "Connecting...";
 
-function rejectIncomingCall() {
-    document.getElementById('whatsapp-call-screen').classList.remove('active');
+    let res = await fetch(`/api/agora-token?channelName=${channelName}&uid=${currentUser.user_id}&role=publisher`);
+    let data = await res.json();
+
+    agoraClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
+    
+    // TIMER FIX: Timer starts ONLY when remote user publishes stream (Call successfully connected!)
+    agoraClient.on("user-published", async (user, mediaType) => {
+        await agoraClient.subscribe(user, mediaType);
+        if (mediaType === "video") {
+            user.videoTrack.play("main-video-view");
+        }
+        if (mediaType === "audio") {
+            user.audioTrack.play();
+        }
+        startCallTimer();
+    });
+
+    await agoraClient.join(data.appId, data.channel, data.token, data.uid);
+    localTracks.audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+    localTracks.videoTrack = await AgoraRTC.createCameraVideoTrack();
+    localTracks.videoTrack.play("pip-video-view");
+    await agoraClient.publish([localTracks.audioTrack, localTracks.videoTrack]);
 }
 
 function startCallTimer() {
+    if(callTimerInterval) return;
     callDurationSecs = 0;
-    clearInterval(callTimerInterval);
+    document.getElementById('call-timer-display').innerText = "00:00";
     callTimerInterval = setInterval(() => {
         callDurationSecs++;
         let m = Math.floor(callDurationSecs / 60).toString().padStart(2, '0');
@@ -210,6 +151,11 @@ function startCallTimer() {
 
 async function endCallSession() {
     clearInterval(callTimerInterval);
+    callTimerInterval = null;
+    if(localTracks.audioTrack) localTracks.audioTrack.close();
+    if(localTracks.videoTrack) localTracks.videoTrack.close();
+    if(agoraClient) await agoraClient.leave();
+
     document.getElementById('video-call-screen').classList.remove('active');
     if(currentBookingId) {
         await fetch('/api/complete-booking', {
@@ -218,18 +164,8 @@ async function endCallSession() {
             body: JSON.stringify({ booking_id: currentBookingId, duration_secs: callDurationSecs })
         });
     }
-    alert("Call ended successfully. History sent to Group 3!");
+    alert("Call ended. History saved!");
     location.reload();
-}
-
-function switchTab(tab) {
-    document.querySelectorAll('.profile-container').forEach(el => el.classList.remove('active'));
-    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-    if(tab === 'home') {
-        document.getElementById('tab-home').classList.add('active');
-    } else if(tab === 'profile') {
-        document.getElementById('tab-profile').classList.add('active');
-    }
 }
 
 initApp();
