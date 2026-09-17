@@ -118,7 +118,7 @@ async function startAgoraCall(channelName) {
 
     agoraClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
     
-    // TIMER FIX: Timer starts ONLY when remote user publishes stream (Call successfully connected!)
+    // TIMER FIX: Timer starts ONLY when remote user joins & publishes stream
     agoraClient.on("user-published", async (user, mediaType) => {
         await agoraClient.subscribe(user, mediaType);
         if (mediaType === "video") {
