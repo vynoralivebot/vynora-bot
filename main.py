@@ -1,8 +1,12 @@
+import hashlib
+import hmac
+import json
 import os
 import random
 import shutil
+import urllib.parse
 import uuid
-from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -35,10 +39,31 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "YOUR_BOT_TOKEN")
 TELEGRAM_GROUP_ID = os.getenv("TELEGRAM_GROUP_ID", "YOUR_GROUP_ID")
 WEBAPP_URL = os.getenv("WEBAPP_URL", "https://your-render-url.onrender.com")
 
+# --- TELEGRAM INIT_DATA CRYPTOGRAPHIC VERIFICATION ---
+def verify_telegram_init_data(init_data: str, bot_token: str) -> dict:
+    try:
+        parsed_data = urllib.parse.parse_qsl(init_data)
+        data_dict = dict(parsed_data)
+        if "hash" not in data_dict:
+            return None
+        
+        received_hash = data_dict.pop("hash")
+        sorted_data = sorted(data_dict.items(), key=lambda x: x[0])
+        data_check_string = "\n".join([f"{k}={v}" for k, v in sorted_data])
+        
+        secret_key = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
+        computed_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+        
+        if hmac.compare_digest(computed_hash, received_hash):
+            user_str = data_dict.get("user")
+            if user_str:
+                return json.loads(user_str)
+        return None
+    except Exception:
+        return None
+
 class UserRegister(BaseModel):
-    user_id: int
-    username: str
-    full_name: str
+    init_data: str
 
 class GameBet(BaseModel):
     user_id: int
@@ -50,20 +75,28 @@ class CallBooking(BaseModel):
     user_id: int
     host_id: int
 
-# --- 1. USER REGISTRATION & PROFILE API ---
+# --- 1. SECURE REGISTRATION VIA INIT_DATA ---
 @app.post("/api/register")
 def register_user(data: UserRegister):
-    user = db.users.find_one({"user_id": data.user_id})
+    user_info = verify_telegram_init_data(data.init_data, TELEGRAM_BOT_TOKEN)
+    if not user_info:
+        raise HTTPException(status_code=401, detail="Unauthorized: Invalid Telegram signature!")
+    
+    user_id = user_info["id"]
+    username = user_info.get("username", "user")
+    full_name = user_info.get("first_name", "User")
+    
+    user = db.users.find_one({"user_id": user_id})
     if not user:
         new_user = {
-            "user_id": data.user_id,
-            "username": data.username,
-            "full_name": data.full_name,
+            "user_id": user_id,
+            "username": username,
+            "full_name": full_name,
             "tokens": 0,  # Join bonus strictly 0
             "dp_url": "https://via.placeholder.com/150",
             "is_banned": False,
             "is_host": False,
-            "can_create_room": data.user_id in ADMIN_IDS
+            "can_create_room": user_id in ADMIN_IDS
         }
         db.users.insert_one(new_user)
         return {"status": "registered", "tokens": 0, "can_create_room": new_user["can_create_room"], "dp_url": new_user["dp_url"]}
