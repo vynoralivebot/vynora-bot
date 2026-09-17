@@ -167,7 +167,6 @@ def get_hosts():
         {"id": "dummy_5", "user_id": 9995, "name": "Priya 💫", "age": 22, "rate": 35, "lang": "Hindi", "loc": "Delhi", "img": "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=400&auto=format&fit=crop", "bio": "Friendly companion & gamer 🎮", "is_online": True, "is_dummy": True}
     ]
     
-    # Real approved hosts first, dummy hosts at the bottom
     all_hosts = db_hosts + dummy_hosts
     return {"hosts": all_hosts}
 
@@ -387,6 +386,10 @@ async def recharge(user_id: int = Form(...), amount_inr: int = Form(...), utr_nu
 
 @app.post("/api/withdraw")
 def withdraw_earnings(data: WithdrawModel):
+    # Enforce daily limit: 700 to 2000 tokens
+    if data.tokens < 700 or data.tokens > 2000:
+        return {"status": "error", "message": "Daily withdrawal limit is between 700 and 2000 tokens!"}
+
     host = hosts_col.find_one({
         "$or": [
             {"user_id": int(data.user_id)},
@@ -406,8 +409,13 @@ def withdraw_earnings(data: WithdrawModel):
     
     users_col.update_one({"user_id": int(data.user_id)}, {"$inc": {"earnings": -int(data.tokens / 0.7)}})
     withdrawals_col.insert_one({"user_id": int(data.user_id), "upi_id": data.upi_id, "tokens": data.tokens, "status": "pending"})
-    notify_all_admins(f"💸 <b>New Withdrawal Request!</b>\nHost ID: <code>{data.user_id}</code>\nTokens: {data.tokens}\nUPI: <code>{data.upi_id}</code>")
-    return {"status": "success", "message": "Withdrawal request sent successfully!"}
+    
+    # Notify Group 1 for withdrawal request
+    group1_msg = f"💸 <b>New Withdrawal Request!</b>\nHost ID: <code>{data.user_id}</code>\nTokens: {data.tokens}\nUPI: <code>{data.upi_id}</code>"
+    send_telegram_message(GROUP_1_ID, group1_msg)
+    send_telegram_message(SECOND_ADMIN_ID, group1_msg)
+
+    return {"status": "success", "message": "Withdrawal request submitted! Your payment will be processed within 24-48 hours."}
 
 @app.post("/api/update-profile-photo")
 async def update_profile_photo(user_id: int = Form(...), avatar: UploadFile = File(...)):
