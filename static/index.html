@@ -1,767 +1,532 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Vynora Live 1v1</title>
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.20.0.js"></script>
-<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-<style>
-:root {
-    --bg-dark: #06040C;
-    --card-bg: rgba(255, 255, 255, 0.04);
-    --card-border: rgba(255, 255, 255, 0.08);
-    --primary-gradient: linear-gradient(135deg, #FF007A 0%, #7928CA 100%);
-    --accent-cyan: #00F5D4;
-    --text-main: #FFFFFF;
-    --text-muted: #94A3B8;
-    --gold: #FFD700;
-}
-* { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
-body { background-color: var(--bg-dark); color: var(--text-main); min-height: 100vh; padding-bottom: 75px; overflow-x: hidden; }
-.app-header { position: sticky; top: 0; z-index: 100; background: rgba(6, 4, 12, 0.95); backdrop-filter: blur(12px); padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--card-border); }
-.brand-logo { font-weight: 800; font-size: 1.15rem; background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: flex; align-items: center; gap: 6px; }
-.header-right { display: flex; align-items: center; gap: 8px; }
-.wallet-badge { display: flex; align-items: center; gap: 6px; background: rgba(255, 215, 0, 0.12); border: 1px solid rgba(255, 215, 0, 0.3); padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 700; color: var(--gold); cursor: pointer; }
-.profile-btn { width: 34px; height: 34px; border-radius: 50%; background: var(--primary-gradient); border: 2px solid var(--card-border); display: flex; align-items: center; justify-content: center; font-weight: 700; cursor: pointer; color: white; overflow: hidden; }
-.profile-btn img { width: 100%; height: 100%; object-fit: cover; }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Vynora Live 1v1</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.20.0.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #06040C;
+            --card-bg: rgba(255, 255, 255, 0.04);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --primary-gradient: linear-gradient(135deg, #FF007A 0%, #7928CA 100%);
+            --banner-pink: linear-gradient(135deg, #FF007A 0%, #FF5500 100%);
+            --accent-cyan: #00F5D4;
+            --text-main: #FFFFFF;
+            --text-muted: #94A3B8;
+            --gold: #FFD700;
+        }
 
-.top-app-banner { margin: 12px 16px; background: linear-gradient(135deg, #1f0b24 0%, #2e082f 50%, #10061e 100%); border: 1px solid rgba(255, 0, 122, 0.3); border-radius: 16px; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 20px rgba(255, 0, 122, 0.2); }
-.top-app-banner h2 { font-size: 1.1rem; font-weight: 800; background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-.top-app-banner p { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
-.get-btn { background: white; color: #FF007A; font-weight: 800; border: none; padding: 6px 14px; border-radius: 14px; font-size: 0.8rem; cursor: pointer; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { background-color: var(--bg-dark); color: var(--text-main); min-height: 100vh; padding-bottom: 75px; overflow-x: hidden; }
 
-.filter-container { display: flex; gap: 8px; padding: 0 16px 12px 16px; overflow-x: auto; }
-.filter-pill { background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); padding: 6px 14px; border-radius: 20px; font-size: 0.78rem; color: var(--text-muted); cursor: pointer; white-space: nowrap; }
-.filter-pill.active { background: #FF007A; color: white; border-color: #FF007A; font-weight: 700; }
+        .app-header {
+            position: sticky; top: 0; z-index: 100; background: rgba(6, 4, 12, 0.95);
+            backdrop-filter: blur(12px); padding: 10px 16px; display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 1px solid var(--card-border);
+        }
 
-.section-header { padding: 4px 16px 8px 16px; font-size: 0.9rem; font-weight: 700; display: flex; align-items: center; gap: 6px; }
-.host-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; padding: 0 16px; }
-.host-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 16px; overflow: hidden; position: relative; cursor: pointer; }
-.host-thumb { width: 100%; height: 185px; object-fit: cover; }
-.badge-live { position: absolute; top: 8px; left: 8px; background: rgba(0, 0, 0, 0.65); padding: 3px 8px; border-radius: 12px; font-size: 0.65rem; color: var(--accent-cyan); font-weight: 700; }
-.badge-rate { position: absolute; top: 8px; right: 8px; background: rgba(0, 0, 0, 0.65); padding: 3px 8px; border-radius: 12px; font-size: 0.7rem; color: var(--gold); font-weight: 700; }
-.host-info { padding: 10px; background: linear-gradient(180deg, rgba(6,4,12,0) 0%, rgba(6,4,12,0.95) 100%); margin-top: -45px; position: relative; }
-.host-name { font-size: 0.88rem; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 4px; }
-.call-btn { width: 100%; background: var(--primary-gradient); border: none; color: white; padding: 8px; border-radius: 10px; font-weight: 700; font-size: 0.82rem; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; }
+        .brand-logo { font-weight: 800; font-size: 1.15rem; background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: flex; align-items: center; gap: 6px; }
+        .header-right { display: flex; align-items: center; gap: 8px; }
+        
+        .wallet-badge { display: flex; align-items: center; gap: 6px; background: rgba(255, 215, 0, 0.12); border: 1px solid rgba(255, 215, 0, 0.3); padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 700; color: var(--gold); cursor: pointer; }
+        .profile-btn { width: 34px; height: 34px; border-radius: 50%; background: var(--primary-gradient); border: 2px solid var(--card-border); display: flex; align-items: center; justify-content: center; font-weight: 700; cursor: pointer; color: white; overflow: hidden; }
+        .profile-btn img { width: 100%; height: 100%; object-fit: cover; }
 
-.profile-container { display: none; padding: 16px; }
-.profile-container.active { display: block; }
-.profile-header-card { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
-.profile-avatar-wrapper { position: relative; width: 75px; height: 75px; border-radius: 50%; overflow: hidden; border: 2px solid #FF007A; }
-.profile-avatar-img { width: 100%; height: 100%; object-fit: cover; }
-.cam-edit-icon { position: absolute; bottom: 0; right: 0; background: #FF007A; color: white; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; cursor: pointer; }
-.user-meta h2 { font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 6px; }
-.user-id-text { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; }
+        /* TOP BANNER */
+        .top-app-banner {
+            margin: 12px 16px; background: linear-gradient(135deg, #1f0b24 0%, #2e082f 50%, #10061e 100%);
+            border: 1px solid rgba(255, 0, 122, 0.3); border-radius: 16px; padding: 14px 18px;
+            display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 20px rgba(255, 0, 122, 0.2);
+        }
+        .top-app-banner h2 { font-size: 1.1rem; font-weight: 800; background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .top-app-banner p { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
 
-.wallet-banner-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
-.wallet-box { background: rgba(255,255,255,0.04); border: 1px solid var(--card-border); padding: 12px; border-radius: 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
-.action-icon-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; text-align: center; margin-bottom: 20px; }
-.icon-card { background: rgba(255,255,255,0.04); border: 1px solid var(--card-border); padding: 12px 6px; border-radius: 14px; cursor: pointer; }
-.icon-card i { font-size: 1.4rem; margin-bottom: 6px; color: #FF007A; }
-.icon-card p { font-size: 0.72rem; color: var(--text-muted); }
+        .promo-banner {
+            margin: 12px 16px; background: var(--banner-pink); border-radius: 16px; padding: 16px;
+            display: flex; justify-content: space-between; align-items: center; color: white; box-shadow: 0 4px 15px rgba(255, 0, 122, 0.4);
+        }
+        .promo-banner h3 { font-size: 1.05rem; font-weight: 800; margin-bottom: 4px; }
+        .promo-banner p { font-size: 0.75rem; opacity: 0.9; }
+        .get-btn { background: white; color: #FF007A; font-weight: 800; border: none; padding: 6px 14px; border-radius: 14px; font-size: 0.8rem; cursor: pointer; }
 
-.plan-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 12px 0; }
-.plan-card { background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); padding: 10px 6px; border-radius: 12px; text-align: center; cursor: pointer; }
-.plan-card.active { border-color: #FF007A; background: rgba(255,0,122,0.15); }
-.plan-amount { font-weight: 800; font-size: 0.95rem; color: white; }
-.plan-tokens { font-size: 0.7rem; color: var(--gold); }
+        .filter-container { display: flex; gap: 8px; padding: 0 16px 12px 16px; overflow-x: auto; }
+        .filter-pill { background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); padding: 6px 14px; border-radius: 20px; font-size: 0.78rem; color: var(--text-muted); cursor: pointer; white-space: nowrap; }
+        .filter-pill.active { background: #FF007A; color: white; border-color: #FF007A; font-weight: 700; }
 
-.qr-box { text-align: center; background: white; padding: 10px; border-radius: 12px; margin: 12px 0; }
-.qr-box img { width: 140px; height: 140px; }
+        .section-header { padding: 4px 16px 8px 16px; font-size: 0.9rem; font-weight: 700; display: flex; align-items: center; gap: 6px; }
 
-.bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background: rgba(6, 4, 12, 0.95); backdrop-filter: blur(16px); border-top: 1px solid var(--card-border); display: flex; justify-content: space-around; align-items: center; z-index: 150; }
-.nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--text-muted); font-size: 0.7rem; cursor: pointer; }
-.nav-item.active { color: #FF007A; font-weight: 700; }
-.nav-item i { font-size: 1.1rem; }
+        .host-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; padding: 0 16px; }
+        .host-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 16px; overflow: hidden; position: relative; cursor: pointer; }
+        .host-thumb { width: 100%; height: 185px; object-fit: cover; }
 
-.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(10px); z-index: 9999 !important; display: none; justify-content: center; align-items: flex-end; }
-.modal-overlay.active { display: flex; }
-.modal-card { background: #130E26; border-top: 1px solid var(--card-border); border-radius: 24px 24px 0 0; width: 100%; max-width: 480px; padding: 20px; max-height: 88vh; overflow-y: auto; }
-.input-box { width: 100%; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--card-border); padding: 12px; border-radius: 12px; color: white; margin-bottom: 10px; outline: none; }
+        .badge-live { position: absolute; top: 8px; left: 8px; background: rgba(0, 0, 0, 0.65); padding: 3px 8px; border-radius: 12px; font-size: 0.65rem; color: var(--accent-cyan); font-weight: 700; }
+        .badge-rate { position: absolute; top: 8px; right: 8px; background: rgba(0, 0, 0, 0.65); padding: 3px 8px; border-radius: 12px; font-size: 0.7rem; color: var(--gold); font-weight: 700; }
+        .host-info { padding: 10px; background: linear-gradient(180deg, rgba(6,4,12,0) 0%, rgba(6,4,12,0.95) 100%); margin-top: -45px; position: relative; }
+        .host-name { font-size: 0.88rem; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 4px; }
 
-/* WHATSAPP STYLE RINGING SCREEN */
-#whatsapp-call-screen { position: fixed; inset: 0; background: linear-gradient(135deg, #06040C 0%, #1a0b2e 100%); z-index: 99999; display: none; flex-direction: column; justify-content: space-between; align-items: center; padding: 50px 20px; text-align: center; }
-#whatsapp-call-screen.active { display: flex; }
-.wa-avatar { width: 120px; height: 120px; border-radius: 50%; border: 4px solid #00F5D4; object-fit: cover; margin-bottom: 20px; animation: pulseRing 1.5s infinite; }
-@keyframes pulseRing { 0% { box-shadow: 0 0 0 0 rgba(0, 245, 212, 0.6); } 70% { box-shadow: 0 0 0 25px rgba(0, 245, 212, 0); } 100% { box-shadow: 0 0 0 0 rgba(0, 245, 212, 0); } }
+        .call-btn { width: 100%; background: var(--primary-gradient); border: none; color: white; padding: 8px; border-radius: 10px; font-weight: 700; font-size: 0.82rem; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; }
 
-/* SYNCHRONIZED VIDEO CALL SCREEN */
-#video-call-screen { position: fixed; inset: 0; width: 100vw; height: 100vh; background: #000; z-index: 999; display: none; flex-direction: column; }
-#video-call-screen.active { display: flex; }
-#main-video-view { position: absolute; inset: 0; width: 100vw; height: 100vh; object-fit: cover; z-index: 1; }
-#pip-video-view { position: absolute; top: 70px; right: 16px; width: 100px; height: 140px; background: #111; border-radius: 14px; overflow: hidden; border: 2px solid #FF007A; z-index: 5; cursor: pointer; display: none; }
-.live-top-bar { position: absolute; top: 16px; left: 16px; right: 16px; z-index: 10; display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.4); padding: 8px 16px; border-radius: 20px; backdrop-filter: blur(8px); }
-.call-timer-display { font-size: 0.95rem; font-weight: 800; color: var(--gold); background: rgba(0,0,0,0.6); padding: 4px 12px; border-radius: 12px; }
-.live-bottom-controls { position: absolute; bottom: 30px; left: 0; right: 0; z-index: 10; display: flex; justify-content: center; gap: 20px; align-items: center; }
-.call-action-btn { width: 50px; height: 50px; border-radius: 50%; border: none; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; cursor: pointer; color: white; }
-.btn-end-call { background: #FF3B30; }
-.btn-mic { background: rgba(255,255,255,0.2); }
-</style>
+        .profile-container { display: none; padding: 16px; }
+        .profile-container.active { display: block; }
+
+        .profile-header-card { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+        .profile-avatar-wrapper { position: relative; width: 75px; height: 75px; border-radius: 50%; overflow: hidden; border: 2px solid #FF007A; }
+        .profile-avatar-img { width: 100%; height: 100%; object-fit: cover; }
+        .cam-edit-icon { position: absolute; bottom: 0; right: 0; background: #FF007A; color: white; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; cursor: pointer; }
+
+        .user-meta h2 { font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+        .user-id-text { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; }
+
+        .wallet-banner-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
+        .wallet-box { background: rgba(255,255,255,0.04); border: 1px solid var(--card-border); padding: 12px; border-radius: 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+
+        .action-icon-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; text-align: center; margin-bottom: 20px; }
+        .icon-card { background: rgba(255,255,255,0.04); border: 1px solid var(--card-border); padding: 12px 6px; border-radius: 14px; cursor: pointer; }
+        .icon-card i { font-size: 1.4rem; margin-bottom: 6px; }
+        .icon-card p { font-size: 0.72rem; color: var(--text-muted); }
+
+        .plan-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 12px 0; max-height: 180px; overflow-y: auto; }
+        .plan-card { background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); padding: 10px 6px; border-radius: 12px; text-align: center; cursor: pointer; }
+        .plan-card.active { border-color: #FF007A; background: rgba(255,0,122,0.15); }
+        .plan-amount { font-weight: 800; font-size: 0.95rem; color: white; }
+        .plan-tokens { font-size: 0.7rem; color: var(--gold); }
+
+        .qr-box { text-align: center; background: white; padding: 10px; border-radius: 12px; margin: 12px 0; }
+        .qr-box img { width: 140px; height: 140px; }
+
+        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background: rgba(6, 4, 12, 0.95); backdrop-filter: blur(16px); border-top: 1px solid var(--card-border); display: flex; justify-content: space-around; align-items: center; z-index: 150; }
+        .nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--text-muted); font-size: 0.7rem; cursor: pointer; }
+        .nav-item.active { color: #FF007A; font-weight: 700; }
+        .nav-item i { font-size: 1.1rem; }
+
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(10px); z-index: 9999 !important; display: none; justify-content: center; align-items: flex-end; }
+        .modal-overlay.active { display: flex; }
+        .modal-card { background: #130E26; border-top: 1px solid var(--card-border); border-radius: 24px 24px 0 0; width: 100%; max-width: 480px; padding: 20px; max-height: 88vh; overflow-y: auto; }
+        .input-box { width: 100%; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--card-border); padding: 12px; border-radius: 12px; color: white; margin-bottom: 10px; outline: none; }
+
+        /* WHATSAPP STYLE INCOMING CALL SCREEN */
+        #whatsapp-call-screen { position: fixed; inset: 0; background: linear-gradient(135deg, #06040C 0%, #1a0b2e 100%); z-index: 99999; display: none; flex-direction: column; justify-content: space-between; align-items: center; padding: 50px 20px; text-align: center; }
+        #whatsapp-call-screen.active { display: flex; }
+        .wa-avatar { width: 120px; height: 120px; border-radius: 50%; border: 4px solid #00F5D4; object-fit: cover; margin-bottom: 20px; animation: pulseRing 1.5s infinite; }
+        @keyframes pulseRing { 0% { box-shadow: 0 0 0 0 rgba(0, 245, 212, 0.6); } 70% { box-shadow: 0 0 0 25px rgba(0, 245, 212, 0); } 100% { box-shadow: 0 0 0 0 rgba(0, 245, 212, 0); } }
+
+        #video-call-screen { position: fixed; inset: 0; width: 100vw; height: 100vh; background: #000; z-index: 999; display: none; flex-direction: column; }
+        #video-call-screen.active { display: flex; }
+        #main-video-view { position: absolute; inset: 0; width: 100vw; height: 100vh; object-fit: cover; z-index: 1; }
+        #pip-video-view { position: absolute; top: 70px; right: 16px; width: 100px; height: 140px; background: #111; border-radius: 14px; overflow: hidden; border: 2px solid #FF007A; z-index: 5; cursor: pointer; display: none; }
+        
+        .live-top-bar { position: absolute; top: 16px; left: 16px; right: 16px; z-index: 10; display: flex; justify-content: space-between; align-items: center; }
+        .live-host-pill { background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.15); padding: 4px 12px 4px 4px; border-radius: 30px; display: flex; align-items: center; gap: 8px; color: white; font-size: 0.85rem; font-weight: 700; }
+        .live-host-pill img { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; }
+        .live-viewer-count { background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.15); padding: 6px 12px; border-radius: 20px; font-size: 0.75rem; color: var(--accent-cyan); font-weight: 700; }
+        
+        .live-chat-messages { position: absolute; bottom: 120px; left: 16px; right: 100px; max-height: 160px; overflow-y: auto; z-index: 10; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+        .chat-bubble { background: rgba(0,0,0,0.6); backdrop-filter: blur(6px); padding: 6px 12px; border-radius: 12px; font-size: 0.8rem; color: white; width: fit-content; max-width: 100%; word-break: break-word; pointer-events: auto; }
+        .chat-bubble b { color: var(--accent-cyan); margin-right: 4px; }
+        .chat-bubble.gift-announcement { background: rgba(255, 0, 122, 0.4); border: 1px solid #FF007A; color: var(--gold); font-weight: 700; }
+
+        .filter-bar { position: absolute; bottom: 75px; left: 16px; right: 16px; z-index: 10; display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+        .cam-filter-btn { background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 4px 10px; border-radius: 15px; font-size: 0.72rem; cursor: pointer; white-space: nowrap; font-weight: 600; }
+        .cam-filter-btn.active { background: #FF007A; border-color: #FF007A; }
+
+        .live-bottom-bar { position: absolute; bottom: 20px; left: 16px; right: 16px; z-index: 10; display: flex; align-items: center; gap: 8px; }
+        .live-chat-input { flex: 1; background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); padding: 10px 16px; border-radius: 30px; color: white; font-size: 0.85rem; outline: none; }
+        .live-action-btn { width: 42px; height: 42px; border-radius: 50%; background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; color: white; font-size: 1.1rem; cursor: pointer; flex-shrink: 0; }
+        .live-end-btn { background: #FF0033; border: none; }
+        
+        .gifts-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 15px 0; }
+        .gift-item { background: rgba(255,255,255,0.06); border: 1px solid var(--card-border); border-radius: 16px; padding: 14px; text-align: center; cursor: pointer; }
+        .gift-emoji { font-size: 2rem; margin-bottom: 6px; }
+
+        .filter-normal { filter: none; }
+        .filter-beauty { filter: brightness(1.15) contrast(1.05) saturate(1.1) drop-shadow(0 0 2px rgba(255,192,203,0.5)); }
+        .filter-rosy { filter: sepia(0.2) hue-rotate(330deg) saturate(1.3) brightness(1.05); }
+        .filter-cool { filter: hue-rotate(180deg) saturate(1.2) brightness(1.05); }
+        .filter-cinematic { filter: contrast(1.25) saturate(0.85) brightness(0.95); }
+    </style>
 </head>
 <body>
 
-<div class="app-header">
-  <div class="brand-logo"><i class="fa-solid fa-gem"></i> Vynora Live</div>
-  <div class="header-right">
-    <div class="wallet-badge" onclick="openRechargeModal()"><i class="fa-solid fa-coins"></i> <span id="user-tokens-count">0</span></div>
-    <div class="profile-btn" id="header-profile-avatar" onclick="switchTab('profile')"></div>
-  </div>
-</div>
-
-<!-- Home Tab -->
-<div id="tab-home" class="profile-container active" style="padding: 0;">
-  <div class="top-app-banner">
-    <div>
-      <h2>Vynora Live 1v1</h2>
-      <p>Connect with verified global hosts instantly.</p>
-    </div>
-    <button class="get-btn" onclick="openRechargeModal()">Recharge</button>
-  </div>
-
-  <div class="filter-container">
-    <div class="filter-pill active" onclick="filterHosts('all')">🔥 All Hosts</div>
-    <div class="filter-pill" onclick="filterHosts('online')">🟢 Online Now</div>
-    <div class="filter-pill" onclick="filterHosts('hindi')">🇮🇳 Hindi</div>
-  </div>
-
-  <div class="section-header"><i class="fa-solid fa-fire text-pink"></i> Featured Global Hosts</div>
-  <div class="host-grid" id="hosts-container"></div>
-</div>
-
-<!-- Profile Tab -->
-<div id="tab-profile" class="profile-container">
-  <div class="profile-header-card">
-    <div class="profile-avatar-wrapper" onclick="triggerPhotoUpload()">
-      <img id="profile-avatar-img" class="profile-avatar-img" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400" />
-      <div class="cam-edit-icon"><i class="fa-solid fa-camera"></i></div>
-    </div>
-    <input type="file" id="avatar-file-input" style="display:none" accept="image/*" onchange="uploadProfilePhoto(this)" />
-    <div class="user-meta">
-      <h2 id="profile-username">User <span id="profile-display-id"></span></h2>
-      <p class="user-id-text" id="profile-full-id-text"></p>
-    </div>
-  </div>
-
-  <div class="wallet-banner-row">
-    <div class="wallet-box" onclick="openRechargeModal()">
-      <div>
-        <p style="font-size: 0.72rem; color: var(--text-muted);">My Balance</p>
-        <h4 style="color: var(--gold); font-size: 1.05rem;" id="wallet-tokens-val">0 Tokens</h4>
-      </div>
-      <i class="fa-solid fa-chevron-right" style="font-size: 0.8rem; color: var(--text-muted);"></i>
-    </div>
-    <div class="wallet-box" onclick="openHostModal()">
-      <div>
-        <p style="font-size: 0.72rem; color: var(--text-muted);">Host Center</p>
-        <h4 style="color: var(--accent-cyan); font-size: 0.95rem;" id="host-status-badge-text">Loading...</h4>
-      </div>
-      <i class="fa-solid fa-chevron-right" style="font-size: 0.8rem; color: var(--text-muted);"></i>
-    </div>
-  </div>
-
-  <!-- Prominent External Online/Offline Switch for Approved Hosts -->
-  <div id="external-host-toggle-box" style="display: none; background: rgba(0,245,212,0.08); border: 1px solid rgba(0,245,212,0.3); padding: 12px; border-radius: 14px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
-    <div>
-      <p style="font-size: 0.75rem; color: var(--accent-cyan); font-weight: 700;">HOST LIVE STATUS</p>
-      <h4 id="external-live-status-label" style="font-size: 0.95rem; color: white;">Offline</h4>
-    </div>
-    <button class="get-btn" id="external-toggle-btn" onclick="toggleHostLiveStatus()" style="background: var(--accent-cyan); color: #000;">Go Online</button>
-  </div>
-
-  <div class="action-icon-grid">
-    <div class="icon-card" onclick="openRechargeModal()"><i class="fa-solid fa-wallet"></i><p>Recharge</p></div>
-    <div class="icon-card" onclick="openHostModal()"><i class="fa-solid fa-video"></i><p>Host Panel</p></div>
-    <div class="icon-card" onclick="switchTab('support')"><i class="fa-solid fa-headset"></i><p>Support</p></div>
-    <div class="icon-card" onclick="openHistoryModal()"><i class="fa-solid fa-clock-rotate-left"></i><p>History</p></div>
-  </div>
-</div>
-
-<!-- Support Tab with Withdrawal Rules -->
-<div id="tab-support" class="profile-container">
-  <h2 style="font-size: 1.1rem; margin-bottom: 12px;"><i class="fa-solid fa-headset"></i> Professional Support & Guidelines</h2>
-  <div style="background: var(--card-bg); border: 1px solid var(--card-border); padding: 14px; border-radius: 14px; font-size: 0.82rem; line-height: 1.5; color: var(--text-muted);">
-    <h3 style="color: white; margin-bottom: 6px;">📜 User Policy</h3>
-    <p>All users must maintain respectful behavior during video calls. Any abusive language will lead to immediate permanent ban by admins.</p>
-    <br>
-    <h3 style="color: white; margin-bottom: 6px;">📹 Host Live Rules & Withdrawal Guidelines</h3>
-    <p>Hosts must maintain professional attire and lighting. Payouts are processed weekly with 30% platform fee deduction.</p>
-    <p style="margin-top:6px; color: var(--gold);"><b>Withdrawal Limit:</b> Daily withdrawal limit is between <b>700 to 2000 Tokens</b> per request. Payments are processed via UPI within 24-48 hours after admin verification.</p>
-    <br>
-    <h3 style="color: white; margin-bottom: 6px;">💳 Payment & Recharge Guidelines</h3>
-    <p>Recharge requests require correct UTR numbers. Verified credits reflect instantly in your wallet.</p>
-  </div>
-</div>
-
-<!-- Bottom Navigation -->
-<div class="bottom-nav">
-  <div class="nav-item active" id="nav-home" onclick="switchTab('home')"><i class="fa-solid fa-house"></i><span>Explore</span></div>
-  <div class="nav-item" id="nav-support" onclick="switchTab('support')"><i class="fa-solid fa-circle-info"></i><span>Support</span></div>
-  <div class="nav-item" id="nav-profile" onclick="switchTab('profile')"><i class="fa-solid fa-user"></i><span>Profile</span></div>
-</div>
-
-<!-- Recharge Modal -->
-<div class="modal-overlay" id="recharge-modal">
-  <div class="modal-card">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-      <h3 style="font-size: 1rem;"><i class="fa-solid fa-wallet"></i> Recharge Wallet</h3>
-      <i class="fa-solid fa-xmark" style="cursor:pointer; font-size: 1.1rem;" onclick="closeModals()"></i>
-    </div>
-    <div class="plan-grid">
-      <div class="plan-card active" onclick="selectPlan(100, 100)">
-        <div class="plan-amount">₹100</div>
-        <div class="plan-tokens">100 Tokens</div>
-      </div>
-      <div class="plan-card" onclick="selectPlan(300, 300)">
-        <div class="plan-amount">₹300</div>
-        <div class="plan-tokens">300 Tokens</div>
-      </div>
-      <div class="plan-card" onclick="selectPlan(500, 550)">
-        <div class="plan-amount">₹500</div>
-        <div class="plan-tokens">550 Tokens+</div>
-      </div>
-    </div>
-    <div class="qr-box">
-      <p style="color:#000; font-size:0.75rem; font-weight:700; margin-bottom:6px;">Scan & Pay via UPI</p>
-      <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=vynora@upi&pn=VynoraLive" alt="QR">
-      <p style="color:#000; font-size:0.7rem; margin-top:4px;">UPI ID: <b>vynora@upi</b></p>
-    </div>
-    <input type="text" id="utr-input" class="input-box" placeholder="Enter 12-digit UTR / Reference Number" />
-    <button class="call-btn" onclick="submitRecharge()">Submit Payment & Verify</button>
-  </div>
-</div>
-
-<!-- Host Center Modal -->
-<div class="modal-overlay" id="host-modal">
-  <div class="modal-card">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-      <h3 style="font-size: 1rem;"><i class="fa-solid fa-video"></i> Host Center & Dashboard</h3>
-      <i class="fa-solid fa-xmark" style="cursor:pointer; font-size: 1.1rem;" onclick="closeModals()"></i>
-    </div>
-    <div id="host-modal-body"></div>
-  </div>
-</div>
-
-<!-- Flexible Duration Booking Modal -->
-<div class="modal-overlay" id="booking-modal">
-  <div class="modal-card">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-      <h3 style="font-size: 1rem;"><i class="fa-solid fa-clock"></i> Select Call Duration</h3>
-      <i class="fa-solid fa-xmark" style="cursor:pointer; font-size: 1.1rem;" onclick="closeModals()"></i>
-    </div>
-    <p id="booking-host-title" style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px;"></p>
-    <div class="plan-grid" id="duration-grid">
-      <div class="plan-card active" onclick="selectDuration(1, this)"><div class="plan-amount">1 Min</div><div class="plan-tokens" id="d-rate-1"></div></div>
-      <div class="plan-card" onclick="selectDuration(3, this)"><div class="plan-amount">3 Mins</div><div class="plan-tokens" id="d-rate-3"></div></div>
-      <div class="plan-card" onclick="selectDuration(5, this)"><div class="plan-amount">5 Mins</div><div class="plan-tokens" id="d-rate-5"></div></div>
-      <div class="plan-card" onclick="selectDuration(10, this)"><div class="plan-amount">10 Mins</div><div class="plan-tokens" id="d-rate-10"></div></div>
-      <div class="plan-card" onclick="selectDuration(15, this)"><div class="plan-amount">15 Mins</div><div class="plan-tokens" id="d-rate-15"></div></div>
-      <div class="plan-card" onclick="selectDuration(30, this)"><div class="plan-amount">30 Mins</div><div class="plan-tokens" id="d-rate-30"></div></div>
-    </div>
-    <div style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 12px; margin: 12px 0; display: flex; justify-content: space-between; align-items: center;">
-      <span style="font-size: 0.85rem; color: var(--text-muted);">Total Cost:</span>
-      <span id="booking-total-cost" style="font-size: 1.1rem; font-weight: 800; color: var(--gold);">0 Tokens</span>
-    </div>
-    <button class="call-btn" onclick="confirmAndSendBooking()">Confirm & Send Call Request</button>
-  </div>
-</div>
-
-<!-- Call History Modal -->
-<div class="modal-overlay" id="history-modal">
-  <div class="modal-card">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-      <h3 style="font-size: 1rem;"><i class="fa-solid fa-clock-rotate-left"></i> Call History & Logs</h3>
-      <i class="fa-solid fa-xmark" style="cursor:pointer; font-size: 1.1rem;" onclick="closeModals()"></i>
-    </div>
-    <div id="history-modal-body" style="max-height: 350px; overflow-y: auto;">
-      <p style="color:var(--text-muted); text-align:center;">Loading history...</p>
-    </div>
-  </div>
-</div>
-
-<!-- WhatsApp Ringing Screen -->
-<div id="whatsapp-call-screen">
-  <div>
-    <p style="font-size:0.8rem; color:#00F5D4; letter-spacing: 2px; margin-bottom: 30px;">INCOMING SECURE CALL</p>
-    <img id="wa-incoming-avatar" class="wa-avatar" src="" />
-    <h2 id="wa-incoming-name" style="font-size: 1.5rem; font-weight: 700;">Host</h2>
-    <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 6px;">Connecting Agora 1v1 Channel...</p>
-  </div>
-  <div style="display:flex; gap: 40px; margin-bottom: 20px;">
-    <button class="call-action-btn btn-end-call" onclick="rejectIncomingCall()"><i class="fa-solid fa-phone-slash"></i></button>
-    <button class="call-action-btn" style="background:#34C759;" onclick="answerIncomingCall()"><i class="fa-solid fa-phone"></i></button>
-  </div>
-</div>
-
-<!-- Synchronized Video Call Screen -->
-<div id="video-call-screen">
-  <div class="live-top-bar">
-    <div style="display:flex; align-items:center; gap:8px;">
-      <span style="width:8px; height:8px; background:#FF3B30; border-radius:50%;"></span>
-      <span id="call-host-title" style="font-size:0.85rem; font-weight:700;">Live Call</span>
-    </div>
-    <div class="call-timer-display" id="call-countdown-timer">00:00</div>
-  </div>
-  <div id="main-video-view"></div>
-  <div id="pip-video-view"></div>
-  <div class="live-bottom-controls">
-    <button class="call-action-btn btn-mic" onclick="toggleMute()"><i class="fa-solid fa-microphone" id="mic-icon"></i></button>
-    <button class="call-action-btn btn-end-call" onclick="endAgoraCall()"><i class="fa-solid fa-phone-slash"></i></button>
-  </div>
-</div>
-
-<script>
-let tg = window.Telegram.WebApp;
-tg.expand();
-
-let userId = tg.initDataUnsafe?.user?.id || 12345678;
-let userName = tg.initDataUnsafe?.user?.first_name || "User";
-let userTokens = 0;
-let selectedPlanAmount = 100;
-let selectedPlanTokens = 100;
-let allHostsList = [];
-let agoraClient, localAudioTrack, localVideoTrack;
-let activeChannel = "";
-let activeBookingId = "";
-let callDurationSecs = 0;
-let callTimerInterval = null;
-
-let currentSelectedHost = null;
-let selectedDurationMins = 1;
-let currentHostRate = 50;
-
-document.addEventListener("DOMContentLoaded", () => {
-  document.getElementById("profile-display-id").innerText = `#${userId}`;
-  document.getElementById("profile-full-id-text").innerText = `Telegram ID: ${userId}`;
-  document.getElementById("profile-username").innerText = userName;
-  fetchUserData();
-  fetchHosts();
-  checkHostStatusBadge();
-});
-
-function switchTab(tabName) {
-  document.querySelectorAll('.profile-container').forEach(el => el.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-  document.getElementById(`tab-${tabName}`).classList.add('active');
-  document.getElementById(`nav-${tabName}`).classList.add('active');
-}
-
-async function fetchUserData() {
-  try {
-    let res = await fetch(`/api/user/${userId}`);
-    let data = await res.json();
-    userTokens = data.tokens;
-    document.getElementById("user-tokens-count").innerText = userTokens;
-    document.getElementById("wallet-tokens-val").innerText = `${userTokens} Tokens`;
-    if(data.avatar) {
-      document.getElementById("header-profile-avatar").innerHTML = `<img src="${data.avatar}">`;
-      document.getElementById("profile-avatar-img").src = data.avatar;
-    }
-  } catch(e) { console.error(e); }
-}
-
-async function checkHostStatusBadge() {
-  try {
-    let res = await fetch(`/api/host/status/${userId}`);
-    let data = await res.json();
-    let badge = document.getElementById("host-status-badge-text");
-    let toggleBox = document.getElementById("external-host-toggle-box");
-    
-    if(data.is_host && data.status === 'approved') {
-      badge.innerText = "Approved 🟢";
-      badge.style.color = "#00F5D4";
-      
-      // Show external toggle box on profile page for approved hosts
-      toggleBox.style.display = "flex";
-      let statusLabel = document.getElementById("external-live-status-label");
-      let toggleBtn = document.getElementById("external-toggle-btn");
-      if(data.is_online) {
-        statusLabel.innerText = "Online 🟢";
-        toggleBtn.innerText = "Go Offline";
-        toggleBtn.style.background = "#FF3B30";
-        toggleBtn.style.color = "#fff";
-      } else {
-        statusLabel.innerText = "Offline 🔴";
-        toggleBtn.innerText = "Go Online";
-        toggleBtn.style.background = "var(--accent-cyan)";
-        toggleBtn.style.color = "#000";
-      }
-    } else if(data.is_host && data.status === 'pending') {
-      badge.innerText = "Pending ⏳";
-      badge.style.color = "var(--gold)";
-      toggleBox.style.display = "none";
-    } else {
-      badge.innerText = "Apply / Live 🚀";
-      badge.style.color = "var(--accent-cyan)";
-      toggleBox.style.display = "none";
-    }
-  } catch(e) { console.error(e); }
-}
-
-async function fetchHosts() {
-  try {
-    let res = await fetch('/api/hosts');
-    let data = await res.json();
-    allHostsList = data.hosts;
-    renderHosts(allHostsList);
-  } catch(e) { console.error(e); }
-}
-
-function renderHosts(hosts) {
-  let container = document.getElementById("hosts-container");
-  container.innerHTML = "";
-  hosts.forEach(h => {
-    container.innerHTML += `
-      <div class="host-card" onclick='openBookingModal(${JSON.stringify(h)})'>
-        <img class="host-thumb" src="${h.img || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400'}" />
-        <div class="badge-live">LIVE</div>
-        <div class="badge-rate">🪙 ${h.rate}/m</div>
-        <div class="host-info">
-          <div class="host-name">${h.name} <i class="fa-solid fa-circle-check" style="color:#00F5D4; font-size:0.7rem;"></i></div>
-          <p style="font-size:0.7rem; color:var(--text-muted); margin-bottom:8px;">${h.bio || 'Global Model'}</p>
-          <button class="call-btn"><i class="fa-solid fa-video"></i> Select Rate</button>
+    <!-- WHATSAPP STYLE INCOMING CALL SCREEN -->
+    <div id="whatsapp-call-screen">
+        <div>
+            <p style="color: #00F5D4; font-size: 0.8rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 25px;">Incoming Video Call</p>
+            <img id="wa-caller-img" src="" class="wa-avatar">
+            <h2 id="wa-caller-name" style="font-size: 1.6rem; font-weight: 800; color: white; margin-bottom: 6px;">Host Name</h2>
+            <p style="font-size: 0.85rem; color: var(--text-muted);">Vynora Secure 1v1 Call...</p>
         </div>
-      </div>
-    `;
-  });
-}
-
-function filterHosts(type) {
-  document.querySelectorAll('.filter-pill').forEach(el => el.classList.remove('active'));
-  event.target.classList.add('active');
-  if(type === 'online') {
-    renderHosts(allHostsList.filter(h => h.is_online));
-  } else if(type === 'hindi') {
-    renderHosts(allHostsList.filter(h => h.lang && h.lang.toLowerCase().includes('hindi')));
-  } else {
-    renderHosts(allHostsList);
-  }
-}
-
-function openBookingModal(host) {
-  currentSelectedHost = host;
-  currentHostRate = host.rate || 50;
-  document.getElementById('booking-host-title').innerText = `Booking call with ${host.name} (Rate: 🪙 ${currentHostRate} Tokens/min)`;
-  
-  [1, 3, 5, 10, 15, 30].forEach(m => {
-    let el = document.getElementById(`d-rate-${m}`);
-    if(el) el.innerText = `${currentHostRate * m} Tokens`;
-  });
-  
-  selectDuration(1, document.querySelector('#duration-grid .plan-card'));
-  document.getElementById('booking-modal').classList.add('active');
-}
-
-function selectDuration(mins, el) {
-  selectedDurationMins = mins;
-  document.querySelectorAll('#duration-grid .plan-card').forEach(c => c.classList.remove('active'));
-  if(el) el.classList.add('active');
-  let totalCost = currentHostRate * selectedDurationMins;
-  document.getElementById('booking-total-cost').innerText = `${totalCost} Tokens`;
-}
-
-async function confirmAndSendBooking() {
-  if(!currentSelectedHost) return;
-  let totalCost = currentHostRate * selectedDurationMins;
-  if(userTokens < totalCost) {
-    alert(`Insufficient tokens! You need ${totalCost} tokens for ${selectedDurationMins} mins. Please recharge.`);
-    closeModals();
-    openRechargeModal();
-    return;
-  }
-  
-  closeModals();
-  let res = await fetch('/api/book-slot', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({
-      user_id: userId, 
-      host_id: currentSelectedHost.id, 
-      host_name: currentSelectedHost.name, 
-      duration_mins: selectedDurationMins, 
-      token_cost: totalCost
-    })
-  });
-  let data = await res.json();
-  if(data.status === 'success') {
-    activeBookingId = data.booking_id;
-    alert("Booking request sent successfully! Please wait for host acceptance.");
-  } else {
-    alert(data.message || "Booking failed");
-  }
-}
-
-function openRechargeModal() { document.getElementById('recharge-modal').classList.add('active'); }
-function closeModals() { document.querySelectorAll('.modal-overlay').forEach(el => el.classList.remove('active')); }
-function selectPlan(amt, tokens) {
-  selectedPlanAmount = amt;
-  selectedPlanTokens = tokens;
-  document.querySelectorAll('.plan-card').forEach(el => el.classList.remove('active'));
-  event.currentTarget.classList.add('active');
-}
-
-async function submitRecharge() {
-  let utr = document.getElementById('utr-input').value.trim();
-  if(!utr) { alert("Please enter UTR number"); return; }
-  let fileInput = document.createElement('input');
-  fileInput.type = 'file';
-  fileInput.onchange = async () => {
-    let formData = new FormData();
-    formData.append('user_id', userId);
-    formData.append('amount_inr', selectedPlanAmount);
-    formData.append('utr_number', utr);
-    formData.append('screenshot', fileInput.files[0]);
-    let res = await fetch('/api/recharge', {method: 'POST', body: formData});
-    let data = await res.json();
-    alert(data.message);
-    closeModals();
-  };
-  fileInput.click();
-}
-
-async function openHostModal() {
-  let res = await fetch(`/api/host/status/${userId}`);
-  let data = await res.json();
-  let body = document.getElementById('host-modal-body');
-  
-  if(data.is_host && data.status === 'approved') {
-    let uRes = await fetch(`/api/user/${userId}`);
-    let uData = await uRes.json();
-    let netEarnings = uData.net_earnings_tokens || 0;
-    
-    body.innerHTML = `
-      <div style="background:rgba(0,245,212,0.1); border:1px solid #00F5D4; padding:12px; border-radius:12px; margin-bottom:12px;">
-        <p style="color:#00F5D4; font-weight:700;">🟢 Approved Host Dashboard</p>
-        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">Total Earnings: ${uData.earnings} Tokens</p>
-        <p style="font-size:0.85rem; color:var(--gold); font-weight:700;">Net Payout (70%): ${netEarnings} Tokens</p>
-      </div>
-      <div style="margin-bottom:12px;">
-        <label style="font-size:0.75rem; color:var(--text-muted);">Set Call Rate (Tokens/Min):</label>
-        <div style="display:flex; gap:8px; margin-top:4px;">
-          <input type="number" id="new-host-rate" class="input-box" value="${data.rate || 50}" style="margin-bottom:0;" />
-          <button class="call-btn" style="width:120px;" onclick="updateHostRate()">Update</button>
+        <div style="display: flex; gap: 50px; justify-content: center; margin-bottom: 40px; width: 100%;">
+            <div onclick="declineWhatsAppCall()" style="display:flex; flex-direction:column; align-items:center; gap:8px; cursor:pointer;">
+                <div style="width: 70px; height: 70px; background: #FF0033; border-radius: 50%; display:flex; align-items:center; justify-content:center; color:white; font-size:1.6rem; box-shadow: 0 4px 20px rgba(255,0,51,0.6);">
+                    <i class="fa-solid fa-phone-slash"></i>
+                </div>
+                <span style="font-size:0.8rem; color:white; font-weight:700;">Decline</span>
+            </div>
+            <div onclick="answerWhatsAppCall()" style="display:flex; flex-direction:column; align-items:center; gap:8px; cursor:pointer;">
+                <div style="width: 70px; height: 70px; background: #00F5D4; border-radius: 50%; display:flex; align-items:center; justify-content:center; color:#000; font-size:1.6rem; box-shadow: 0 4px 20px rgba(0,245,212,0.6); animation: pulseRing 1s infinite;">
+                    <i class="fa-solid fa-phone"></i>
+                </div>
+                <span style="font-size:0.8rem; color:white; font-weight:700;">Accept</span>
+            </div>
         </div>
-      </div>
-      <button class="call-btn" style="margin-bottom:10px;" onclick="toggleHostLiveStatus()">${data.is_online ? 'Go Offline 🔴' : 'Go Online 🟢'}</button>
-      <div style="border-top:1px solid var(--card-border); padding-top:12px; margin-top:12px;">
-        <h4 style="font-size:0.9rem; margin-bottom:8px;">💸 Withdraw Earnings (Limit: 700 - 2000 Tokens/day)</h4>
-        <input type="text" id="withdraw-upi" class="input-box" placeholder="Enter UPI ID (e.g. user@oksbi)" />
-        <input type="number" id="withdraw-tokens" class="input-box" placeholder="Tokens to Withdraw (700-2000)" />
-        <button class="call-btn" onclick="submitWithdrawal(${netEarnings})">Request Withdrawal</button>
-      </div>
-    `;
-  } else if(data.is_host && data.status === 'pending') {
-    body.innerHTML = `<p style="color:var(--gold); text-align:center; padding:20px;">⏳ Your host application is pending admin approval.</p>`;
-  } else {
-    body.innerHTML = `
-      <input type="text" id="h-name" class="input-box" placeholder="Your Stage Name" />
-      <input type="number" id="h-age" class="input-box" placeholder="Age" />
-      <input type="number" id="h-rate" class="input-box" placeholder="Token Rate per Min (e.g. 50)" />
-      <input type="text" id="h-lang" class="input-box" placeholder="Languages (e.g. English, Hindi)" />
-      <input type="text" id="h-loc" class="input-box" placeholder="Location / Country" />
-      <textarea id="h-bio" class="input-box" placeholder="Short Bio / Specialty"></textarea>
-      <button class="call-btn" onclick="submitHostRegistration()">Submit Host Application</button>
-    `;
-  }
-  document.getElementById('host-modal').classList.add('active');
-}
+    </div>
 
-async function updateHostRate() {
-  let rate = parseInt(document.getElementById('new-host-rate').value);
-  if(!rate || rate <= 0) { alert("Enter valid rate"); return; }
-  let res = await fetch('/api/host/update-rate', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({user_id: userId, rate: rate})
-  });
-  let data = await res.json();
-  alert(data.message || "Rate updated successfully!");
-  closeModals();
-  fetchHosts();
-}
-
-async function submitWithdrawal(maxNet) {
-  let upi = document.getElementById('withdraw-upi').value.trim();
-  let tokens = parseInt(document.getElementById('withdraw-tokens').value);
-  if(!upi || !tokens) { alert("Please fill all withdrawal fields"); return; }
-  if(tokens < 700 || tokens > 2000) { alert("Daily withdrawal limit is between 700 and 2000 tokens!"); return; }
-  if(tokens > maxNet) { alert("Insufficient net balance!"); return; }
-  
-  let res = await fetch('/api/withdraw', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({user_id: userId, upi_id: upi, tokens: tokens})
-  });
-  let data = await res.json();
-  alert(data.message);
-  closeModals();
-}
-
-async function submitHostRegistration() {
-  let payload = {
-    user_id: userId,
-    name: document.getElementById('h-name').value,
-    age: parseInt(document.getElementById('h-age').value || 20),
-    rate: parseInt(document.getElementById('h-rate').value || 50),
-    lang: document.getElementById('h-lang').value,
-    loc: document.getElementById('h-loc').value,
-    bio: document.getElementById('h-bio').value
-  };
-  let res = await fetch('/api/register-host', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(payload)
-  });
-  let data = await res.json();
-  alert(data.message);
-  closeModals();
-  checkHostStatusBadge();
-}
-
-async function toggleHostLiveStatus() {
-  let res = await fetch(`/api/host/toggle-live/${userId}`, {method: 'POST'});
-  let data = await res.json();
-  alert(`Host status: ${data.is_online ? 'Online 🟢' : 'Offline 🔴'}`);
-  closeModals();
-  checkHostStatusBadge();
-  fetchHosts();
-}
-
-async function openHistoryModal() {
-  document.getElementById('history-modal').classList.add('active');
-  let body = document.getElementById('history-modal-body');
-  body.innerHTML = `<p style="color:var(--text-muted); text-align:center;">Loading history...</p>`;
-  
-  try {
-    let res = await fetch(`/api/user/bookings/${userId}`);
-    let data = await res.json();
-    if(!data.bookings || data.bookings.length === 0) {
-      body.innerHTML = `<p style="color:var(--text-muted); text-align:center;">No call history found.</p>`;
-      return;
-    }
-    body.innerHTML = "";
-    data.bookings.forEach(b => {
-      body.innerHTML += `
-        <div style="background:rgba(255,255,255,0.04); border:1px solid var(--card-border); padding:10px; border-radius:12px; margin-bottom:8px; font-size:0.78rem;">
-          <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-            <span style="font-weight:700; color:white;">Host: ${b.host_name}</span>
-            <span style="color:var(--gold);">${b.token_cost} Tokens</span>
-          </div>
-          <p style="color:var(--text-muted);">Duration: ${b.duration_mins} Mins | Status: <b>${b.status.toUpperCase()}</b></p>
-          <p style="color:var(--text-muted); font-size:0.7rem; margin-top:2px;">Time: ${b.formatted_time}</p>
+    <header class="app-header">
+        <div class="brand-logo"><i class="fa-solid fa-bolt" style="color:#FF007A;"></i> Vynora Live</div>
+        <div class="header-right">
+            <div class="wallet-badge" onclick="openRechargeModal()">
+                <span>🪙 <span id="user-token-bal">0</span></span>
+                <i class="fa-solid fa-plus-circle" style="color:#FF007A;"></i>
+            </div>
+            <div class="profile-btn" onclick="switchTab('profile')">
+                <img id="header-avatar-img" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop">
+            </div>
         </div>
-      `;
-    });
-  } catch(e) {
-    body.innerHTML = `<p style="color:#FF3B30; text-align:center;">Error loading history.</p>`;
-  }
-}
+    </header>
 
-function triggerPhotoUpload() { document.getElementById('avatar-file-input').click(); }
-async function uploadProfilePhoto(input) {
-  if(!input.files[0]) return;
-  let formData = new FormData();
-  formData.append('user_id', userId);
-  formData.append('avatar', input.files[0]);
-  let res = await fetch('/api/update-profile-photo', {method: 'POST', body: formData});
-  let data = await res.json();
-  if(data.avatar_url) {
-    document.getElementById("header-profile-avatar").innerHTML = `<img src="${data.avatar_url}">`;
-    document.getElementById("profile-avatar-img").src = data.avatar_url;
-    alert("Profile photo updated successfully!");
-  }
-}
+    <div id="home-tab-view">
+        <!-- TOP BANNER -->
+        <div class="top-app-banner">
+            <div>
+                <h2>✨ Vynora Live 1v1</h2>
+                <p>Connect with Verified Global Streamers</p>
+            </div>
+            <i class="fa-solid fa-crown" style="font-size: 1.8rem; color: var(--gold);"></i>
+        </div>
 
-// Ringing & Agora Call Handling
-function triggerRingingScreen(channel, hostName, hostImg, bookingId) {
-  activeChannel = channel;
-  activeBookingId = bookingId;
-  document.getElementById('wa-incoming-avatar').src = hostImg || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400';
-  document.getElementById('wa-incoming-name').innerText = hostName || 'Host';
-  document.getElementById('whatsapp-call-screen').classList.add('active');
-}
+        <div class="promo-banner" id="promo-banner-card">
+            <div>
+                <h3>💎 VIP Creator Lounge</h3>
+                <p>Earn coins by hosting 1v1 private calls!</p>
+            </div>
+            <button class="get-btn" onclick="openHostRegistrationModal()" id="become-host-banner-btn">Become Host</button>
+        </div>
 
-function rejectIncomingCall() {
-  document.getElementById('whatsapp-call-screen').classList.remove('active');
-}
+        <div class="filter-container">
+            <div class="filter-pill active" onclick="filterHosts('all', this)">🔥 All Hosts</div>
+            <div class="filter-pill" onclick="filterHosts('verified', this)">💎 Verified Only</div>
+            <div class="filter-pill" onclick="filterHosts('private', this)">👑 Private Calls</div>
+            <div class="filter-pill" onclick="filterHosts('budget', this)">⚡ Under 50🪙</div>
+        </div>
 
-async function answerIncomingCall() {
-  document.getElementById('whatsapp-call-screen').classList.remove('active');
-  document.getElementById('video-call-screen').classList.add('active');
-  await startAgoraCall(activeChannel, userId);
-}
+        <div class="section-header"><i class="fa-solid fa-video" style="color:#FF007A;"></i> Public Live Streams & Streamers</div>
+        <div class="host-grid" id="hosts-container"></div>
+    </div>
 
-async function startAgoraCall(channelName, uid) {
-  try {
-    let res = await fetch(`/api/agora-token?channelName=${channelName}&uid=${uid}&role=publisher`);
-    let data = await res.json();
-    
-    agoraClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
-    await agoraClient.join(data.appId, data.channel, data.token, data.uid);
-    
-    localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
-    localVideoTrack = await AgoraRTC.createCameraVideoTrack();
-    
-    localVideoTrack.play("pip-video-view");
-    document.getElementById("pip-video-view").style.display = "block";
-    
-    await agoraClient.publish([localAudioTrack, localVideoTrack]);
-    
-    agoraClient.on("user-published", async (user, mediaType) => {
-      await agoraClient.subscribe(user, mediaType);
-      if (mediaType === "video") { user.videoTrack.play("main-video-view"); }
-      if (mediaType === "audio") { user.audioTrack.play(); }
-    });
+    <div class="profile-container" id="profile-tab-view">
+        <div class="profile-header-card">
+            <div class="profile-avatar-wrapper">
+                <img id="profile-avatar-img" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop" class="profile-avatar-img">
+                <div class="cam-edit-icon" onclick="promptPhotoUpdate()"><i class="fa-solid fa-camera"></i></div>
+                <input type="file" id="profile-file-input" style="display: none;" accept="image/*" onchange="uploadProfilePhoto(this)">
+            </div>
+            <div class="user-meta">
+                <h2 id="profile-user-name">Vynora Live 👑</h2>
+                <div class="user-id-text">ID: <span id="profile-user-id">7001825467</span> • 🇮🇳 India</div>
+            </div>
+        </div>
 
-    startSynchronizedTimer(selectedDurationMins * 60);
-  } catch(e) {
-    console.error("Agora Error:", e);
-    alert("Failed to connect video call.");
-  }
-}
+        <div class="wallet-banner-row">
+            <div class="wallet-box" onclick="openRechargeModal()">
+                <div><div style="font-size:0.75rem; color:var(--text-muted);">Tokens Earned</div><b style="color:var(--gold);">🪙 <span id="profile-tokens-count">0</span></b></div>
+                <i class="fa-solid fa-chevron-right" style="font-size:0.8rem; color:var(--text-muted);"></i>
+            </div>
+            <div class="wallet-box" onclick="openWithdrawModal()" id="earnings-box" style="display:none;">
+                <div><div style="font-size:0.75rem; color:var(--text-muted);">Net Payout (70%)</div><b style="color:var(--accent-cyan);">💰 ₹<span id="profile-earnings-count">0</span></b></div>
+                <i class="fa-solid fa-chevron-right" style="font-size:0.8rem; color:var(--text-muted);"></i>
+            </div>
+        </div>
 
-function startSynchronizedTimer(durationSecs) {
-  callDurationSecs = durationSecs;
-  if(callTimerInterval) clearInterval(callTimerInterval);
-  
-  callTimerInterval = setInterval(() => {
-    let mins = Math.floor(callDurationSecs / 60);
-    let secs = callDurationSecs % 60;
-    document.getElementById("call-countdown-timer").innerText = `${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
-    
-    if(callDurationSecs <= 0) {
-      clearInterval(callTimerInterval);
-      endAgoraCall();
-    }
-    callDurationSecs--;
-  }, 1000);
-}
+        <!-- HOST RATE CHANGE SECTION -->
+        <div style="margin-bottom: 16px; display:none; background:rgba(255,255,255,0.04); border:1px solid var(--card-border); padding:14px; border-radius:14px;" id="host-rate-container">
+            <h4 style="font-size:0.9rem; margin-bottom:8px; color:var(--gold);">⚙️ Manage Call Rate</h4>
+            <div style="display:flex; gap:10px;">
+                <input type="number" id="new-call-rate-input" class="input-box" placeholder="New Rate (Tokens/min)" style="margin-bottom:0;">
+                <button class="get-btn" style="background:var(--accent-cyan); color:#000; font-weight:700; white-space:nowrap;" onclick="updateHostRate()">Update Rate</button>
+            </div>
+        </div>
 
-function toggleMute() {
-  if(localAudioTrack) {
-    let muted = localAudioTrack.muted;
-    localAudioTrack.setMuted(!muted);
-    document.getElementById("mic-icon").className = muted ? "fa-solid fa-microphone" : "fa-solid fa-microphone-slash";
-  }
-}
+        <div style="margin-bottom: 20px; display:none;" id="withdraw-btn-container">
+            <button class="call-btn" style="background: linear-gradient(135deg, #00F5D4 0%, #00B2FF 100%); color: #000;" onclick="openWithdrawModal()">
+                <i class="fa-solid fa-wallet"></i> Withdraw Earnings (UPI)
+            </button>
+        </div>
 
-async function endAgoraCall() {
-  if(callTimerInterval) clearInterval(callTimerInterval);
-  if(localAudioTrack) { localAudioTrack.stop(); localAudioTrack.close(); }
-  if(localVideoTrack) { localVideoTrack.stop(); localVideoTrack.close(); }
-  if(agoraClient) { await agoraClient.leave(); }
-  document.getElementById('video-call-screen').classList.remove('active');
-  
-  if(activeBookingId) {
-    await fetch('/api/complete-booking', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({booking_id: activeBookingId})
-    });
-  }
-  fetchUserData();
-}
-</script>
-</body>
-</html>
+        <div class="action-icon-grid" id="profile-action-grid"></div>
+    </div>
+
+    <!-- HOST BOOKINGS MODAL -->
+    <div class="modal-overlay" id="host-bookings-modal">
+        <div class="modal-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h3>📋 Recent Booking Requests</h3>
+                <button style="background:none; border:none; color:white; font-size:1.2rem;" onclick="closeModal('host-bookings-modal')">✕</button>
+            </div>
+            <div id="host-bookings-list" style="max-height: 300px; overflow-y: auto;">
+                <p style="text-align:center; color:var(--text-muted);">Loading bookings...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- USER BOOKINGS MODAL -->
+    <div class="modal-overlay" id="user-bookings-modal">
+        <div class="modal-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h3>📅 My Bookings & Sessions</h3>
+                <button style="background:none; border:none; color:white; font-size:1.2rem;" onclick="closeModal('user-bookings-modal')">✕</button>
+            </div>
+            <div id="user-bookings-list" style="max-height: 320px; overflow-y: auto;">
+                <p style="text-align:center; color:var(--text-muted);">Loading your bookings...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- HISTORY / CALL LOGS MODAL -->
+    <div class="modal-overlay" id="history-modal">
+        <div class="modal-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h3>📜 Recent Call History</h3>
+                <button style="background:none; border:none; color:white; font-size:1.2rem;" onclick="closeModal('history-modal')">✕</button>
+            </div>
+            <div id="history-list-container" style="max-height: 320px; overflow-y: auto;">
+                <p style="text-align:center; color:var(--text-muted);">Loading history...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- WITHDRAWAL MODAL -->
+    <div class="modal-overlay" id="withdraw-modal">
+        <div class="modal-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h3>💸 Withdraw Earnings</h3>
+                <button style="background:none; border:none; color:white; font-size:1.2rem;" onclick="closeModal('withdraw-modal')">✕</button>
+            </div>
+            <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:10px;">Available Net Payout (70%): ₹<span id="withdraw-available-bal">0</span></p>
+            <input type="text" id="withdraw-upi-input" class="input-box" placeholder="Enter your UPI ID (e.g. okaxis@paytm)">
+            <input type="number" id="withdraw-amount-input" class="input-box" placeholder="Enter Tokens to Withdraw">
+            <button class="call-btn" style="padding:12px;" onclick="submitWithdrawalRequest()">🚀 Submit Withdrawal Request</button>
+        </div>
+    </div>
+
+    <nav class="bottom-nav">
+        <div class="nav-item active" id="nav-home" onclick="switchTab('home')"><i class="fa-solid fa-house"></i><span>Home</span></div>
+        <div class="nav-item" onclick="openRechargeModal()"><i class="fa-solid fa-wallet"></i><span>Recharge</span></div>
+        <div class="nav-item" onclick="openSupportLink()"><i class="fa-solid fa-headset"></i><span>Support</span></div>
+        <div class="nav-item" id="nav-profile" onclick="switchTab('profile')"><i class="fa-solid fa-user"></i><span>Profile</span></div>
+    </nav>
+
+    <!-- HOST PROFILE DRAWER -->
+    <div class="modal-overlay" id="host-booking-modal">
+        <div class="modal-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h3 id="bk-host-name">Host Profile</h3>
+                <button style="background:none; border:none; color:white; font-size:1.2rem;" onclick="closeModal('host-booking-modal')">✕</button>
+            </div>
+            <img id="drawer-host-img" src="" style="width:100%; height:180px; object-fit:cover; border-radius:16px; margin-bottom:10px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <div>
+                    <h4 id="drawer-name-title" style="font-size:1rem;">Host Name</h4>
+                    <p id="drawer-bio" style="font-size:0.75rem; color:var(--text-muted);">Verified Host 👑</p>
+                </div>
+                <div style="background:rgba(255,215,0,0.1); border:1px solid rgba(255,215,0,0.3); padding:4px 10px; border-radius:12px; color:var(--gold); font-size:0.8rem; font-weight:700;">
+                    🪙 <span id="drawer-rate">50</span>/min
+                </div>
+            </div>
+
+            <div class="booking-option-card" style="background:rgba(0,245,212,0.08); border-color:var(--accent-cyan); display:flex; justify-content:space-between; align-items:center; padding:12px; border-radius:14px; margin-bottom:10px;">
+                <div><b>⚡ Watch Public Stream</b><p style="font-size:0.7rem; color:var(--text-muted);">Join live stream free</p></div>
+                <button class="call-btn" style="width:auto; padding:6px 12px; background:var(--accent-cyan); color:#000;" onclick="joinPublicStream()">👀 Watch Live</button>
+            </div>
+
+            <div style="font-size:0.8rem; font-weight:700; margin: 10px 0 6px 0;">⏱️ Private Slot Booking (1m - 30m):</div>
+            <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:6px; max-height:160px; overflow-y:auto; padding-right:4px;">
+                <div class="plan-card" onclick="confirmBooking(1)"><div class="plan-amount">1 Min</div><div class="plan-tokens" id="cost-1">🪙 50</div></div>
+                <div class="plan-card" onclick="confirmBooking(5)"><div class="plan-amount">5 Mins</div><div class="plan-tokens" id="cost-5">🪙 250</div></div>
+                <div class="plan-card" onclick="confirmBooking(10)"><div class="plan-amount">10 Mins</div><div class="plan-tokens" id="cost-10">🪙 500</div></div>
+                <div class="plan-card" onclick="confirmBooking(15)"><div class="plan-amount">15 Mins</div><div class="plan-tokens" id="cost-15">🪙 750</div></div>
+                <div class="plan-card" onclick="confirmBooking(20)"><div class="plan-amount">20 Mins</div><div class="plan-tokens" id="cost-20">🪙 1000</div></div>
+                <div class="plan-card" onclick="confirmBooking(30)"><div class="plan-amount">30 Mins</div><div class="plan-tokens" id="cost-30">🪙 1500</div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- VIDEO CALL SCREEN -->
+    <div id="video-call-screen">
+        <div id="main-video-view"></div>
+        <div id="pip-video-view" onclick="swapVideoLayouts()" title="Tap to Swap View"></div>
+        
+        <div class="live-top-bar">
+            <div class="live-host-pill">
+                <img id="live-active-img" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop">
+                <div>
+                    <div id="live-active-name" style="font-size:0.8rem; line-height:1;">Streamer</div>
+                    <div style="font-size:0.65rem; color:var(--gold);">🪙 <span id="live-host-rate">50</span>/m</div>
+                </div>
+            </div>
+            <div class="live-viewer-count">👁️ <span id="viewer-count">1</span> Watching</div>
+        </div>
+
+        <div class="live-chat-messages" id="chat-messages-container"></div>
+
+        <div class="filter-bar">
+            <div class="cam-filter-btn active" onclick="applyCameraFilter('filter-normal', this)">✨ Normal</div>
+            <div class="cam-filter-btn" onclick="applyCameraFilter('filter-beauty', this)">🌟 Beauty Glow</div>
+            <div class="cam-filter-btn" onclick="applyCameraFilter('filter-rosy', this)">🌸 Rosy Pink</div>
+            <div class="cam-filter-btn" onclick="applyCameraFilter('filter-cool', this)">🧊 Cool Blue</div>
+            <div class="cam-filter-btn" onclick="applyCameraFilter('filter-cinematic', this)">🕶️ Cinematic</div>
+        </div>
+
+        <div class="live-bottom-bar">
+            <input type="text" class="live-chat-input" placeholder="Say something nice..." id="chat-input" onkeypress="handleChatKey(event)">
+            <div class="live-action-btn" onclick="sendChatMessage()" title="Send SMS"><i class="fa-solid fa-paper-plane" style="color:var(--accent-cyan);"></i></div>
+            <div class="live-action-btn" onclick="openGiftModal()" title="Send Gift">🎁</div>
+            <div class="live-action-btn live-end-btn" onclick="leaveCall()" title="End Call"><i class="fa-solid fa-phone-slash"></i></div>
+        </div>
+    </div>
+
+    <!-- GIFT MODAL -->
+    <div class="modal-overlay" id="gift-modal">
+        <div class="modal-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h3>🎁 Send Gift to Streamer</h3>
+                <button style="background:none; border:none; color:white; font-size:1.2rem;" onclick="closeModal('gift-modal')">✕</button>
+            </div>
+            <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:10px;">Your Tokens: 🪙 <span id="gift-user-tokens">0</span></p>
+            <div class="gifts-grid">
+                <div class="gift-item" onclick="sendGift(10, 'Rose 🌹')"><div class="gift-emoji">🌹</div><div style="font-size:0.8rem; font-weight:700;">Rose</div><div style="font-size:0.7rem; color:var(--gold);">🪙 10</div></div>
+                <div class="gift-item" onclick="sendGift(50, 'Heart ❤️')"><div class="gift-emoji">❤️</div><div style="font-size:0.8rem; font-weight:700;">Heart</div><div style="font-size:0.7rem; color:var(--gold);">🪙 50</div></div>
+                <div class="gift-item" onclick="sendGift(100, 'Ring 💍')"><div class="gift-emoji">💍</div><div style="font-size:0.8rem; font-weight:700;">Ring</div><div style="font-size:0.7rem; color:var(--gold);">🪙 100</div></div>
+                <div class="gift-item" onclick="sendGift(250, 'Crown 👑')"><div class="gift-emoji">👑</div><div style="font-size:0.8rem; font-weight:700;">Crown</div><div style="font-size:0.7rem; color:var(--gold);">🪙 250</div></div>
+                <div class="gift-item" onclick="sendGift(500, 'Car 🏎️')"><div class="gift-emoji">🏎️</div><div style="font-size:0.8rem; font-weight:700;">Car</div><div style="font-size:0.7rem; color:var(--gold);">🪙 500</div></div>
+                <div class="gift-item" onclick="sendGift(1000, 'Castle 🏰')"><div class="gift-emoji">🏰</div><div style="font-size:0.8rem; font-weight:700;">Castle</div><div style="font-size:0.7rem; color:var(--gold);">🪙 1000</div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- RECHARGE MODAL -->
+    <div class="modal-overlay" id="recharge-modal">
+        <div class="modal-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h3>💳 Select Recharge Plan</h3>
+                <button style="background:none; border:none; color:white; font-size:1.2rem;" onclick="closeModal('recharge-modal')">✕</button>
+            </div>
+            <div class="plan-grid">
+                <div class="plan-card active" onclick="selectPlan(50, this)"><div class="plan-amount">₹50</div><div class="plan-tokens">50 Tokens</div></div>
+                <div class="plan-card" onclick="selectPlan(100, this)"><div class="plan-amount">₹100</div><div class="plan-tokens">100 Tokens</div></div>
+                <div class="plan-card" onclick="selectPlan(200, this)"><div class="plan-amount">₹200</div><div class="plan-tokens">200 Tokens</div></div>
+                <div class="plan-card" onclick="selectPlan(500, this)"><div class="plan-amount">₹500</div><div class="plan-tokens">550 Tokens</div></div>
+                <div class="plan-card" onclick="selectPlan(1000, this)"><div class="plan-amount">₹1000</div><div class="plan-tokens">1150 Tokens</div></div>
+                <div class="plan-card" onclick="selectPlan(2000, this)"><div class="plan-amount">₹2000</div><div class="plan-tokens">2400 Tokens</div></div>
+            </div>
+            <div class="qr-box">
+                <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=vynoralive@slc&pn=RajnishKumar&am=50" id="upi-qr-img">
+                <p style="font-size:0.75rem; color:#666; margin-top:4px;">UPI ID: <b>vynoralive@slc</b></p>
+            </div>
+            
+            <div style="text-align: left; margin-bottom: 4px;">
+                <label style="font-size: 0.75rem; color: var(--text-muted);">Upload Payment Screenshot:</label>
+            </div>
+            <input type="file" id="recharge-screenshot" class="input-box" accept="image/*">
+            
+            <input type="text" id="recharge-utr" class="input-box" placeholder="Enter 12-Digit UTR / Ref Number">
+            <button class="call-btn" style="padding:12px;" onclick="submitRecharge()">🚀 Submit For Approval</button>
+        </div>
+    </div>
+
+    <!-- HOST REGISTRATION MODAL (URL REMOVED) -->
+    <div class="modal-overlay" id="host-reg-modal">
+        <div class="modal-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                <h3>📹 Host Registration</h3>
+                <button style="background:none; border:none; color:white;" onclick="closeModal('host-reg-modal')">✕</button>
+            </div>
+            <input type="text" id="host-name-input" class="input-box" placeholder="Your Full Name">
+            <input type="number" id="host-age-input" class="input-box" placeholder="Age">
+            <input type="number" id="host-rate-input" class="input-box" placeholder="Call Rate (Tokens/min)">
+            <input type="text" id="host-lang-input" class="input-box" placeholder="Languages">
+            <input type="text" id="host-loc-input" class="input-box" placeholder="Location">
+            <input type="text" id="host-bio-input" class="input-box" placeholder="Short Bio">
+            <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:8px;">* Note: After approval, you can upload your profile photo directly from your profile settings.</p>
+            <button class="call-btn" style="padding:12px;" onclick="submitHostRegistration()">🚀 Submit For Approval</button>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram?.WebApp;
+        if (tg) tg.expand();
+
+        const userId = tg?.initDataUnsafe?.user?.id ? Math.abs(parseInt(tg.initDataUnsafe.user.id)) : 7001825467;
+        const userName = tg?.initDataUnsafe?.user?.first_name || "Vynora Live";
+        const telegramPhoto = tg?.initDataUnsafe?.user?.photo_url || "";
+        
+        let userTokens = 0;
+        let selectedAmount = 50;
+        let selectedHostObj = null;
+        let allHostsList = [];
+
+        let agoraClient = null;
+        let localTracks = { audioTrack: null, videoTrack: null };
+        let chatInterval = null;
+        let bookingCheckInterval = null;
+        let isMainViewLocal = false;
+        let callTimerInterval = null;
+        let pendingApprovedBooking = null;
+
+        async function initData() {
+            try {
+                const res = await fetch(`/api/user/${userId}`);
+                const data = await res.json();
+                
+                if (data.is_banned) {
+                    document.body.innerHTML = `<div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; text-align:center; padding:20px; background:#06040C; color:white;"><h2 style="color:#FF0033; margin-bottom:10px;">🚫 Account Suspended</h2><p style="color:#94A3B8; font-size:0.9rem;">Your account has been suspended by the admin. Please contact support @VynoraSupport</p></div>`;
+                    return;
+                }
+
+                userTokens = data.tokens || 0;
+                document.getElementById('user-token-bal').innerText = userTokens;
+                document.getElementById('profile-tokens-count').innerText = data.earnings || 0;
+                document.getElementById('profile-earnings-count').innerText = data.net_earnings_inr || 0;
+
+                document.getElementById('profile-user-name').innerText = `${userName} 👑`;
+                document.getElementById('profile-user-id').innerText = userId;
+
+                const avatarImg = data.avatar || telegramPhoto || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop";
+                document.getElementById('profile-avatar-img').src = avatarImg;
+                document.getElementById('header-avatar-img').src = avatarImg;
+            } catch(e) {}
+
+            try {
+                const hostRes = await fetch(`/api/host/status/${userId}`);
+                const hostData = await hostRes.json();
+                
+                const actionGrid = document.getElementById('profile-action-grid');
+                const earningsBox = document.getElementById('earnings-box');
+                const withdrawBtnContainer = document.getElementById('withdraw-btn-container');
+                const promoBannerCard = document.getElementById('promo-banner-card');
+                const hostRateContainer = document.getElementById('host-rate-container');
+
+                if (hostData.is_host && hostData.status === "approved") {
+                    earningsBox.style.display = 'flex';
+                    withdrawBtnContainer.style.display = 'block';
+                    hostRateContainer.style.display = 'block';
+                    promoBannerCard.style.display = 'none';
+
+                    const isOnline = hostData.is_online;
+                    actionGrid.innerHTML = `
+                        <div class="icon-card" style="background: rgba(255,0,122,0.25); border-color: #FF007A;" onclick="startMyLiveStream()">
+                            <i class="fa-solid fa-tower-broadcast" style="color:#FF007A;"></i>
+                            <p style="color:white; font-weight:700;">Go Live 🔴</p>
+                        </div>
+                        <div class="icon-card" style="background: rgba(0,245,212,0.15); border-color: var(--accent-cyan);" onclick="openHostBookingsModal()">
+                            <i class="fa-solid fa-clipboard-list" style="color:var(--accent-cyan);"></i>
+                            <p style="color:white; font-weight:700;">Bookings</p>
+                        </div>
+                        <div class="icon-card" style="background: rgba(0,245,212,0.15); border-color: var(--accent-cyan);" onclick="toggleHostOnlineStatus()">
+                            <i class="fa-solid fa-power-off" style="color:var(--accent-cyan);"></i>
+                            <p style="color:white; font-weight:700;">${isOnline ? "Online 🟢" : "Offline 🔴"}</p>
+                        </div>
+                        <div class="icon-card" style="background: rgba(255,215,0,0.15); border-color: var(--gold);" onclick=
