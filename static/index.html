@@ -1,562 +1,652 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Vynora Live 1v1</title>
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.20.0.js"></script>
-<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-<style>
-:root {
-    --bg-dark: #06040C;
-    --card-bg: rgba(255, 255, 255, 0.04);
-    --card-border: rgba(255, 255, 255, 0.08);
-    --primary-gradient: linear-gradient(135deg, #FF007A 0%, #7928CA 100%);
-    --banner-pink: linear-gradient(135deg, #FF007A 0%, #FF5500 100%);
-    --accent-cyan: #00F5D4;
-    --text-main: #FFFFFF;
-    --text-muted: #94A3B8;
-    --gold: #FFD700;
-}
-* { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
-body { background-color: var(--bg-dark); color: var(--text-main); min-height: 100vh; padding-bottom: 75px; overflow-x: hidden; }
-.app-header { position: sticky; top: 0; z-index: 100; background: rgba(6, 4, 12, 0.95); backdrop-filter: blur(12px); padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--card-border); }
-.brand-logo { font-weight: 800; font-size: 1.15rem; background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: flex; align-items: center; gap: 6px; }
-.header-right { display: flex; align-items: center; gap: 8px; }
-.wallet-badge { display: flex; align-items: center; gap: 6px; background: rgba(255, 215, 0, 0.12); border: 1px solid rgba(255, 215, 0, 0.3); padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 700; color: var(--gold); cursor: pointer; }
-.profile-btn { width: 34px; height: 34px; border-radius: 50%; background: var(--primary-gradient); border: 2px solid var(--card-border); display: flex; align-items: center; justify-content: center; font-weight: 700; cursor: pointer; color: white; overflow: hidden; }
-.profile-btn img { width: 100%; height: 100%; object-fit: cover; }
+import os
+import time
+import uuid
+from fastapi import FastAPI, UploadFile, File, Form, Request
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+import requests
+from agora_token_builder import RtcTokenBuilder
+from database import users_col, hosts_col, bookings_col, recharges_col, withdrawals_col, chats_col
 
-/* TOP BANNER */
-.top-app-banner { margin: 12px 16px; background: linear-gradient(135deg, #1f0b24 0%, #2e082f 50%, #10061e 100%); border: 1px solid rgba(255, 0, 122, 0.3); border-radius: 16px; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 20px rgba(255, 0, 122, 0.2); }
-.top-app-banner h2 { font-size: 1.1rem; font-weight: 800; background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-.top-app-banner p { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+app = FastAPI()
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
-.promo-banner { margin: 12px 16px; background: var(--banner-pink); border-radius: 16px; padding: 16px; display: flex; justify-content: space-between; align-items: center; color: white; box-shadow: 0 4px 15px rgba(255, 0, 122, 0.4); }
-.promo-banner h3 { font-size: 1.05rem; font-weight: 800; margin-bottom: 4px; }
-.promo-banner p { font-size: 0.75rem; opacity: 0.9; }
-.get-btn { background: white; color: #FF007A; font-weight: 800; border: none; padding: 6px 14px; border-radius: 14px; font-size: 0.8rem; cursor: pointer; }
+BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN")
+GROUP_1_ID = os.getenv("GROUP_1_ID", "-100XXXXXXXXXX")
+GROUP_2_ID = os.getenv("GROUP_2_ID", "-100XXXXXXXXXX")
+GROUP_3_ID = os.getenv("GROUP_3_ID", "-100XXXXXXXXXX")
+SECOND_ADMIN_ID = 1108685585
 
-.filter-container { display: flex; gap: 8px; padding: 0 16px 12px 16px; overflow-x: auto; }
-.filter-pill { background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); padding: 6px 14px; border-radius: 20px; font-size: 0.78rem; color: var(--text-muted); cursor: pointer; white-space: nowrap; }
-.filter-pill.active { background: #FF007A; color: white; border-color: #FF007A; font-weight: 700; }
+AGORA_APP_ID = os.getenv("AGORA_APP_ID", "YOUR_AGORA_APP_ID")
+AGORA_APP_CERTIFICATE = os.getenv("AGORA_APP_CERTIFICATE", "YOUR_AGORA_CERTIFICATE")
 
-.section-header { padding: 4px 16px 8px 16px; font-size: 0.9rem; font-weight: 700; display: flex; align-items: center; gap: 6px; }
-.host-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; padding: 0 16px; }
-.host-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 16px; overflow: hidden; position: relative; cursor: pointer; }
-.host-thumb { width: 100%; height: 185px; object-fit: cover; }
-.badge-live { position: absolute; top: 8px; left: 8px; background: rgba(0, 0, 0, 0.65); padding: 3px 8px; border-radius: 12px; font-size: 0.65rem; color: var(--accent-cyan); font-weight: 700; }
-.badge-rate { position: absolute; top: 8px; right: 8px; background: rgba(0, 0, 0, 0.65); padding: 3px 8px; border-radius: 12px; font-size: 0.7rem; color: var(--gold); font-weight: 700; }
-.host-info { padding: 10px; background: linear-gradient(180deg, rgba(6,4,12,0) 0%, rgba(6,4,12,0.95) 100%); margin-top: -45px; position: relative; }
-.host-name { font-size: 0.88rem; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 4px; }
-.call-btn { width: 100%; background: var(--primary-gradient); border: none; color: white; padding: 8px; border-radius: 10px; font-weight: 700; font-size: 0.82rem; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; }
+TELEGRAM_API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
-.profile-container { display: none; padding: 16px; }
-.profile-container.active { display: block; }
-.profile-header-card { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
-.profile-avatar-wrapper { position: relative; width: 75px; height: 75px; border-radius: 50%; overflow: hidden; border: 2px solid #FF007A; }
-.profile-avatar-img { width: 100%; height: 100%; object-fit: cover; }
-.cam-edit-icon { position: absolute; bottom: 0; right: 0; background: #FF007A; color: white; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; cursor: pointer; }
-.user-meta h2 { font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 6px; }
-.user-id-text { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; }
+def send_telegram_message(chat_id, text, reply_markup=None):
+    payload = {"chat_id": int(chat_id), "text": text, "parse_mode": "HTML"}
+    if reply_markup:
+        payload["reply_markup"] = reply_markup
+    try:
+        res = requests.post(f"{TELEGRAM_API_URL}/sendMessage", json=payload)
+        print("Telegram Response:", res.json())
+    except Exception as e:
+        print("Telegram Error:", e)
 
-.wallet-banner-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
-.wallet-box { background: rgba(255,255,255,0.04); border: 1px solid var(--card-border); padding: 12px; border-radius: 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
-.action-icon-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; text-align: center; margin-bottom: 20px; }
-.icon-card { background: rgba(255,255,255,0.04); border: 1px solid var(--card-border); padding: 12px 6px; border-radius: 14px; cursor: pointer; }
-.icon-card i { font-size: 1.4rem; margin-bottom: 6px; color: #FF007A; }
-.icon-card p { font-size: 0.72rem; color: var(--text-muted); }
+def notify_all_admins(text, reply_markup=None):
+    groups = [GROUP_1_ID, GROUP_2_ID, GROUP_3_ID]
+    for g in groups:
+        if g and str(g) != "-100XXXXXXXXXX":
+            send_telegram_message(g, text, reply_markup=reply_markup)
+    send_telegram_message(SECOND_ADMIN_ID, text, reply_markup=reply_markup)
 
-.plan-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 12px 0; }
-.plan-card { background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); padding: 10px 6px; border-radius: 12px; text-align: center; cursor: pointer; }
-.plan-card.active { border-color: #FF007A; background: rgba(255,0,122,0.15); }
-.plan-amount { font-weight: 800; font-size: 0.95rem; color: white; }
-.plan-tokens { font-size: 0.7rem; color: var(--gold); }
+@app.on_event("startup")
+def set_webhook_on_startup():
+    render_url = "https://vynora-bot.onrender.com/telegram-webhook"
+    webhook_api = f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook?url={render_url}"
+    try:
+        requests.get(webhook_api)
+    except Exception as e:
+        print("Webhook setup error:", e)
 
-.qr-box { text-align: center; background: white; padding: 10px; border-radius: 12px; margin: 12px 0; }
-.qr-box img { width: 140px; height: 140px; }
+class HostRegisterModel(BaseModel):
+    user_id: int
+    name: str
+    age: int
+    rate: int
+    lang: str
+    loc: str
+    bio: str
 
-.bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background: rgba(6, 4, 12, 0.95); backdrop-filter: blur(16px); border-top: 1px solid var(--card-border); display: flex; justify-content: space-around; align-items: center; z-index: 150; }
-.nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--text-muted); font-size: 0.7rem; cursor: pointer; }
-.nav-item.active { color: #FF007A; font-weight: 700; }
-.nav-item i { font-size: 1.1rem; }
+class UpdateRateModel(BaseModel):
+    user_id: int
+    rate: int
 
-.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(10px); z-index: 9999 !important; display: none; justify-content: center; align-items: flex-end; }
-.modal-overlay.active { display: flex; }
-.modal-card { background: #130E26; border-top: 1px solid var(--card-border); border-radius: 24px 24px 0 0; width: 100%; max-width: 480px; padding: 20px; max-height: 88vh; overflow-y: auto; }
-.input-box { width: 100%; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--card-border); padding: 12px; border-radius: 12px; color: white; margin-bottom: 10px; outline: none; }
+class BookingModel(BaseModel):
+    user_id: int
+    host_id: str
+    host_name: str
+    duration_mins: int
+    token_cost: int
 
-/* WHATSAPP STYLE INCOMING RINGING SCREEN */
-#whatsapp-call-screen { position: fixed; inset: 0; background: linear-gradient(135deg, #06040C 0%, #1a0b2e 100%); z-index: 99999; display: none; flex-direction: column; justify-content: space-between; align-items: center; padding: 50px 20px; text-align: center; }
-#whatsapp-call-screen.active { display: flex; }
-.wa-avatar { width: 120px; height: 120px; border-radius: 50%; border: 4px solid #00F5D4; object-fit: cover; margin-bottom: 20px; animation: pulseRing 1.5s infinite; }
-@keyframes pulseRing { 0% { box-shadow: 0 0 0 0 rgba(0, 245, 212, 0.6); } 70% { box-shadow: 0 0 0 25px rgba(0, 245, 212, 0); } 100% { box-shadow: 0 0 0 0 rgba(0, 245, 212, 0); } }
+class ActionBookingModel(BaseModel):
+    booking_id: str
 
-/* SYNCHRONIZED VIDEO CALL SCREEN */
-#video-call-screen { position: fixed; inset: 0; width: 100vw; height: 100vh; background: #000; z-index: 999; display: none; flex-direction: column; }
-#video-call-screen.active { display: flex; }
-#main-video-view { position: absolute; inset: 0; width: 100vw; height: 100vh; object-fit: cover; z-index: 1; }
-#pip-video-view { position: absolute; top: 70px; right: 16px; width: 100px; height: 140px; background: #111; border-radius: 14px; overflow: hidden; border: 2px solid #FF007A; z-index: 5; cursor: pointer; display: none; }
-.live-top-bar { position: absolute; top: 16px; left: 16px; right: 16px; z-index: 10; display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.4); padding: 8px 16px; border-radius: 20px; backdrop-filter: blur(8px); }
-.call-timer-display { font-size: 0.95rem; font-weight: 800; color: var(--gold); background: rgba(0,0,0,0.6); padding: 4px 12px; border-radius: 12px; }
-.live-bottom-controls { position: absolute; bottom: 30px; left: 0; right: 0; z-index: 10; display: flex; justify-content: center; gap: 20px; align-items: center; }
-.call-action-btn { width: 50px; height: 50px; border-radius: 50%; border: none; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; cursor: pointer; color: white; }
-.btn-end-call { background: #FF3B30; }
-.btn-mic { background: rgba(255,255,255,0.2); }
-</style>
-</head>
-<body>
+class CompleteBookingModel(BaseModel):
+    booking_id: str
 
-<div class="app-header">
-  <div class="brand-logo"><i class="fa-solid fa-gem"></i> Vynora Live</div>
-  <div class="header-right">
-    <div class="wallet-badge" onclick="openRechargeModal()"><i class="fa-solid fa-coins"></i> <span id="user-tokens-count">0</span></div>
-    <div class="profile-btn" id="header-profile-avatar" onclick="switchTab('profile')"></div>
-  </div>
-</div>
+class GiftModel(BaseModel):
+    user_id: int
+    host_id: str
+    gift_cost: int
+    gift_name: str
+    channel: str
+    sender_name: str
 
-<!-- Home Tab -->
-<div id="tab-home" class="profile-container active" style="padding: 0;">
-  <div class="top-app-banner">
-    <div>
-      <h2>Vynora Live 1v1</h2>
-      <p>Connect with verified global hosts instantly.</p>
-    </div>
-    <button class="get-btn" onclick="openRechargeModal()">Recharge</button>
-  </div>
+class ChatModel(BaseModel):
+    channel: str
+    sender: str
+    text: str
+    type: str = "chat"
 
-  <div class="filter-container">
-    <div class="filter-pill active" onclick="filterHosts('all')">🔥 All Hosts</div>
-    <div class="filter-pill" onclick="filterHosts('online')">🟢 Online Now</div>
-    <div class="filter-pill" onclick="filterHosts('hindi')">🇮🇳 Hindi</div>
-  </div>
+class WithdrawModel(BaseModel):
+    user_id: int
+    upi_id: str
+    tokens: int
 
-  <div class="section-header"><i class="fa-solid fa-fire text-pink"></i> Featured Global Hosts</div>
-  <div class="host-grid" id="hosts-container"></div>
-</div>
-
-<!-- Profile Tab -->
-<div id="tab-profile" class="profile-container">
-  <div class="profile-header-card">
-    <div class="profile-avatar-wrapper" onclick="triggerPhotoUpload()">
-      <img id="profile-avatar-img" class="profile-avatar-img" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400" />
-      <div class="cam-edit-icon"><i class="fa-solid fa-camera"></i></div>
-    </div>
-    <input type="file" id="avatar-file-input" style="display:none" accept="image/*" onchange="uploadProfilePhoto(this)" />
-    <div class="user-meta">
-      <h2 id="profile-username">User <span id="profile-display-id"></span></h2>
-      <p class="user-id-text" id="profile-full-id-text"></p>
-    </div>
-  </div>
-
-  <div class="wallet-banner-row">
-    <div class="wallet-box" onclick="openRechargeModal()">
-      <div>
-        <p style="font-size: 0.72rem; color: var(--text-muted);">My Balance</p>
-        <h4 style="color: var(--gold); font-size: 1.05rem;" id="wallet-tokens-val">0 Tokens</h4>
-      </div>
-      <i class="fa-solid fa-chevron-right" style="font-size: 0.8rem; color: var(--text-muted);"></i>
-    </div>
-    <div class="wallet-box" onclick="openHostModal()">
-      <div>
-        <p style="font-size: 0.72rem; color: var(--text-muted);">Host Center</p>
-        <h4 style="color: var(--accent-cyan); font-size: 0.95rem;" id="host-status-badge-text">Apply / Live</h4>
-      </div>
-      <i class="fa-solid fa-chevron-right" style="font-size: 0.8rem; color: var(--text-muted);"></i>
-    </div>
-  </div>
-
-  <div class="action-icon-grid">
-    <div class="icon-card" onclick="openRechargeModal()"><i class="fa-solid fa-wallet"></i><p>Recharge</p></div>
-    <div class="icon-card" onclick="openHostModal()"><i class="fa-solid fa-video"></i><p>Host Panel</p></div>
-    <div class="icon-card" onclick="openSupportModal()"><i class="fa-solid fa-headset"></i><p>Support</p></div>
-    <div class="icon-card" onclick="openBookingsModal()"><i class="fa-solid fa-clock-rotate-left"></i><p>History</p></div>
-  </div>
-</div>
-
-<!-- Support Tab -->
-<div id="tab-support" class="profile-container">
-  <h2 style="font-size: 1.1rem; margin-bottom: 12px;"><i class="fa-solid fa-headset"></i> Professional Support & Guidelines</h2>
-  <div style="background: var(--card-bg); border: 1px solid var(--card-border); padding: 14px; border-radius: 14px; font-size: 0.82rem; line-height: 1.5; color: var(--text-muted);">
-    <h3 style="color: white; margin-bottom: 6px;">📜 User Policy</h3>
-    <p>All users must maintain respectful behavior during video calls. Any abusive language will lead to immediate permanent ban by admins.</p>
-    <br>
-    <h3 style="color: white; margin-bottom: 6px;">📹 Host Live Rules</h3>
-    <p>Hosts must maintain professional attire and lighting. Payouts are processed weekly with 30% platform fee deduction.</p>
-    <br>
-    <h3 style="color: white; margin-bottom: 6px;">💳 Payment & Recharge Guidelines</h3>
-    <p>Recharge requests require correct UTR numbers. Verified credits reflect instantly in your wallet.</p>
-  </div>
-</div>
-
-<!-- Bottom Navigation -->
-<div class="bottom-nav">
-  <div class="nav-item active" id="nav-home" onclick="switchTab('home')"><i class="fa-solid fa-house"></i><span>Explore</span></div>
-  <div class="nav-item" id="nav-support" onclick="switchTab('support')"><i class="fa-solid fa-circle-info"></i><span>Support</span></div>
-  <div class="nav-item" id="nav-profile" onclick="switchTab('profile')"><i class="fa-solid fa-user"></i><span>Profile</span></div>
-</div>
-
-<!-- Recharge Modal -->
-<div class="modal-overlay" id="recharge-modal">
-  <div class="modal-card">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-      <h3 style="font-size: 1rem;"><i class="fa-solid fa-wallet"></i> Recharge Wallet</h3>
-      <i class="fa-solid fa-xmark" style="cursor:pointer; font-size: 1.1rem;" onclick="closeModals()"></i>
-    </div>
-    <div class="plan-grid">
-      <div class="plan-card active" onclick="selectPlan(100, 100)">
-        <div class="plan-amount">₹100</div>
-        <div class="plan-tokens">100 Tokens</div>
-      </div>
-      <div class="plan-card" onclick="selectPlan(300, 300)">
-        <div class="plan-amount">₹300</div>
-        <div class="plan-tokens">300 Tokens</div>
-      </div>
-      <div class="plan-card" onclick="selectPlan(500, 550)">
-        <div class="plan-amount">₹500</div>
-        <div class="plan-tokens">550 Tokens+</div>
-      </div>
-    </div>
-    <div class="qr-box">
-      <p style="color:#000; font-size:0.75rem; font-weight:700; margin-bottom:6px;">Scan & Pay via UPI</p>
-      <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=vynora@upi&pn=VynoraLive" alt="QR">
-      <p style="color:#000; font-size:0.7rem; margin-top:4px;">UPI ID: <b>vynora@upi</b></p>
-    </div>
-    <input type="text" id="utr-input" class="input-box" placeholder="Enter 12-digit UTR / Reference Number" />
-    <button class="call-btn" onclick="submitRecharge()">Submit Payment & Verify</button>
-  </div>
-</div>
-
-<!-- Host Center Modal -->
-<div class="modal-overlay" id="host-modal">
-  <div class="modal-card">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-      <h3 style="font-size: 1rem;"><i class="fa-solid fa-video"></i> Host Center</h3>
-      <i class="fa-solid fa-xmark" style="cursor:pointer; font-size: 1.1rem;" onclick="closeModals()"></i>
-    </div>
-    <div id="host-modal-body"></div>
-  </div>
-</div>
-
-<!-- WhatsApp Ringing Screen -->
-<div id="whatsapp-call-screen">
-  <div>
-    <p style="font-size:0.8rem; color:#00F5D4; letter-spacing: 2px; margin-bottom: 30px;">INCOMING SECURE CALL</p>
-    <img id="wa-incoming-avatar" class="wa-avatar" src="" />
-    <h2 id="wa-incoming-name" style="font-size: 1.5rem; font-weight: 700;">Host</h2>
-    <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 6px;">Connecting Agora 1v1 Channel...</p>
-  </div>
-  <div style="display:flex; gap: 40px; margin-bottom: 20px;">
-    <button class="call-action-btn btn-end-call" onclick="rejectIncomingCall()"><i class="fa-solid fa-phone-slash"></i></button>
-    <button class="call-action-btn" style="background:#34C759;" onclick="answerIncomingCall()"><i class="fa-solid fa-phone"></i></button>
-  </div>
-</div>
-
-<!-- Synchronized Video Call Screen -->
-<div id="video-call-screen">
-  <div class="live-top-bar">
-    <div style="display:flex; align-items:center; gap:8px;">
-      <span style="width:8px; height:8px; background:#FF3B30; border-radius:50%;"></span>
-      <span id="call-host-title" style="font-size:0.85rem; font-weight:700;">Live Call</span>
-    </div>
-    <div class="call-timer-display" id="call-countdown-timer">00:00</div>
-  </div>
-  <div id="main-video-view"></div>
-  <div id="pip-video-view"></div>
-  <div class="live-bottom-controls">
-    <button class="call-action-btn btn-mic" onclick="toggleMute()"><i class="fa-solid fa-microphone" id="mic-icon"></i></button>
-    <button class="call-action-btn btn-end-call" onclick="endAgoraCall()"><i class="fa-solid fa-phone-slash"></i></button>
-  </div>
-</div>
-
-<script>
-let tg = window.Telegram.WebApp;
-tg.expand();
-let userId = tg.initDataUnsafe?.user?.id || 12345678;
-let userName = tg.initDataUnsafe?.user?.first_name || "User";
-let userTokens = 0;
-let selectedPlanAmount = 100;
-let selectedPlanTokens = 100;
-let allHostsList = [];
-let agoraClient, localAudioTrack, localVideoTrack;
-let activeChannel = "";
-let callDurationSecs = 0;
-let callTimerInterval = null;
-
-document.addEventListener("DOMContentLoaded", () => {
-  document.getElementById("profile-display-id").innerText = `#${userId}`;
-  document.getElementById("profile-full-id-text").innerText = `Telegram ID: ${userId}`;
-  document.getElementById("profile-username").innerText = userName;
-  fetchUserData();
-  fetchHosts();
-});
-
-function switchTab(tabName) {
-  document.querySelectorAll('.profile-container').forEach(el => el.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-  document.getElementById(`tab-${tabName}`).classList.add('active');
-  document.getElementById(`nav-${tabName}`).classList.add('active');
-}
-
-async function fetchUserData() {
-  try {
-    let res = await fetch(`/api/user/${userId}`);
-    let data = await res.json();
-    userTokens = data.tokens;
-    document.getElementById("user-tokens-count").innerText = userTokens;
-    document.getElementById("wallet-tokens-val").innerText = `${userTokens} Tokens`;
-    if(data.avatar) {
-      document.getElementById("header-profile-avatar").innerHTML = `<img src="${data.avatar}">`;
-      document.getElementById("profile-avatar-img").src = data.avatar;
+@app.get("/api/user/{user_id}")
+def get_user(user_id: int):
+    user = users_col.find_one({"user_id": int(user_id)})
+    if user and user.get("is_banned", False):
+        return {"tokens": 0, "earnings": 0, "net_earnings_tokens": 0, "net_earnings_inr": 0, "avatar": "", "is_banned": True}
+    if not user:
+        user = {"user_id": int(user_id), "tokens": 0, "earnings": 0, "avatar": "", "is_banned": False}
+        users_col.insert_one(user)
+        notify_all_admins(f"👤 <b>New User Started Bot!</b>\nID: <code>{user_id}</code>")
+    
+    raw_earnings = user.get("earnings", 0)
+    net_earnings_tokens = int(raw_earnings * 0.7)
+    return {
+        "tokens": user.get("tokens", 0),
+        "earnings": raw_earnings,
+        "net_earnings_tokens": net_earnings_tokens,
+        "net_earnings_inr": net_earnings_tokens,
+        "avatar": user.get("avatar", ""),
+        "is_banned": False
     }
-  } catch(e) { console.error(e); }
-}
 
-async function fetchHosts() {
-  try {
-    let res = await fetch('/api/hosts');
-    let data = await res.json();
-    allHostsList = data.hosts;
-    renderHosts(allHostsList);
-  } catch(e) { console.error(e); }
-}
+@app.get("/api/host/status/{user_id}")
+def get_host_status(user_id: int):
+    host = hosts_col.find_one({
+        "$or": [
+            {"user_id": int(user_id)},
+            {"id": str(user_id)},
+            {"id": f"h_{user_id}"},
+            {"_id": f"host_{user_id}"}
+        ]
+    })
+    if host:
+        return {
+            "is_host": True, 
+            "status": host.get("status", "pending"), 
+            "is_online": host.get("is_online", False),
+            "rate": host.get("rate", 50)
+        }
+    return {"is_host": False, "status": "none", "is_online": False, "rate": 50}
 
-function renderHosts(hosts) {
-  let container = document.getElementById("hosts-container");
-  container.innerHTML = "";
-  hosts.forEach(h => {
-    container.innerHTML += `
-      <div class="host-card" onclick="bookHost('${h.id}', '${h.name}', ${h.rate})">
-        <img class="host-thumb" src="${h.img || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400'}" />
-        <div class="badge-live">LIVE</div>
-        <div class="badge-rate">🪙 ${h.rate}/m</div>
-        <div class="host-info">
-          <div class="host-name">${h.name} <i class="fa-solid fa-circle-check" style="color:#00F5D4; font-size:0.7rem;"></i></div>
-          <p style="font-size:0.7rem; color:var(--text-muted); margin-bottom:8px;">${h.bio || 'Global Model'}</p>
-          <button class="call-btn"><i class="fa-solid fa-video"></i> Call Now</button>
-        </div>
-      </div>
-    `;
-  });
-}
+@app.post("/api/host/toggle-live/{user_id}")
+def toggle_host_live(user_id: int):
+    host = hosts_col.find_one({
+        "$or": [
+            {"user_id": int(user_id)},
+            {"id": str(user_id)},
+            {"id": f"h_{user_id}"},
+            {"_id": f"host_{user_id}"}
+        ]
+    })
+    if not host or host.get("status") != "approved":
+        return {"status": "error", "message": "Host not found or not approved"}
+    new_status = not host.get("is_online", False)
+    hosts_col.update_one({"_id": host["_id"]}, {"$set": {"is_online": new_status}})
+    return {"status": "success", "is_online": new_status}
 
-function filterHosts(type) {
-  document.querySelectorAll('.filter-pill').forEach(el => el.classList.remove('active'));
-  event.target.classList.add('active');
-  if(type === 'online') {
-    renderHosts(allHostsList.filter(h => h.is_online));
-  } else if(type === 'hindi') {
-    renderHosts(allHostsList.filter(h => h.lang && h.lang.toLowerCase().includes('hindi')));
-  } else {
-    renderHosts(allHostsList);
-  }
-}
+@app.post("/api/host/update-rate")
+def update_host_rate(data: UpdateRateModel):
+    host = hosts_col.find_one({
+        "$or": [
+            {"user_id": int(data.user_id)},
+            {"id": str(data.user_id)},
+            {"id": f"h_{data.user_id}"},
+            {"_id": f"host_{data.user_id}"}
+        ]
+    })
+    if not host:
+        return {"status": "error", "message": "Host not found"}
+    hosts_col.update_one({"_id": host["_id"]}, {"$set": {"rate": data.rate}})
+    return {"status": "success", "message": "Call rate updated successfully!"}
 
-async function bookHost(hostId, hostName, rate) {
-  let duration = 3; // 3 minutes default slot
-  let totalCost = rate * duration;
-  if(userTokens < totalCost) {
-    alert(`Insufficient tokens! You need ${totalCost} tokens for ${duration} mins. Please recharge.`);
-    openRechargeModal();
-    return;
-  }
-  
-  if(confirm(`Book 1v1 Call with ${hostname = hostName} for ${duration} mins? Cost: ${totalCost} Tokens`)) {
-    let res = await fetch('/api/book-slot', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({user_id: userId, host_id: hostId, host_name: hostName, duration_mins: duration, token_cost: totalCost})
-    });
-    let data = await res.json();
-    if(data.status === 'success') {
-      alert("Booking request sent to host! Please wait for acceptance.");
-    } else {
-      alert(data.message || "Booking failed");
+@app.get("/api/hosts")
+def get_hosts():
+    db_hosts = list(hosts_col.find({"status": "approved"}, {"_id": 0}))
+    dummy_hosts = [
+        {"id": "dummy_1", "user_id": 9991, "name": "Sophia 💎", "age": 22, "rate": 40, "lang": "English", "loc": "UK", "img": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&auto=format&fit=crop", "bio": "International VIP Model ✨", "is_online": True, "is_dummy": True},
+        {"id": "dummy_2", "user_id": 9992, "name": "Ananya 🔥", "age": 21, "rate": 50, "lang": "Hindi", "loc": "Mumbai", "img": "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400&auto=format&fit=crop", "bio": "Bollywood dancer & host 💃", "is_online": True, "is_dummy": True},
+        {"id": "dummy_3", "user_id": 9993, "name": "Elena 👑", "age": 23, "rate": 60, "lang": "French", "loc": "France", "img": "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&auto=format&fit=crop", "bio": "Parisian fashion enthusiast 🌸", "is_online": True, "is_dummy": True},
+        {"id": "dummy_4", "user_id": 9994, "name": "Natasha ✨", "age": 20, "rate": 45, "lang": "Russian", "loc": "Russia", "img": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop", "bio": "Professional singer & artist 🎶", "is_online": True, "is_dummy": True},
+        {"id": "dummy_5", "user_id": 9995, "name": "Priya 💫", "age": 22, "rate": 35, "lang": "Hindi", "loc": "Delhi", "img": "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=400&auto=format&fit=crop", "bio": "Friendly companion & gamer 🎮", "is_online": True, "is_dummy": True}
+    ]
+    all_hosts = dummy_hosts + db_hosts
+    for h in all_hosts:
+        if not h.get("id"):
+            h["id"] = f"h_{h.get('user_id')}"
+    return {"hosts": all_hosts}
+
+@app.get("/api/agora-token")
+def get_agora_token(channelName: str, uid: int, role: str):
+    privilege_expired_ts = int(time.time()) + 3600
+    rtc_role = 1 if role == "publisher" else 2
+    token = RtcTokenBuilder.buildTokenWithUid(
+        AGORA_APP_ID, AGORA_APP_CERTIFICATE, channelName, int(uid), rtc_role, privilege_expired_ts
+    )
+    return {"status": "success", "token": token, "appId": AGORA_APP_ID, "channel": channelName, "uid": int(uid)}
+
+@app.post("/api/book-slot")
+def book_slot(data: BookingModel):
+    if str(data.host_id).startswith("dummy_"):
+        return {"status": "error", "message": "✨ Host is currently busy in a private international session. Please try another host!"}
+    
+    user = users_col.find_one({"user_id": int(data.user_id)})
+    if not user or user.get("tokens", 0) < data.token_cost:
+        return {"status": "error", "message": f"Insufficient tokens! You need {data.token_cost} tokens. Please recharge."}
+    
+    users_col.update_one({"user_id": int(data.user_id)}, {"$inc": {"tokens": -data.token_cost}})
+    booking_id = str(uuid.uuid4())[:8]
+    clean_host_id = str(data.host_id).replace("h_", "").replace("host_", "")
+    channel_name = f"private_call_{clean_host_id}_{data.user_id}"
+    current_time = time.time()
+    
+    booking_doc = {
+        "booking_id": booking_id,
+        "user_id": int(data.user_id),
+        "host_id": data.host_id,
+        "host_name": data.host_name,
+        "duration_mins": data.duration_mins,
+        "token_cost": data.token_cost,
+        "channel_name": channel_name,
+        "status": "pending",
+        "time": current_time,
+        "call_started_at": 0
     }
-  }
-}
-
-function openRechargeModal() { document.getElementById('recharge-modal').classList.add('active'); }
-function closeModals() { document.querySelectorAll('.modal-overlay').forEach(el => el.classList.remove('active')); }
-function selectPlan(amt, tokens) {
-  selectedPlanAmount = amt;
-  selectedPlanTokens = tokens;
-  document.querySelectorAll('.plan-card').forEach(el => el.classList.remove('active'));
-  event.currentTarget.classList.add('active');
-}
-
-async function submitRecharge() {
-  let utr = document.getElementById('utr-input').value.trim();
-  if(!utr) { alert("Please enter UTR number"); return; }
-  let fileInput = document.createElement('input');
-  fileInput.type = 'file';
-  fileInput.onchange = async () => {
-    let formData = new FormData();
-    formData.append('user_id', userId);
-    formData.append('amount_inr', selectedPlanAmount);
-    formData.append('utr_number', utr);
-    formData.append('screenshot', fileInput.files[0]);
-    let res = await fetch('/api/recharge', {method: 'POST', body: formData});
-    let data = await res.json();
-    alert(data.message);
-    closeModals();
-  };
-  fileInput.click();
-}
-
-async function openHostModal() {
-  let res = await fetch(`/api/host/status/${userId}`);
-  let data = await res.json();
-  let body = document.getElementById('host-modal-body');
-  if(data.is_host && data.status === 'approved') {
-    body.innerHTML = `
-      <p style="color:#00F5D4; font-weight:700; margin-bottom:10px;">🟢 You are an Approved Host!</p>
-      <button class="call-btn" onclick="toggleHostLiveStatus()">${data.is_online ? 'Go Offline' : 'Go Online Now'}</button>
-    `;
-  } else if(data.is_host && data.status === 'pending') {
-    body.innerHTML = `<p style="color:var(--gold);">⏳ Your host application is pending admin approval.</p>`;
-  } else {
-    body.innerHTML = `
-      <input type="text" id="h-name" class="input-box" placeholder="Your Stage Name" />
-      <input type="number" id="h-age" class="input-box" placeholder="Age" />
-      <input type="number" id="h-rate" class="input-box" placeholder="Token Rate per Min (e.g. 50)" />
-      <input type="text" id="h-lang" class="input-box" placeholder="Languages (e.g. English, Hindi)" />
-      <input type="text" id="h-loc" class="input-box" placeholder="Location / Country" />
-      <textarea id="h-bio" class="input-box" placeholder="Short Bio / Specialty"></textarea>
-      <button class="call-btn" onclick="submitHostRegistration()">Submit Host Application</button>
-    `;
-  }
-  document.getElementById('host-modal').classList.add('active');
-}
-
-async function submitHostRegistration() {
-  let payload = {
-    user_id: userId,
-    name: document.getElementById('h-name').value,
-    age: parseInt(document.getElementById('h-age').value || 20),
-    rate: parseInt(document.getElementById('h-rate').value || 50),
-    lang: document.getElementById('h-lang').value,
-    loc: document.getElementById('h-loc').value,
-    bio: document.getElementById('h-bio').value
-  };
-  let res = await fetch('/api/register-host', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(payload)
-  });
-  let data = await res.json();
-  alert(data.message);
-  closeModals();
-}
-
-async function toggleHostLiveStatus() {
-  let res = await fetch(`/api/host/toggle-live/${userId}`, {method: 'POST'});
-  let data = await res.json();
-  alert(`Host status: ${data.is_online ? 'Online' : 'Offline'}`);
-  closeModals();
-}
-
-function triggerPhotoUpload() { document.getElementById('avatar-file-input').click(); }
-async function uploadProfilePhoto(input) {
-  if(!input.files[0]) return;
-  let formData = new FormData();
-  formData.append('user_id', userId);
-  formData.append('avatar', input.files[0]);
-  let res = await fetch('/api/update-profile-photo', {method: 'POST', body: formData});
-  let data = await res.json();
-  if(data.avatar_url) {
-    document.getElementById("header-profile-avatar").innerHTML = `<img src="${data.avatar_url}">`;
-    document.getElementById("profile-avatar-img").src = data.avatar_url;
-    alert("Profile photo updated successfully!");
-  }
-}
-
-// Synchronized Call Timer & Agora Integration
-function triggerRingingScreen(channel, hostName, hostImg) {
-  activeChannel = channel;
-  document.getElementById('wa-incoming-avatar').src = hostImg || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400';
-  document.getElementById('wa-incoming-name').innerText = hostName || 'Host';
-  document.getElementById('whatsapp-call-screen').classList.add('active');
-}
-
-function rejectIncomingCall() {
-  document.getElementById('whatsapp-call-screen').classList.remove('active');
-}
-
-async function answerIncomingCall() {
-  document.getElementById('whatsapp-call-screen').classList.remove('active');
-  document.getElementById('video-call-screen').classList.add('active');
-  await startAgoraCall(activeChannel, userId);
-}
-
-async function startAgoraCall(channelName, uid) {
-  try {
-    let res = await fetch(`/api/agora-token?channelName=${channelName}&uid=${uid}&role=publisher`);
-    let data = await res.json();
+    bookings_col.insert_one(booking_doc)
     
-    agoraClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
-    await agoraClient.join(data.appId, data.channel, data.token, data.uid);
+    host = hosts_col.find_one({
+        "$or": [
+            {"id": data.host_id},
+            {"_id": f"host_{clean_host_id}"},
+            {"user_id": int(clean_host_id) if clean_host_id.isdigit() else 0}
+        ]
+    })
+    if host:
+        host_telegram_id = host.get("user_id") or (int(clean_host_id) if clean_host_id.isdigit() else None)
+        if host_telegram_id:
+            keyboard = {
+                "inline_keyboard": [
+                    [
+                        {"text": "✅ Accept & Join", "callback_data": f"accept_bk_{booking_id}"},
+                        {"text": "❌ Reject", "callback_data": f"reject_bk_{booking_id}"}
+                    ]
+                ]
+            }
+            msg = f"🔔 <b>New Private Booking Request!</b>\n\n👤 User ID: <code>{data.user_id}</code>\n⏱️ Duration: {data.duration_mins} Mins\n🪙 Cost: {data.token_cost} Tokens"
+            send_telegram_message(host_telegram_id, msg, reply_markup=keyboard)
+            
+    group_msg = f"📌 <b>New Booking Received!</b>\nHost: {data.host_name}\nUser ID: <code>{data.user_id}</code>\nDuration: {data.duration_mins} Mins\nTokens: {data.token_cost}"
+    notify_all_admins(group_msg)
     
-    localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
-    localVideoTrack = await AgoraRTC.createCameraVideoTrack();
-    
-    localVideoTrack.play("pip-video-view");
-    document.getElementById("pip-video-view").style.display = "block";
-    
-    await agoraClient.publish([localAudioTrack, localVideoTrack]);
-    
-    agoraClient.on("user-published", async (user, mediaType) => {
-      await agoraClient.subscribe(user, mediaType);
-      if (mediaType === "video") {
-        user.videoTrack.play("main-video-view");
-      }
-      if (mediaType === "audio") {
-        user.audioTrack.play();
-      }
-    });
+    return {"status": "success", "booking_id": booking_id}
 
-    // Start Synchronized Timer precisely when face-to-face connection is established
-    startSynchronizedTimer(180); // 3 minutes default call duration
-  } catch(e) {
-    console.error("Agora Error:", e);
-    alert("Failed to connect video call.");
-  }
-}
+@app.get("/api/host/bookings/{user_id}")
+def get_host_bookings(user_id: int):
+    try:
+        host = hosts_col.find_one({
+            "$or": [
+                {"user_id": int(user_id)},
+                {"id": str(user_id)},
+                {"id": f"h_{user_id}"},
+                {"_id": f"host_{user_id}"}
+            ]
+        })
+        if not host:
+            return {"bookings": []}
+        
+        h_ids = [str(user_id), f"h_{user_id}", f"host_{user_id}"]
+        if host.get("id"): h_ids.append(str(host.get("id")))
+        if host.get("user_id"): h_ids.append(str(host.get("user_id")))
+        
+        bookings_cursor = bookings_col.find({"host_id": {"$in": list(set(h_ids))}}).sort("time", -1)
+        host_bookings = []
+        for b in bookings_cursor:
+            b_id = str(b.get("booking_id") or b.get("_id"))
+            call_time_formatted = time.strftime('%Y-%m-%d %H:%M', time.localtime(b.get("time", time.time())))
+            host_bookings.append({
+                "booking_id": b_id,
+                "user_id": b.get("user_id"),
+                "host_id": b.get("host_id"),
+                "host_name": b.get("host_name"),
+                "duration_mins": b.get("duration_mins"),
+                "token_cost": b.get("token_cost"),
+                "channel_name": b.get("channel_name", f"private_call_{user_id}_{b.get('user_id')}"),
+                "status": b.get("status", "pending"),
+                "call_started_at": b.get("call_started_at", 0),
+                "formatted_time": call_time_formatted,
+                "time": b.get("time", 0)
+            })
+        return {"bookings": host_bookings}
+    except Exception as e:
+        print("Error in host bookings:", str(e))
+        return {"bookings": []}
 
-function startSynchronizedTimer(durationSecs) {
-  callDurationSecs = durationSecs;
-  if(callTimerInterval) clearInterval(callTimerInterval);
-  
-  callTimerInterval = setInterval(() => {
-    let mins = Math.floor(callDurationSecs / 60);
-    let secs = callDurationSecs % 60;
-    document.getElementById("call-countdown-timer").innerText = `${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
+@app.post("/api/host/accept-booking")
+def accept_booking(data: ActionBookingModel):
+    booking = bookings_col.find_one({
+        "$or": [
+            {"booking_id": data.booking_id},
+            {"_id": data.booking_id}
+        ]
+    })
+    if not booking or booking.get("status") != "pending":
+        return {"status": "error", "message": "Booking not found or already processed"}
     
-    if(callDurationSecs <= 0) {
-      clearInterval(callTimerInterval);
-      endAgoraCall();
+    current_time = time.time()
+    bookings_col.update_one(
+        {"_id": booking["_id"]}, 
+        {"$set": {"status": "approved", "call_started_at": current_time}}
+    )
+    
+    h_val = str(booking["host_id"])
+    clean_h = h_val.replace("h_", "").replace("host_", "")
+    host = hosts_col.find_one({
+        "$or": [
+            {"id": h_val},
+            {"_id": f"host_{clean_h}"},
+            {"user_id": int(clean_h) if clean_h.isdigit() else 0}
+        ]
+    })
+    if host and "user_id" in host:
+        users_col.update_one({"user_id": int(host["user_id"])}, {"$inc": {"earnings": booking["token_cost"]}}, upsert=True)
+        
+    webapp_url = "https://vynora-bot.onrender.com/static/index.html"
+    user_keyboard = {"inline_keyboard": [[{"text": "📞 Answer Call", "web_app": {"url": webapp_url}}]]}
+    send_telegram_message(int(booking["user_id"]), "📞 <b>Incoming Video Call!</b> Host accepted your booking. Tap below to pick up.", reply_markup=user_keyboard)
+    
+    return {"status": "success", "message": "Booking accepted successfully!", "channel_name": booking.get("channel_name"), "call_started_at": current_time}
+
+@app.post("/api/host/reject-booking")
+def reject_booking(data: ActionBookingModel):
+    booking = bookings_col.find_one({
+        "$or": [
+            {"booking_id": data.booking_id},
+            {"_id": data.booking_id}
+        ]
+    })
+    if not booking:
+        return {"status": "error", "message": "Booking not found"}
+    bookings_col.update_one({"_id": booking["_id"]}, {"$set": {"status": "rejected"}})
+    users_col.update_one({"user_id": int(booking["user_id"])}, {"$inc": {"tokens": booking["token_cost"]}})
+    send_telegram_message(int(booking["user_id"]), f"❌ Booking rejected. {booking['token_cost']} tokens refunded.")
+    return {"status": "success", "message": "Booking rejected and tokens refunded!"}
+
+@app.post("/api/complete-booking")
+def complete_booking(data: CompleteBookingModel):
+    booking = bookings_col.find_one({
+        "$or": [
+            {"booking_id": data.booking_id},
+            {"_id": data.booking_id}
+        ]
+    })
+    if booking and booking.get("status") != "completed":
+        bookings_col.update_one({"_id": booking["_id"]}, {"$set": {"status": "completed"}})
+        
+        # Detailed call history sent to Group 3
+        time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(booking.get("time", time.time())))
+        group3_msg = (
+            f"📊 <b>Call History & Summary Report</b>\n\n"
+            f"🆔 Booking ID: <code>{booking.get('booking_id')}</code>\n"
+            f"👤 User ID: <code>{booking.get('user_id')}</code>\n"
+            f"📹 Host ID / Name: <code>{booking.get('host_id')}</code> ({booking.get('host_name')})\n"
+            f"⏱️ Duration: {booking.get('duration_mins')} Mins\n"
+            f"🪙 Tokens Spent: {booking.get('token_cost')}\n"
+            f"📅 Date & Time: {time_str}\n"
+            f"📌 Status: COMPLETED"
+        )
+        send_telegram_message(GROUP_3_ID, group3_msg)
+        return {"status": "success", "message": "Booking marked as completed and logged"}
+    return {"status": "error", "message": "Booking not found or already completed"}
+
+@app.get("/api/user/bookings/{user_id}")
+def get_user_bookings(user_id: int):
+    try:
+        user_bookings_cursor = bookings_col.find({"user_id": int(user_id)}, {"_id": 0}).sort("time", -1)
+        user_bookings = []
+        for b in user_bookings_cursor:
+            call_time_formatted = time.strftime('%Y-%m-%d %H:%M', time.localtime(b.get("time", time.time())))
+            h_val = str(b.get("host_id"))
+            clean_h = h_val.replace("h_", "").replace("host_", "")
+            host = hosts_col.find_one({
+                "$or": [
+                    {"id": h_val},
+                    {"_id": f"host_{clean_h}"},
+                    {"user_id": int(clean_h) if clean_h.isdigit() else 0}
+                ]
+            })
+            if host:
+                b["host_user_id"] = host.get("user_id") or (int(clean_h) if clean_h.isdigit() else 0)
+                b["host_img"] = host.get("img")
+            if not b.get("channel_name"):
+                b["channel_name"] = f"private_call_{clean_h}_{user_id}"
+            b["call_started_at"] = b.get("call_started_at", 0)
+            b["formatted_time"] = call_time_formatted
+            user_bookings.append(b)
+        return {"bookings": user_bookings}
+    except Exception as e:
+        print("Error in user bookings:", str(e))
+        return {"bookings": []}
+
+@app.post("/api/register-host")
+def register_host(data: HostRegisterModel):
+    host_data = data.dict()
+    host_data["status"] = "pending"
+    host_data["id"] = f"h_{data.user_id}"
+    host_data["_id"] = f"host_{data.user_id}"
+    host_data["user_id"] = int(data.user_id)
+    host_data["is_online"] = False
+    host_data["img"] = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop"
+    
+    hosts_col.update_one({"user_id": int(data.user_id)}, {"$set": host_data}, upsert=True)
+    
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {"text": "✅ Approve Host", "callback_data": f"approve_host_{data.user_id}"},
+                {"text": "❌ Reject Host", "callback_data": f"reject_host_{data.user_id}"}
+            ]
+        ]
     }
-    callDurationSecs--;
-  }, 1000);
-}
+    notify_all_admins(f"📹 <b>New Host Application!</b>\nName: {data.name}\nAge: {data.age}\nRate: {data.rate} Tokens/min\nID: <code>{data.user_id}</code>", reply_markup=keyboard)
+    return {"status": "success", "message": "Host registered successfully! Waiting for admin approval."}
 
-function toggleMute() {
-  if(localAudioTrack) {
-    let muted = localAudioTrack.muted;
-    localAudioTrack.setMuted(!muted);
-    document.getElementById("mic-icon").className = muted ? "fa-solid fa-microphone" : "fa-solid fa-microphone-slash";
-  }
-}
+@app.post("/api/recharge")
+async def recharge(user_id: int = Form(...), amount_inr: int = Form(...), utr_number: str = Form(...), screenshot: UploadFile = File(...)):
+    tokens_expected = amount_inr if amount_inr < 500 else amount_inr + 50
+    recharge_id = str(int(time.time()))
+    recharges_col.insert_one({
+        "recharge_id": recharge_id,
+        "user_id": int(user_id),
+        "amount_inr": amount_inr,
+        "tokens_expected": tokens_expected,
+        "utr_number": utr_number,
+        "status": "pending"
+    })
+    keyboard = {"inline_keyboard": [[{"text": f"✅ Approve (+{tokens_expected})", "callback_data": f"approve_rc_{recharge_id}"}, {"text": "❌ Reject", "callback_data": f"reject_rc_{recharge_id}"}]]}
+    notify_all_admins(f"💳 <b>New Recharge Request!</b>\nUser ID: <code>{user_id}</code>\nAmount: ₹{amount_inr}\nUTR: <code>{utr_number}</code>", reply_markup=keyboard)
+    return {"status": "success", "message": "Recharge submitted! Waiting for admin approval."}
 
-async function endAgoraCall() {
-  if(callTimerInterval) clearInterval(callTimerInterval);
-  if(localAudioTrack) { localAudioTrack.stop(); localAudioTrack.close(); }
-  if(localVideoTrack) { localVideoTrack.stop(); localVideoTrack.close(); }
-  if(agoraClient) { await agoraClient.leave(); }
-  document.getElementById('video-call-screen').classList.remove('active');
-  fetchUserData();
-}
-</script>
-</body>
-</html>
+@app.post("/api/withdraw")
+def withdraw_earnings(data: WithdrawModel):
+    host = hosts_col.find_one({
+        "$or": [
+            {"user_id": int(data.user_id)},
+            {"id": str(data.user_id)},
+            {"id": f"h_{data.user_id}"},
+            {"_id": f"host_{data.user_id}"}
+        ],
+        "status": "approved"
+    })
+    if not host:
+        return {"status": "error", "message": "Withdrawal option is only available for approved hosts!"}
+    
+    user = users_col.find_one({"user_id": int(data.user_id)})
+    net_earnings = int(user.get("earnings", 0) * 0.7) if user else 0
+    if not user or net_earnings < data.tokens:
+        return {"status": "error", "message": "Insufficient net earnings balance (after 30% fee)!"}
+    
+    users_col.update_one({"user_id": int(data.user_id)}, {"$inc": {"earnings": -int(data.tokens / 0.7)}})
+    withdrawals_col.insert_one({"user_id": int(data.user_id), "upi_id": data.upi_id, "tokens": data.tokens, "status": "pending"})
+    notify_all_admins(f"💸 <b>New Withdrawal Request!</b>\nHost ID: <code>{data.user_id}</code>\nTokens: {data.tokens}\nUPI: <code>{data.upi_id}</code>")
+    return {"status": "success", "message": "Withdrawal request sent successfully!"}
+
+@app.post("/api/update-profile-photo")
+async def update_profile_photo(user_id: int = Form(...), avatar: UploadFile = File(...)):
+    upload_dir = "static/uploads"
+    os.makedirs(upload_dir, exist_ok=True)
+    file_path = os.path.join(upload_dir, avatar.filename)
+    with open(file_path, "wb") as buffer:
+        buffer.write(await avatar.read())
+    avatar_url = f"https://vynora-bot.onrender.com/static/uploads/{avatar.filename}"
+    users_col.update_one({"user_id": int(user_id)}, {"$set": {"avatar": avatar_url}}, upsert=True)
+    hosts_col.update_one({"user_id": int(user_id)}, {"$set": {"img": avatar_url}}, upsert=True)
+    return {"status": "success", "avatar_url": avatar_url}
+
+@app.post("/telegram-webhook")
+async def telegram_webhook(req: Request):
+    body = await req.json()
+    if "message" in body:
+        msg = body["message"]
+        chat_id = msg["chat"]["id"]
+        user_id = msg["from"]["id"]
+        text = msg.get("text", "").strip()
+        
+        if text.startswith("/ban "):
+            try:
+                target_id = int(text.replace("/ban ", "").strip())
+                users_col.update_one({"user_id": target_id}, {"$set": {"is_banned": True}}, upsert=True)
+                send_telegram_message(chat_id, f"🚫 User <code>{target_id}</code> has been banned successfully.")
+            except Exception as e:
+                send_telegram_message(chat_id, "❌ Error. Format: /ban <user_id>")
+            return {"ok": True}
+            
+        elif text.startswith("/unban "):
+            try:
+                target_id = int(text.replace("/unban ", "").strip())
+                users_col.update_one({"user_id": target_id}, {"$set": {"is_banned": False}}, upsert=True)
+                send_telegram_message(chat_id, f"✅ User <code>{target_id}</code> has been unbanned.")
+            except Exception as e:
+                send_telegram_message(chat_id, "❌ Error. Format: /unban <user_id>")
+            return {"ok": True}
+            
+        elif text.startswith("/addtokens "):
+            try:
+                parts = text.replace("/addtokens ", "").strip().split()
+                target_id = int(parts[0])
+                amt = int(parts[1])
+                users_col.update_one({"user_id": target_id}, {"$inc": {"tokens": amt}}, upsert=True)
+                send_telegram_message(chat_id, f"🪙 Added {amt} tokens to User <code>{target_id}</code>.")
+                send_telegram_message(target_id, f"🎉 Admin added +{amt} Tokens to your wallet!")
+            except Exception as e:
+                send_telegram_message(chat_id, "❌ Error. Format: /addtokens <user_id> <amount>")
+            return {"ok": True}
+            
+        elif text.startswith("/cuttokens "):
+            try:
+                parts = text.replace("/cuttokens ", "").strip().split()
+                target_id = int(parts[0])
+                amt = int(parts[1])
+                users_col.update_one({"user_id": target_id}, {"$inc": {"tokens": -amt}}, upsert=True)
+                send_telegram_message(chat_id, f"✂️ Cut {amt} tokens from User <code>{target_id}</code>.")
+                send_telegram_message(target_id, f"⚠️ Admin deducted {amt} Tokens from your wallet.")
+            except Exception as e:
+                send_telegram_message(chat_id, "❌ Error. Format: /cuttokens <user_id> <amount>")
+            return {"ok": True}
+            
+        elif text.startswith("/userinfo "):
+            try:
+                target_id = int(text.replace("/userinfo ", "").strip())
+                user = users_col.find_one({"user_id": target_id})
+                host = hosts_col.find_one({"user_id": target_id})
+                if user:
+                    msg = (
+                        f"👤 <b>User Data & Info:</b>\n\n"
+                        f"🆔 ID: <code>{target_id}</code>\n"
+                        f"🪙 Tokens: {user.get('tokens', 0)}\n"
+                        f"💰 Earnings: {user.get('earnings', 0)}\n"
+                        f"🚫 Banned: {user.get('is_banned', False)}\n"
+                        f"📹 Host Status: {host.get('status', 'None') if host else 'Not a Host'}"
+                    )
+                else:
+                    msg = f"❌ User ID <code>{target_id}</code> database mein nahi mila!"
+                send_telegram_message(chat_id, msg)
+            except Exception as e:
+                send_telegram_message(chat_id, "❌ Format: /userinfo <user_id>")
+            return {"ok": True}
+            
+        elif text.startswith("/hostinfo "):
+            try:
+                target_id = int(text.replace("/hostinfo ", "").strip())
+                host = hosts_col.find_one({
+                    "$or": [
+                        {"user_id": target_id},
+                        {"id": str(target_id)},
+                        {"id": f"h_{target_id}"},
+                        {"_id": f"host_{target_id}"}
+                    ]
+                })
+                user = users_col.find_one({"user_id": target_id})
+                if host:
+                    raw_earnings = user.get("earnings", 0) if user else 0
+                    net_payout = int(raw_earnings * 0.7)
+                    msg = (
+                        f"📹 <b>Host Profile & Status Info:</b>\n\n"
+                        f"🆔 ID: <code>{target_id}</code>\n"
+                        f"👤 Name: {host.get('name', 'N/A')}\n"
+                        f"📌 Status: <b>{str(host.get('status', 'pending')).upper()}</b>\n"
+                        f"🟢 Live Online: {host.get('is_online', False)}\n"
+                        f"🪙 Call Rate: {host.get('rate', 50)} Tokens/min\n"
+                        f"💰 Total Earnings: {raw_earnings} Tokens\n"
+                        f"💸 Net Payout (70%): ₹{net_payout}"
+                    )
+                else:
+                    msg = f"❌ Host ID <code>{target_id}</code> approved ya registered nahi mila!"
+                send_telegram_message(chat_id, msg)
+            except Exception as e:
+                send_telegram_message(chat_id, "❌ Format: /hostinfo <user_id>")
+            return {"ok": True}
+
+        if text.startswith("/start"):
+            user = users_col.find_one({"user_id": int(user_id)})
+            if user and user.get("is_banned", False):
+                send_telegram_message(chat_id, "🚫 Your account has been suspended by the admin.")
+                return {"ok": True}
+            if not user:
+                users_col.insert_one({"user_id": int(user_id), "tokens": 0, "earnings": 0, "avatar": "", "is_banned": False})
+                notify_all_admins(f"👤 <b>New User Started Bot!</b>\nID: <code>{user_id}</code>")
+            webapp_url = "https://vynora-bot.onrender.com/static/index.html"
+            keyboard = {"inline_keyboard": [[{"text": "🚀 Open Vynora Live App", "web_app": {"url": webapp_url}}]]}
+            send_telegram_message(chat_id, "✨ <b>Welcome to Vynora Live 1v1!</b>", reply_markup=keyboard)
+
+    elif "callback_query" in body:
+        callback = body["callback_query"]
+        data_str = callback["data"]
+        message_id = callback["message"]["message_id"]
+        chat_id = callback["message"]["chat"]["id"]
+
+        if data_str.startswith("approve_host_"):
+            host_user_id = int(data_str.replace("approve_host_", ""))
+            hosts_col.update_one({"user_id": host_user_id}, {"$set": {"status": "approved", "is_online": True}})
+            send_telegram_message(host_user_id, "🎉 <b>Congratulations!</b> Your host application has been approved by the admin.")
+            notify_all_admins(f"✅ <b>Host Approved!</b> Host ID: <code>{host_user_id}</code> is now active.")
+            requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": "✅ Host Approved Successfully"})
+
+        elif data_str.startswith("reject_host_"):
+            host_user_id = int(data_str.replace("reject_host_", ""))
+            hosts_col.update_one({"user_id": host_user_id}, {"$set": {"status": "rejected"}})
+            send_telegram_message(host_user_id, "❌ Your host application was rejected by the admin.")
+            requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": "❌ Host Application Rejected"})
+
+        elif data_str.startswith("approve_rc_"):
+            recharge_id = data_str.replace("approve_rc_", "")
+            rc = recharges_col.find_one({"recharge_id": recharge_id})
+            if rc and rc["status"] == "pending":
+                recharges_col.update_one({"recharge_id": recharge_id}, {"$set": {"status": "approved"}})
+                u_id = int(rc["user_id"])
+                tokens = rc["tokens_expected"]
+                users_col.update_one({"user_id": u_id}, {"$inc": {"tokens": tokens}}, upsert=True)
+                send_telegram_message(u_id, f"🎉 <b>Recharge Approved!</b> +{tokens} Tokens added.")
+                notify_all_admins(f"💳 <b>Recharge Approved & Verified!</b>\nUser ID: <code>{u_id}</code>\nAmount: ₹{rc.get('amount_inr')}\nTokens: +{tokens}\nUTR: <code>{rc.get('utr_number')}</code>")
+                requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": "✅ Recharge Approved Successfully"})
+
+        elif data_str.startswith("reject_rc_"):
+            recharge_id = data_str.replace("reject_rc_", "")
+            recharges_col.update_one({"recharge_id": recharge_id}, {"$set": {"status": "rejected"}})
+            requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": "❌ Recharge Rejected"})
+
+        elif data_str.startswith("accept_bk_"):
+            booking_id = data_str.replace("accept_bk_", "")
+            booking = bookings_col.find_one({"booking_id": booking_id})
+            if booking and booking.get("status") == "pending":
+                current_time = time.time()
+                bookings_col.update_one({"booking_id": booking_id}, {"$set": {"status": "approved", "call_started_at": current_time}})
+                h_val = str(booking["host_id"])
+                clean_h = h_val.replace("h_", "").replace("host_", "")
+                host = hosts_col.find_one({
+                    "$or": [
+                        {"id": h_val},
+                        {"_id": f"host_{clean_h}"},
+                        {"user_id": int(clean_h) if clean_h.isdigit() else 0}
+                    ]
+                })
+                if host and "user_id" in host:
+                    users_col.update_one({"user_id": int(host["user_id"])}, {"$inc": {"earnings": booking["token_cost"]}}, upsert=True)
+                webapp_url = "https://vynora-bot.onrender.com/static/index.html"
+                user_keyboard = {"inline_keyboard": [[{"text": "📞 Answer Call", "web_app": {"url": webapp_url}}]]}
+                send_telegram_message(int(booking["user_id"]), "📞 <b>Incoming Video Call!</b> Host accepted your booking. Tap below to pick up.", reply_markup=user_keyboard)
+                requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": "✅ Booking Accepted & Call Ready"})
+
+        elif data_str.startswith("reject_bk_"):
+            booking_id = data_str.replace("reject_bk_", "")
+            booking = bookings_col.find_one({"booking_id": booking_id})
+            if booking:
+                bookings_col.update_one({"booking_id": booking_id}, {"$set": {"status": "rejected"}})
+                users_col.update_one({"user_id": int(booking["user_id"])}, {"$inc": {"tokens": booking["token_cost"]}})
+                send_telegram_message(int(booking["user_id"]), f"❌ Booking rejected. {booking['token_cost']} tokens refunded.")
+                requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": "❌ Booking Rejected"})
+
+    return {"ok": True}
