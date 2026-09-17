@@ -9,7 +9,7 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
-            --bg-dark: #070510;
+            --bg-dark: #06040C;
             --card-bg: rgba(255, 255, 255, 0.04);
             --card-border: rgba(255, 255, 255, 0.08);
             --primary-gradient: linear-gradient(135deg, #FF007A 0%, #7928CA 100%);
@@ -24,7 +24,7 @@
         body { background-color: var(--bg-dark); color: var(--text-main); min-height: 100vh; padding-bottom: 75px; overflow-x: hidden; }
 
         .app-header {
-            position: sticky; top: 0; z-index: 100; background: rgba(7, 5, 16, 0.95);
+            position: sticky; top: 0; z-index: 100; background: rgba(6, 4, 12, 0.95);
             backdrop-filter: blur(12px); padding: 10px 16px; display: flex; justify-content: space-between; align-items: center;
             border-bottom: 1px solid var(--card-border);
         }
@@ -36,7 +36,7 @@
         .profile-btn { width: 34px; height: 34px; border-radius: 50%; background: var(--primary-gradient); border: 2px solid var(--card-border); display: flex; align-items: center; justify-content: center; font-weight: 700; cursor: pointer; color: white; overflow: hidden; }
         .profile-btn img { width: 100%; height: 100%; object-fit: cover; }
 
-        /* TOP BANNER AS REQUESTED */
+        /* TOP BANNER */
         .top-app-banner {
             margin: 12px 16px; background: linear-gradient(135deg, #1f0b24 0%, #2e082f 50%, #10061e 100%);
             border: 1px solid rgba(255, 0, 122, 0.3); border-radius: 16px; padding: 14px 18px;
@@ -65,7 +65,7 @@
 
         .badge-live { position: absolute; top: 8px; left: 8px; background: rgba(0, 0, 0, 0.65); padding: 3px 8px; border-radius: 12px; font-size: 0.65rem; color: var(--accent-cyan); font-weight: 700; }
         .badge-rate { position: absolute; top: 8px; right: 8px; background: rgba(0, 0, 0, 0.65); padding: 3px 8px; border-radius: 12px; font-size: 0.7rem; color: var(--gold); font-weight: 700; }
-        .host-info { padding: 10px; background: linear-gradient(180deg, rgba(7,5,16,0) 0%, rgba(7,5,16,0.95) 100%); margin-top: -45px; position: relative; }
+        .host-info { padding: 10px; background: linear-gradient(180deg, rgba(6,4,12,0) 0%, rgba(6,4,12,0.95) 100%); margin-top: -45px; position: relative; }
         .host-name { font-size: 0.88rem; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 4px; }
 
         .call-btn { width: 100%; background: var(--primary-gradient); border: none; color: white; padding: 8px; border-radius: 10px; font-weight: 700; font-size: 0.82rem; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; }
@@ -98,7 +98,7 @@
         .qr-box { text-align: center; background: white; padding: 10px; border-radius: 12px; margin: 12px 0; }
         .qr-box img { width: 140px; height: 140px; }
 
-        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background: rgba(7, 5, 16, 0.95); backdrop-filter: blur(16px); border-top: 1px solid var(--card-border); display: flex; justify-content: space-around; align-items: center; z-index: 150; }
+        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background: rgba(6, 4, 12, 0.95); backdrop-filter: blur(16px); border-top: 1px solid var(--card-border); display: flex; justify-content: space-around; align-items: center; z-index: 150; }
         .nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--text-muted); font-size: 0.7rem; cursor: pointer; }
         .nav-item.active { color: #FF007A; font-weight: 700; }
         .nav-item i { font-size: 1.1rem; }
@@ -109,7 +109,7 @@
         .input-box { width: 100%; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--card-border); padding: 12px; border-radius: 12px; color: white; margin-bottom: 10px; outline: none; }
 
         /* WHATSAPP STYLE INCOMING CALL SCREEN */
-        #whatsapp-call-screen { position: fixed; inset: 0; background: linear-gradient(135deg, #070510 0%, #1a0b2e 100%); z-index: 99999; display: none; flex-direction: column; justify-content: space-between; align-items: center; padding: 50px 20px; text-align: center; }
+        #whatsapp-call-screen { position: fixed; inset: 0; background: linear-gradient(135deg, #06040C 0%, #1a0b2e 100%); z-index: 99999; display: none; flex-direction: column; justify-content: space-between; align-items: center; padding: 50px 20px; text-align: center; }
         #whatsapp-call-screen.active { display: flex; }
         .wa-avatar { width: 120px; height: 120px; border-radius: 50%; border: 4px solid #00F5D4; object-fit: cover; margin-bottom: 20px; animation: pulseRing 1.5s infinite; }
         @keyframes pulseRing { 0% { box-shadow: 0 0 0 0 rgba(0, 245, 212, 0.6); } 70% { box-shadow: 0 0 0 25px rgba(0, 245, 212, 0); } 100% { box-shadow: 0 0 0 0 rgba(0, 245, 212, 0); } }
@@ -189,7 +189,7 @@
     </header>
 
     <div id="home-tab-view">
-        <!-- TOP BANNER (AS REQUESTED) -->
+        <!-- TOP BANNER -->
         <div class="top-app-banner">
             <div>
                 <h2>✨ Vynora Live 1v1</h2>
@@ -407,7 +407,7 @@
         </div>
     </div>
 
-    <!-- RECHARGE MODAL (₹50 to ₹2000 Options) -->
+    <!-- RECHARGE MODAL -->
     <div class="modal-overlay" id="recharge-modal">
         <div class="modal-card">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
@@ -437,7 +437,7 @@
         </div>
     </div>
 
-    <!-- HOST REGISTRATION MODAL (URL REMOVED AS REQUESTED) -->
+    <!-- HOST REGISTRATION MODAL (URL REMOVED) -->
     <div class="modal-overlay" id="host-reg-modal">
         <div class="modal-card">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
@@ -450,7 +450,7 @@
             <input type="text" id="host-lang-input" class="input-box" placeholder="Languages">
             <input type="text" id="host-loc-input" class="input-box" placeholder="Location">
             <input type="text" id="host-bio-input" class="input-box" placeholder="Short Bio">
-            <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:8px;">* Note: After approval, you can upload your profile photo from your profile settings.</p>
+            <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:8px;">* Note: After approval, you can upload your profile photo directly from your profile settings.</p>
             <button class="call-btn" style="padding:12px;" onclick="submitHostRegistration()">🚀 Submit For Approval</button>
         </div>
     </div>
@@ -482,7 +482,7 @@
                 const data = await res.json();
                 
                 if (data.is_banned) {
-                    document.body.innerHTML = `<div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; text-align:center; padding:20px; background:#070510; color:white;"><h2 style="color:#FF0033; margin-bottom:10px;">🚫 Account Suspended</h2><p style="color:#94A3B8; font-size:0.9rem;">Your account has been suspended by the admin. Please contact support @VynoraSupport</p></div>`;
+                    document.body.innerHTML = `<div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; text-align:center; padding:20px; background:#06040C; color:white;"><h2 style="color:#FF0033; margin-bottom:10px;">🚫 Account Suspended</h2><p style="color:#94A3B8; font-size:0.9rem;">Your account has been suspended by the admin. Please contact support @VynoraSupport</p></div>`;
                     return;
                 }
 
@@ -1068,7 +1068,8 @@
         async function confirmBooking(mins) {
             const cost = selectedHostObj.rate * mins;
             if (userTokens < cost) {
-                alert(`⚠️ Balance Low! You need ${cost} Tokens for ${mins} mins.`);
+                alert(`⚠️ Balance Low! You need ${cost} Tokens for ${mins} mins. Please recharge first.`);
+                closeModal('host-booking-modal');
                 openRechargeModal();
                 return;
             }
@@ -1143,7 +1144,7 @@
         function openHostRegistrationModal() { document.getElementById('host-reg-modal').classList.add('active'); }
         
         function openSupportLink() {
-            alert("📋 VYNORA LIVE POLICIES & SUPPORT:\n\n1. 🎥 HOST RULES: Approved hosts must stay online and accept private call requests within 10 minutes. Inactivity leads to suspension.\n2. 💸 PAYMENT POLICY: Withdrawals are processed via UPI for approved hosts (30% platform fee deducted automatically). Minimum payout applies.\n3. 👤 USER POLICY: For recharges, upload valid UTR & screenshot. If bookings are ignored for 10 mins, tokens are auto-refunded to your wallet.\n\nNeed help? Contact Admin Support @VynoraSupport");
+            alert("📋 VYNORA LIVE OFFICIAL POLICIES & SUPPORT:\n\n1. 👤 USER RECHARGE POLICY:\n   • New users start with 0 tokens and must complete a UPI recharge (₹50+) to book 1v1 private calls.\n   • Upload correct 12-digit UTR and payment screenshot for instant approval.\n\n2. 🎥 HOST LIVE & CONDUCT RULES:\n   • Approved hosts must stay online and accept incoming private call requests within 10 minutes.\n   • Failing to accept requests repeatedly will result in temporary suspension.\n\n3. 💸 PAYOUT & WITHDRAWAL POLICY:\n   • Hosts earn tokens per minute of call duration.\n   • 30% platform fee is deducted automatically, and net payout (70%) can be withdrawn via UPI anytime.\n\nNeed urgent help? Contact Official Admin Support: @VynoraSupport");
             window.open("https://t.me/VynoraSupport", "_blank");
         }
 
@@ -1155,7 +1156,7 @@
             const loc = document.getElementById('host-loc-input').value.trim() || "India";
             const bio = document.getElementById('host-bio-input').value.trim();
 
-            if (!name || !rate) return alert("Fill Name and Rate!");
+            if (!name || !rate) return alert("Please fill Name and Call Rate!");
 
             try {
                 const res = await fetch('/api/register-host', {
