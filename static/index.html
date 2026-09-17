@@ -92,7 +92,7 @@
             </div>
         </div>
 
-        <!-- 4. PROFILE SECTION (DP Sync & Details) -->
+        <!-- 4. PROFILE SECTION (Direct File Upload & Sync) -->
         <div id="section-profile" class="hidden space-y-4">
             <div class="glass p-6 rounded-xl flex flex-col items-center text-center">
                 <img id="user-dp" src="https://via.placeholder.com/150" class="w-24 h-24 rounded-full border-2 border-pink-500 object-cover mb-3 shadow-lg">
@@ -100,9 +100,9 @@
                 <p class="text-xs text-gray-400 mb-4">Telegram ID: <span id="user-id-text">---</span></p>
 
                 <div class="w-full space-y-2 text-left">
-                    <label class="text-xs text-gray-300 font-medium">Update Profile DP Image URL:</label>
-                    <input type="text" id="dp-input-url" placeholder="https://example.com/image.jpg" class="w-full p-2.5 bg-gray-900 rounded-lg border border-gray-700 text-xs text-white focus:outline-none focus:border-pink-500">
-                    <button onclick="updateProfileDp()" class="w-full bg-pink-600 hover:bg-pink-700 py-2.5 rounded-lg font-bold text-xs transition">Save & Sync DP</button>
+                    <label class="text-xs text-gray-300 font-medium">Select DP from Device:</label>
+                    <input type="file" id="dp-file-input" accept="image/*" class="w-full p-2 bg-gray-900 rounded-lg border border-gray-700 text-xs text-white file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-pink-600 file:text-white hover:file:bg-pink-700">
+                    <button onclick="updateProfileDp()" class="w-full bg-pink-600 hover:bg-pink-700 py-2.5 rounded-lg font-bold text-xs transition">Upload & Sync DP</button>
                 </div>
             </div>
         </div>
@@ -119,17 +119,25 @@
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
+        // Fallback user for browser testing, real user data comes via tg.initData
         const user = tg.initDataUnsafe?.user || { id: 7001825467, username: "admin_test", first_name: "Admin" };
         let userTokens = 0;
         let currentGame = '';
 
         async function initApp() {
             try {
+                // Sending init_data securely to backend for verification
                 const res = await fetch('/api/register', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_id: user.id, username: user.username || "user", full_name: user.first_name })
+                    body: JSON.stringify({ init_data: tg.initData || "" })
                 });
+                
+                if(!res.ok) {
+                    alert("Authentication failed via Telegram initData!");
+                    return;
+                }
+                
                 const data = await res.json();
                 userTokens = data.tokens;
                 
@@ -176,21 +184,25 @@
         }
 
         async function updateProfileDp() {
-            const url = document.getElementById('dp-input-url').value.trim();
-            if(!url) return alert("Please enter a valid image URL!");
+            const fileInput = document.getElementById('dp-file-input');
+            if(fileInput.files.length === 0) return alert("Please select an image file first!");
+            
+            const formData = new FormData();
+            formData.append("user_id", user.id);
+            formData.append("file", fileInput.files[0]);
             
             const res = await fetch('/api/update-dp', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user_id: user.id, dp_url: url })
+                body: formData
             });
             
             if(res.ok) {
-                document.getElementById('user-dp').src = url;
-                document.getElementById('header-dp').src = url;
-                alert("Profile DP updated & synced successfully!");
+                const data = await res.json();
+                document.getElementById('user-dp').src = data.dp_url;
+                document.getElementById('header-dp').src = data.dp_url;
+                alert("Profile DP uploaded & synced successfully!");
             } else {
-                alert("Failed to update DP.");
+                alert("Failed to upload DP.");
             }
         }
 
