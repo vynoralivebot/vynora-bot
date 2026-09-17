@@ -161,6 +161,15 @@ body { background-color: var(--bg-dark); color: var(--text-main); min-height: 10
     </div>
   </div>
 
+  <!-- Prominent External Online/Offline Switch for Approved Hosts -->
+  <div id="external-host-toggle-box" style="display: none; background: rgba(0,245,212,0.08); border: 1px solid rgba(0,245,212,0.3); padding: 12px; border-radius: 14px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
+    <div>
+      <p style="font-size: 0.75rem; color: var(--accent-cyan); font-weight: 700;">HOST LIVE STATUS</p>
+      <h4 id="external-live-status-label" style="font-size: 0.95rem; color: white;">Offline</h4>
+    </div>
+    <button class="get-btn" id="external-toggle-btn" onclick="toggleHostLiveStatus()" style="background: var(--accent-cyan); color: #000;">Go Online</button>
+  </div>
+
   <div class="action-icon-grid">
     <div class="icon-card" onclick="openRechargeModal()"><i class="fa-solid fa-wallet"></i><p>Recharge</p></div>
     <div class="icon-card" onclick="openHostModal()"><i class="fa-solid fa-video"></i><p>Host Panel</p></div>
@@ -169,15 +178,16 @@ body { background-color: var(--bg-dark); color: var(--text-main); min-height: 10
   </div>
 </div>
 
-<!-- Support Tab -->
+<!-- Support Tab with Withdrawal Rules -->
 <div id="tab-support" class="profile-container">
   <h2 style="font-size: 1.1rem; margin-bottom: 12px;"><i class="fa-solid fa-headset"></i> Professional Support & Guidelines</h2>
   <div style="background: var(--card-bg); border: 1px solid var(--card-border); padding: 14px; border-radius: 14px; font-size: 0.82rem; line-height: 1.5; color: var(--text-muted);">
     <h3 style="color: white; margin-bottom: 6px;">📜 User Policy</h3>
     <p>All users must maintain respectful behavior during video calls. Any abusive language will lead to immediate permanent ban by admins.</p>
     <br>
-    <h3 style="color: white; margin-bottom: 6px;">📹 Host Live Rules</h3>
+    <h3 style="color: white; margin-bottom: 6px;">📹 Host Live Rules & Withdrawal Guidelines</h3>
     <p>Hosts must maintain professional attire and lighting. Payouts are processed weekly with 30% platform fee deduction.</p>
+    <p style="margin-top:6px; color: var(--gold);"><b>Withdrawal Limit:</b> Daily withdrawal limit is between <b>700 to 2000 Tokens</b> per request. Payments are processed via UPI within 24-48 hours after admin verification.</p>
     <br>
     <h3 style="color: white; margin-bottom: 6px;">💳 Payment & Recharge Guidelines</h3>
     <p>Recharge requests require correct UTR numbers. Verified credits reflect instantly in your wallet.</p>
@@ -305,8 +315,6 @@ body { background-color: var(--bg-dark); color: var(--text-main); min-height: 10
 let tg = window.Telegram.WebApp;
 tg.expand();
 
-// Secure Telegram initData extraction as requested
-let initData = tg.initData || "";
 let userId = tg.initDataUnsafe?.user?.id || 12345678;
 let userName = tg.initDataUnsafe?.user?.first_name || "User";
 let userTokens = 0;
@@ -358,15 +366,35 @@ async function checkHostStatusBadge() {
     let res = await fetch(`/api/host/status/${userId}`);
     let data = await res.json();
     let badge = document.getElementById("host-status-badge-text");
+    let toggleBox = document.getElementById("external-host-toggle-box");
+    
     if(data.is_host && data.status === 'approved') {
       badge.innerText = "Approved 🟢";
       badge.style.color = "#00F5D4";
+      
+      // Show external toggle box on profile page for approved hosts
+      toggleBox.style.display = "flex";
+      let statusLabel = document.getElementById("external-live-status-label");
+      let toggleBtn = document.getElementById("external-toggle-btn");
+      if(data.is_online) {
+        statusLabel.innerText = "Online 🟢";
+        toggleBtn.innerText = "Go Offline";
+        toggleBtn.style.background = "#FF3B30";
+        toggleBtn.style.color = "#fff";
+      } else {
+        statusLabel.innerText = "Offline 🔴";
+        toggleBtn.innerText = "Go Online";
+        toggleBtn.style.background = "var(--accent-cyan)";
+        toggleBtn.style.color = "#000";
+      }
     } else if(data.is_host && data.status === 'pending') {
       badge.innerText = "Pending ⏳";
       badge.style.color = "var(--gold)";
+      toggleBox.style.display = "none";
     } else {
       badge.innerText = "Apply / Live 🚀";
       badge.style.color = "var(--accent-cyan)";
+      toggleBox.style.display = "none";
     }
   } catch(e) { console.error(e); }
 }
@@ -517,9 +545,9 @@ async function openHostModal() {
       </div>
       <button class="call-btn" style="margin-bottom:10px;" onclick="toggleHostLiveStatus()">${data.is_online ? 'Go Offline 🔴' : 'Go Online 🟢'}</button>
       <div style="border-top:1px solid var(--card-border); padding-top:12px; margin-top:12px;">
-        <h4 style="font-size:0.9rem; margin-bottom:8px;">💸 Withdraw Earnings</h4>
+        <h4 style="font-size:0.9rem; margin-bottom:8px;">💸 Withdraw Earnings (Limit: 700 - 2000 Tokens/day)</h4>
         <input type="text" id="withdraw-upi" class="input-box" placeholder="Enter UPI ID (e.g. user@oksbi)" />
-        <input type="number" id="withdraw-tokens" class="input-box" placeholder="Tokens to Withdraw" />
+        <input type="number" id="withdraw-tokens" class="input-box" placeholder="Tokens to Withdraw (700-2000)" />
         <button class="call-btn" onclick="submitWithdrawal(${netEarnings})">Request Withdrawal</button>
       </div>
     `;
@@ -557,6 +585,7 @@ async function submitWithdrawal(maxNet) {
   let upi = document.getElementById('withdraw-upi').value.trim();
   let tokens = parseInt(document.getElementById('withdraw-tokens').value);
   if(!upi || !tokens) { alert("Please fill all withdrawal fields"); return; }
+  if(tokens < 700 || tokens > 2000) { alert("Daily withdrawal limit is between 700 and 2000 tokens!"); return; }
   if(tokens > maxNet) { alert("Insufficient net balance!"); return; }
   
   let res = await fetch('/api/withdraw', {
@@ -595,6 +624,7 @@ async function toggleHostLiveStatus() {
   let data = await res.json();
   alert(`Host status: ${data.is_online ? 'Online 🟢' : 'Offline 🔴'}`);
   closeModals();
+  checkHostStatusBadge();
   fetchHosts();
 }
 
