@@ -93,7 +93,8 @@ def get_user(user_id: int):
         return {"tokens": 0, "earnings": 0, "net_earnings_tokens": 0, "net_earnings_inr": 0, "avatar": "", "is_banned": True}
         
     if not user:
-        user = {"user_id": int(user_id), "tokens": 100, "earnings": 0, "avatar": "", "is_banned": False}
+        # 0 Free Tokens for new users as requested
+        user = {"user_id": int(user_id), "tokens": 0, "earnings": 0, "avatar": "", "is_banned": False}
         users_col.insert_one(user)
         send_telegram_message(GROUP_2_ID, f"👤 <b>New User Started Bot!</b>\nID: <code>{user_id}</code>")
     
@@ -102,7 +103,7 @@ def get_user(user_id: int):
     net_earnings_inr = net_earnings_tokens
 
     return {
-        "tokens": user.get("tokens", 100), 
+        "tokens": user.get("tokens", 0), 
         "earnings": raw_earnings,
         "net_earnings_tokens": net_earnings_tokens,
         "net_earnings_inr": net_earnings_inr,
@@ -152,7 +153,7 @@ def update_host_rate(data: UpdateRateModel):
 def get_hosts():
     db_hosts = list(hosts_col.find({"status": "approved"}, {"_id": 0}))
     
-    # 5 Gorgeous Dummy Hosts (Protected against real bookings)
+    # 5 Dummy Hosts (Non-bookable with polite busy message)
     dummy_hosts = [
         {"id": "dummy_1", "user_id": 9991, "name": "Sophia 💎", "age": 22, "rate": 40, "lang": "English", "loc": "UK", "img": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&auto=format&fit=crop", "bio": "International VIP Model ✨", "is_online": True, "is_dummy": True},
         {"id": "dummy_2", "user_id": 9992, "name": "Ananya 🔥", "age": 21, "rate": 50, "lang": "Hindi", "loc": "Mumbai", "img": "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400&auto=format&fit=crop", "bio": "Bollywood dancer & host 💃", "is_online": True, "is_dummy": True},
@@ -178,13 +179,13 @@ def get_agora_token(channelName: str, uid: int, role: str):
 
 @app.post("/api/book-slot")
 def book_slot(data: BookingModel):
-    # Check if dummy host
+    # Dummy host booking restriction with polite message
     if str(data.host_id).startswith("dummy_"):
         return {"status": "error", "message": "✨ Host is currently busy in a private international session. Please try another host!"}
 
     user = users_col.find_one({"user_id": int(data.user_id)})
     if not user or user.get("tokens", 0) < data.token_cost:
-        return {"status": "error", "message": f"Insufficient tokens! You need {data.token_cost} tokens."}
+        return {"status": "error", "message": f"Insufficient tokens! You need {data.token_cost} tokens. Please recharge."}
 
     users_col.update_one({"user_id": int(data.user_id)}, {"$inc": {"tokens": -data.token_cost}})
 
@@ -406,7 +407,6 @@ def get_user_bookings(user_id: int):
 
 @app.post("/api/register-host")
 def register_host(data: HostRegisterModel):
-    # Default image placeholder until profile photo is uploaded
     host_data = data.dict()
     host_data["status"] = "pending"
     host_data["id"] = f"h_{data.user_id}"
@@ -507,8 +507,7 @@ async def telegram_webhook(req: Request):
         user_id = msg["from"]["id"]
         text = msg.get("text", "").strip()
 
-        # --- ADMIN COMMANDS FOR BAN/UNBAN & ADD/CUT TOKENS ---
-        # Format: /ban <user_id> | /unban <user_id> | /addtokens <user_id> <amount> | /cuttokens <user_id> <amount>
+        # ADMIN COMMANDS
         if text.startswith("/ban "):
             try:
                 target_id = int(text.replace("/ban ", "").strip())
@@ -551,6 +550,59 @@ async def telegram_webhook(req: Request):
                 send_telegram_message(chat_id, "❌ Error. Format: /cuttokens <user_id> <amount>")
             return {"ok": True}
 
+        elif text.startswith("/userinfo "):
+            try:
+                target_id = int(text.replace("/userinfo ", "").strip())
+                user = users_col.find_one({"user_id": target_id})
+                host = hosts_col.find_one({"user_id": target_id})
+                if user:
+                    msg = (
+                        f"👤 <b>User Data & Info:</b>\n\n"
+                        f"🆔 ID: <code>{target_id}</code>\n"
+                        f"🪙 Tokens: {user.get('tokens', 0)}\n"
+                        f"💰 Earnings: {user.get('earnings', 0)}\n"
+                        f"🚫 Banned: {user.get('is_banned', False)}\n"
+                        f"📹 Host Status: {host.get('status', 'None') if host else 'Not a Host'}"
+                    )
+                else:
+                    msg = f"❌ User ID <code>{target_id}</code> database mein nahi mila!"
+                send_telegram_message(chat_id, msg)
+            except Exception as e:
+                send_telegram_message(chat_id, "❌ Format: /userinfo <user_id>")
+            return {"ok": True}
+
+        elif text.startswith("/hostinfo "):
+            try:
+                target_id = int(text.replace("/hostinfo ", "").strip())
+                host = hosts_col.find_one({
+                    "$or": [
+                        {"user_id": target_id},
+                        {"id": str(target_id)},
+                        {"id": f"h_{target_id}"},
+                        {"_id": f"host_{target_id}"}
+                    ]
+                })
+                user = users_col.find_one({"user_id": target_id})
+                if host:
+                    raw_earnings = user.get("earnings", 0) if user else 0
+                    net_payout = int(raw_earnings * 0.7)
+                    msg = (
+                        f"📹 <b>Host Profile & Status Info:</b>\n\n"
+                        f"🆔 ID: <code>{target_id}</code>\n"
+                        f"👤 Name: {host.get('name', 'N/A')}\n"
+                        f"📌 Status: <b>{str(host.get('status', 'pending')).upper()}</b>\n"
+                        f"🟢 Live Online: {host.get('is_online', False)}\n"
+                        f"🪙 Call Rate: {host.get('rate', 50)} Tokens/min\n"
+                        f"💰 Total Earnings: {raw_earnings} Tokens\n"
+                        f"💸 Net Payout (70%): ₹{net_payout}"
+                    )
+                else:
+                    msg = f"❌ Host ID <code>{target_id}</code> approved ya registered nahi mila!"
+                send_telegram_message(chat_id, msg)
+            except Exception as e:
+                send_telegram_message(chat_id, "❌ Format: /hostinfo <user_id>")
+            return {"ok": True}
+
         if text.startswith("/start"):
             user = users_col.find_one({"user_id": int(user_id)})
             if user and user.get("is_banned", False):
@@ -558,7 +610,7 @@ async def telegram_webhook(req: Request):
                 return {"ok": True}
 
             if not user:
-                users_col.insert_one({"user_id": int(user_id), "tokens": 100, "earnings": 0, "avatar": "", "is_banned": False})
+                users_col.insert_one({"user_id": int(user_id), "tokens": 0, "earnings": 0, "avatar": "", "is_banned": False})
                 send_telegram_message(GROUP_2_ID, f"👤 <b>New User Started Bot!</b>\nID: <code>{user_id}</code>")
             webapp_url = "https://vynora-bot.onrender.com/static/index.html"
             keyboard = {"inline_keyboard": [[{"text": "🚀 Open Vynora Live App", "web_app": {"url": webapp_url}}]]}
