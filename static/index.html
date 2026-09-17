@@ -18,7 +18,10 @@
             <img id="header-dp" src="https://via.placeholder.com/150" class="w-9 h-9 rounded-full border border-pink-500 object-cover">
             <h1 class="text-lg font-bold bg-gradient-to-r from-pink-500 to-purple-500 bg-clip-text text-transparent">VYNORA LIVE</h1>
         </div>
-        <div id="user-tokens" class="bg-gray-800 px-3 py-1 rounded-full text-sm font-semibold border border-gray-700">🪙 0 Tokens</div>
+        <div class="flex items-center space-x-2">
+            <div id="user-tokens" class="bg-gray-800 px-3 py-1 rounded-full text-sm font-semibold border border-gray-700">🪙 0 Tokens</div>
+            <button onclick="openRechargeModal()" class="bg-pink-600 px-2.5 py-1 rounded-full text-xs font-bold">Recharge</button>
+        </div>
     </header>
 
     <!-- Main Content Container -->
@@ -34,19 +37,17 @@
         <!-- 1. LIVE 1V1 CALLING SECTION -->
         <div id="section-live" class="space-y-4">
             <div class="glass p-4 rounded-xl">
-                <h3 class="font-bold mb-3 text-sm text-pink-400">Available Hosts for 1v1 Call</h3>
-                <div class="space-y-3">
-                    <div class="flex items-center justify-between bg-gray-900/60 p-3 rounded-lg border border-gray-800">
-                        <div class="flex items-center space-x-3">
-                            <div class="w-10 h-10 rounded-full bg-pink-600/30 flex items-center justify-center font-bold">👑</div>
-                            <div>
-                                <h4 class="font-bold text-sm">Demo Host</h4>
-                                <p class="text-xs text-green-400">● Online (50 Tokens / min)</p>
-                            </div>
-                        </div>
-                        <button onclick="requestCall(12345)" class="bg-gradient-to-r from-pink-600 to-purple-600 px-4 py-1.5 rounded-lg font-bold text-xs">Call</button>
-                    </div>
+                <h3 class="font-bold mb-3 text-sm text-pink-400">Hosts & Streamers</h3>
+                <div id="hosts-container" class="space-y-3">
+                    <p class="text-xs text-gray-400">Loading hosts...</p>
                 </div>
+            </div>
+
+            <!-- Active Call Timer Box (Hidden by default) -->
+            <div id="call-timer-box" class="hidden glass p-4 rounded-xl border border-green-500/40 text-center">
+                <h3 class="font-bold text-green-400 text-sm mb-1">📞 Call Connected in Session</h3>
+                <p id="call-timer" class="text-2xl font-mono font-bold text-white mb-2">00:00</p>
+                <button onclick="endCall()" class="bg-red-600 hover:bg-red-700 px-4 py-1.5 rounded-lg text-xs font-bold">End Call</button>
             </div>
         </div>
 
@@ -108,6 +109,39 @@
         </div>
     </main>
 
+    <!-- Recharge Modal (UPI & QR) -->
+    <div id="recharge-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="glass p-6 rounded-2xl w-full max-w-sm space-y-4 border border-pink-500/40">
+            <div class="flex justify-between items-center">
+                <h3 class="font-bold text-base text-pink-400">Recharge Tokens</h3>
+                <button onclick="closeRechargeModal()" class="text-gray-400 hover:text-white font-bold">✕</button>
+            </div>
+            <p class="text-xs text-gray-400">Choose payment method to top up your wallet instantly:</p>
+            
+            <div class="space-y-2">
+                <label class="text-xs text-gray-300 font-medium">Select Amount (₹):</label>
+                <select id="recharge-amount" class="w-full p-2.5 bg-gray-900 rounded-lg border border-gray-700 text-sm text-white">
+                    <option value="50">₹50 (500 Tokens)</option>
+                    <option value="100">₹100 (1000 Tokens)</option>
+                    <option value="500">₹500 (5000 Tokens)</option>
+                </select>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 pt-2">
+                <button onclick="processRecharge('upi')" class="bg-gradient-to-r from-pink-600 to-purple-600 py-2.5 rounded-lg font-bold text-xs">Pay via UPI</button>
+                <button onclick="processRecharge('qr')" class="bg-gray-800 border border-gray-700 hover:border-pink-500 py-2.5 rounded-lg font-bold text-xs">Scan QR Code</button>
+            </div>
+
+            <div id="qr-display-box" class="hidden text-center pt-2">
+                <p class="text-xs text-gray-300 mb-2">Scan & Pay via any UPI App:</p>
+                <div class="bg-white p-3 rounded-lg inline-block">
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=vynora@upi&pn=VynoraLive" class="w-32 h-32 mx-auto">
+                </div>
+                <p class="text-[10px] text-green-400 mt-2">● Auto-detecting payment...</p>
+            </div>
+        </div>
+    </div>
+
     <!-- Bottom Navigation Bar -->
     <nav class="fixed bottom-0 left-0 right-0 glass border-t border-gray-800 p-2.5 flex justify-around shadow-2xl z-50">
         <button onclick="switchTab('live')" class="flex flex-col items-center text-xs text-pink-400 font-medium" id="nav-live">📹 Live</button>
@@ -119,25 +153,19 @@
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
-        // Fallback user for browser testing, real user data comes via tg.initData
         const user = tg.initDataUnsafe?.user || { id: 7001825467, username: "admin_test", first_name: "Admin" };
         let userTokens = 0;
         let currentGame = '';
+        let callInterval = null;
+        let callSeconds = 0;
 
         async function initApp() {
             try {
-                // Sending init_data securely to backend for verification
                 const res = await fetch('/api/register', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ init_data: tg.initData || "" })
+                    body: JSON.stringify({ user_id: user.id, username: user.username || "user", full_name: user.first_name })
                 });
-                
-                if(!res.ok) {
-                    alert("Authentication failed via Telegram initData!");
-                    return;
-                }
-                
                 const data = await res.json();
                 userTokens = data.tokens;
                 
@@ -153,8 +181,40 @@
                 if(data.can_create_room) {
                     document.getElementById('room-create-box').classList.remove('hidden');
                 }
+
+                loadHosts();
             } catch (err) {
                 console.error("Init Error:", err);
+            }
+        }
+
+        async function loadHosts() {
+            try {
+                const res = await fetch('/api/hosts');
+                const data = await res.json();
+                const container = document.getElementById('hosts-container');
+                container.innerHTML = '';
+                
+                data.hosts.forEach(host => {
+                    const isOffline = host.offline;
+                    const statusText = isOffline ? '○ Offline' : '● Online (50 Tokens / min)';
+                    const statusColor = isOffline ? 'text-gray-500' : 'text-green-400';
+                    
+                    container.innerHTML += `
+                        <div class="flex items-center justify-between bg-gray-900/60 p-3 rounded-lg border border-gray-800">
+                            <div class="flex items-center space-x-3">
+                                <img src="${host.dp_url}" class="w-10 h-10 rounded-full border border-pink-500 object-cover">
+                                <div>
+                                    <h4 class="font-bold text-sm text-white">${host.full_name}</h4>
+                                    <p class="text-xs ${statusColor}">${statusText}</p>
+                                </div>
+                            </div>
+                            <button onclick="requestCall(${host.user_id})" class="bg-gradient-to-r from-pink-600 to-purple-600 px-4 py-1.5 rounded-lg font-bold text-xs ${isOffline ? 'opacity-50 cursor-not-allowed' : ''}">Call</button>
+                        </div>
+                    `;
+                });
+            } catch(e) {
+                console.error("Load hosts error", e);
             }
         }
 
@@ -177,10 +237,29 @@
             });
             const data = await res.json();
             if(res.ok) {
-                alert("📞 Call request sent! Notification has been posted to the Telegram group for host approval.");
+                alert("📞 Call request sent! Telegram group notified. Starting call session timer...");
+                startCallTimer();
             } else {
                 alert(data.detail || "Failed to book call. Check your token balance.");
             }
+        }
+
+        function startCallTimer() {
+            document.getElementById('call-timer-box').classList.remove('hidden');
+            callSeconds = 0;
+            if(callInterval) clearInterval(callInterval);
+            callInterval = setInterval(() => {
+                callSeconds++;
+                const mins = String(Math.floor(callSeconds / 60)).padStart(2, '0');
+                const secs = String(callSeconds % 60).padStart(2, '0');
+                document.getElementById('call-timer').innerText = `${mins}:${secs}`;
+            }, 1000);
+        }
+
+        function endCall() {
+            if(callInterval) clearInterval(callInterval);
+            document.getElementById('call-timer-box').classList.add('hidden');
+            alert("Call ended.");
         }
 
         async function updateProfileDp() {
@@ -203,6 +282,37 @@
                 alert("Profile DP uploaded & synced successfully!");
             } else {
                 alert("Failed to upload DP.");
+            }
+        }
+
+        function openRechargeModal() {
+            document.getElementById('recharge-modal').classList.remove('hidden');
+        }
+
+        function closeRechargeModal() {
+            document.getElementById('recharge-modal').classList.add('hidden');
+            document.getElementById('qr-display-box').classList.add('hidden');
+        }
+
+        async function processRecharge(method) {
+            const amount = parseInt(document.getElementById('recharge-amount').value);
+            if(method === 'qr') {
+                document.getElementById('qr-display-box').classList.remove('hidden');
+            }
+            
+            const res = await fetch('/api/recharge', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: user.id, amount: amount, payment_method: method })
+            });
+            const data = await res.json();
+            if(res.ok) {
+                userTokens = data.new_balance;
+                document.getElementById('user-tokens').innerText = `🪙 ${userTokens} Tokens`;
+                setTimeout(() => {
+                    closeRechargeModal();
+                    alert(data.message);
+                }, 2000);
             }
         }
 
