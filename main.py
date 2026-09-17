@@ -18,6 +18,9 @@ GROUP_3_ID = os.getenv("GROUP_3_ID", "-100XXXXXXXXXX")
 AGORA_APP_ID = os.getenv("AGORA_APP_ID", "YOUR_AGORA_APP_ID")
 AGORA_APP_CERTIFICATE = os.getenv("AGORA_APP_CERTIFICATE", "YOUR_AGORA_CERTIFICATE")
 
+# Admin IDs (Added Admin ID 1108685585 and primary admin)
+ADMIN_IDS = [1108685585, 999999999]
+
 TELEGRAM_API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
 def send_telegram_message(chat_id, text, reply_markup=None):
@@ -65,6 +68,14 @@ class ActionBookingModel(BaseModel):
 class CompleteBookingModel(BaseModel):
     booking_id: str
     duration_secs: int = 0
+
+class GiftModel(BaseModel):
+    user_id: int
+    host_id: str
+    gift_cost: int
+    gift_name: str
+    channel: str
+    sender_name: str
 
 class ChatModel(BaseModel):
     channel: str
@@ -226,3 +237,64 @@ def complete_booking(data: CompleteBookingModel):
         send_telegram_message(GROUP_3_ID, history_msg)
         return {"status": "success", "message": "Booking completed and history sent"}
     return {"status": "error", "message": "Booking not found"}
+
+@app.post("/telegram-webhook")
+async def telegram_webhook(req: Request):
+    body = await req.json()
+    if "message" in body:
+        msg = body["message"]
+        chat_id = msg["chat"]["id"]
+        user_id = msg["from"]["id"]
+        text = msg.get("text", "").strip()
+
+        # Admin Commands Authorization Check for ADMIN_IDS (including 1108685585)
+        if text.startswith(("/ban ", "/unban ", "/addtokens ", "/cuttokens ", "/userinfo ", "/hostinfo ")):
+            if user_id not in ADMIN_IDS:
+                send_telegram_message(chat_id, "🚫 You are not authorized to use admin commands.")
+                return {"ok": True}
+
+        if text.startswith("/ban "):
+            try:
+                target_id = int(text.replace("/ban ", "").strip())
+                users_col.update_one({"user_id": target_id}, {"$set": {"is_banned": True}}, upsert=True)
+                send_telegram_message(chat_id, f"🚫 User <code>{target_id}</code> has been banned.")
+            except Exception:
+                send_telegram_message(chat_id, "❌ Format: /ban <user_id>")
+            return {"ok": True}
+        elif text.startswith("/unban "):
+            try:
+                target_id = int(text.replace("/unban ", "").strip())
+                users_col.update_one({"user_id": target_id}, {"$set": {"is_banned": False}}, upsert=True)
+                send_telegram_message(chat_id, f"✅ User <code>{target_id}</code> has been unbanned.")
+            except Exception:
+                send_telegram_message(chat_id, "❌ Format: /unban <user_id>")
+            return {"ok": True}
+        elif text.startswith("/addtokens "):
+            try:
+                parts = text.replace("/addtokens ", "").strip().split()
+                target_id = int(parts[0])
+                amt = int(parts[1])
+                users_col.update_one({"user_id": target_id}, {"$inc": {"tokens": amt}}, upsert=True)
+                send_telegram_message(chat_id, f"🪙 Added {amt} tokens to User <code>{target_id}</code>.")
+            except Exception:
+                send_telegram_message(chat_id, "❌ Format: /addtokens <user_id> <amount>")
+            return {"ok": True}
+        elif text.startswith("/cuttokens "):
+            try:
+                parts = text.replace("/cuttokens ", "").strip().split()
+                target_id = int(parts[0])
+                amt = int(parts[1])
+                users_col.update_one({"user_id": target_id}, {"$inc": {"tokens": -amt}}, upsert=True)
+                send_telegram_message(chat_id, f"✂️ Cut {amt} tokens from User <code>{target_id}</code>.")
+            except Exception:
+                send_telegram_message(chat_id, "❌ Format: /cuttokens <user_id> <amount>")
+            return {"ok": True}
+        elif text.startswith("/start"):
+            user = users_col.find_one({"user_id": int(user_id)})
+            if not user:
+                users_col.insert_one({"user_id": int(user_id), "tokens": 0, "earnings": 0, "avatar": "", "is_banned": False})
+                send_telegram_message(GROUP_2_ID, f"👤 <b>New User Started Bot!</b>\nID: <code>{user_id}</code>")
+            webapp_url = "https://vynora-bot.onrender.com/static/index.html"
+            keyboard = {"inline_keyboard": [[{"text": "🚀 Open Vynora Live App", "web_app": {"url": webapp_url}}]]}
+            send_telegram_message(chat_id, "✨ <b>Welcome to Vynora Live 1v1!</b>", reply_markup=keyboard)
+    return {"ok": True}
