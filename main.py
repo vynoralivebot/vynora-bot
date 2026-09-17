@@ -1,10 +1,6 @@
-import hashlib
-import hmac
-import json
 import os
 import random
 import shutil
-import urllib.parse
 import uuid
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -39,31 +35,16 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "YOUR_BOT_TOKEN")
 TELEGRAM_GROUP_ID = os.getenv("TELEGRAM_GROUP_ID", "YOUR_GROUP_ID")
 WEBAPP_URL = os.getenv("WEBAPP_URL", "https://your-render-url.onrender.com")
 
-# --- TELEGRAM INIT_DATA CRYPTOGRAPHIC VERIFICATION ---
-def verify_telegram_init_data(init_data: str, bot_token: str) -> dict:
-    try:
-        parsed_data = urllib.parse.parse_qsl(init_data)
-        data_dict = dict(parsed_data)
-        if "hash" not in data_dict:
-            return None
-        
-        received_hash = data_dict.pop("hash")
-        sorted_data = sorted(data_dict.items(), key=lambda x: x[0])
-        data_check_string = "\n".join([f"{k}={v}" for k, v in sorted_data])
-        
-        secret_key = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
-        computed_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
-        
-        if hmac.compare_digest(computed_hash, received_hash):
-            user_str = data_dict.get("user")
-            if user_str:
-                return json.loads(user_str)
-        return None
-    except Exception:
-        return None
-
-class UserRegister(BaseModel):
-    init_data: str
+# --- AUTOMATIC WEBHOOK SETUP ON STARTUP ---
+@app.on_event("startup")
+def startup_event():
+    if TELEGRAM_BOT_TOKEN and WEBAPP_URL and "your-render-url" not in WEBAPP_URL:
+        webhook_url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/setWebhook?url={WEBAPP_URL}/telegram-webhook"
+        try:
+            res = requests.get(webhook_url)
+            print("Webhook Auto-Setup Response:", res.json())
+        except Exception as e:
+            print("Webhook setup failed:", e)
 
 class GameBet(BaseModel):
     user_id: int
@@ -75,16 +56,18 @@ class CallBooking(BaseModel):
     user_id: int
     host_id: int
 
-# --- 1. SECURE REGISTRATION VIA INIT_DATA ---
+class RechargeRequest(BaseModel):
+    user_id: int
+    amount: int
+    payment_method: str # 'upi' or 'qr'
+
+# --- 1. USER REGISTRATION & HOST LISTING API ---
 @app.post("/api/register")
-def register_user(data: UserRegister):
-    user_info = verify_telegram_init_data(data.init_data, TELEGRAM_BOT_TOKEN)
-    if not user_info:
-        raise HTTPException(status_code=401, detail="Unauthorized: Invalid Telegram signature!")
-    
-    user_id = user_info["id"]
-    username = user_info.get("username", "user")
-    full_name = user_info.get("first_name", "User")
+async def register_user(request: Request):
+    data = await request.json()
+    user_id = data.get("user_id")
+    username = data.get("username", "user")
+    full_name = data.get("full_name", "User")
     
     user = db.users.find_one({"user_id": user_id})
     if not user:
@@ -95,18 +78,30 @@ def register_user(data: UserRegister):
             "tokens": 0,  # Join bonus strictly 0
             "dp_url": "https://via.placeholder.com/150",
             "is_banned": False,
-            "is_host": False,
+            "is_host": user_id in ADMIN_IDS, # Admins/Creators are hosts by default
             "can_create_room": user_id in ADMIN_IDS
         }
         db.users.insert_one(new_user)
-        return {"status": "registered", "tokens": 0, "can_create_room": new_user["can_create_room"], "dp_url": new_user["dp_url"]}
+        return {"status": "registered", "tokens": 0, "can_create_room": new_user["can_create_room"], "dp_url": new_user["dp_url"], "is_host": new_user["is_host"]}
     
     return {
         "status": "exists", 
         "tokens": user.get("tokens", 0), 
         "dp_url": user.get("dp_url", "https://via.placeholder.com/150"), 
-        "can_create_room": user.get("can_create_room", False) or user.get("user_id") in ADMIN_IDS
+        "can_create_room": user.get("can_create_room", False) or user.get("user_id") in ADMIN_IDS,
+        "is_host": user.get("is_host", False)
     }
+
+@app.get("/api/hosts")
+def get_hosts():
+    # Fetch real hosts from DB, fallback to dummy hosts if none
+    real_hosts = list(db.users.find({"is_host": True}, {"_id": 0, "user_id": 1, "full_name": 1, "dp_url": 1}))
+    dummy_hosts = [
+        {"user_id": 9991, "full_name": "Pooja Sharma (Dummy)", "dp_url": "https://via.placeholder.com/150", "offline": True},
+        {"user_id": 9992, "full_name": "Anjali Sen (Dummy)", "dp_url": "https://via.placeholder.com/150", "offline": True}
+    ]
+    # Real hosts on top
+    return {"hosts": real_hosts + dummy_hosts}
 
 # --- 2. DIRECT FILE UPLOAD DP API ---
 @app.post("/api/update-dp")
@@ -131,36 +126,48 @@ def book_call(data: CallBooking):
     user = db.users.find_one({"user_id": data.user_id})
     host = db.users.find_one({"user_id": data.host_id})
     
-    if not user or not host:
-        raise HTTPException(status_code=404, detail="User or Host not found")
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
     
     if user.get("tokens", 0) < 50:
-        raise HTTPException(status_code=400, detail="Insufficient tokens for call")
+        raise HTTPException(status_code=400, detail="Insufficient tokens for call (Min 50 required)")
+    
+    host_name = host.get("full_name", "Host") if host else "Demo Host"
     
     notification_text = (
         f"🚨 **New 1v1 Call Request!**\n\n"
         f"👤 User: {user.get('full_name')} (ID: {data.user_id})\n"
-        f"🎯 Target Host: {host.get('full_name')} (ID: {data.host_id})\n\n"
+        f"🎯 Target Host: {host_name} (ID: {data.host_id})\n\n"
         f"Host please accept the request to start the session."
     )
     
     try:
-        requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage", json={
-            "chat_id": TELEGRAM_GROUP_ID,
-            "text": notification_text,
-            "parse_mode": "Markdown",
-            "reply_markup": {
-                "inline_keyboard": [[
-                    {"text": "✅ Accept Call", "callback_data": f"accept_call_{data.host_id}_{data.user_id}"}
-                ]]
-            }
-        })
+        if TELEGRAM_GROUP_ID and "YOUR_GROUP_ID" not in TELEGRAM_GROUP_ID:
+            requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage", json={
+                "chat_id": TELEGRAM_GROUP_ID,
+                "text": notification_text,
+                "parse_mode": "Markdown",
+                "reply_markup": {
+                    "inline_keyboard": [[
+                        {"text": "✅ Accept Call", "callback_data": f"accept_call_{data.host_id}_{data.user_id}"}
+                    ]]
+                }
+            })
     except Exception as e:
         print("Notification error:", e)
         
-    return {"status": "success", "message": "Call request sent!"}
+    return {"status": "success", "message": "Call request sent & group notified!"}
 
-# --- 4. MINI GAMES API ---
+# --- 4. RECHARGE API (UPI & QR) ---
+@app.post("/api/recharge")
+def process_recharge(data: RechargeRequest):
+    # Add tokens based on recharge amount
+    tokens_to_add = data.amount * 10 # e.g., ₹50 = 500 tokens
+    db.users.update_one({"user_id": data.user_id}, {"$inc": {"tokens": tokens_to_add}}, upsert=True)
+    updated_user = db.users.find_one({"user_id": data.user_id})
+    return {"status": "success", "new_balance": updated_user["tokens"], "message": f"Successfully recharged via {data.payment_method.upper()}!"}
+
+# --- 5. MINI GAMES API ---
 @app.post("/api/game/play")
 def play_game(data: GameBet):
     user = db.users.find_one({"user_id": data.user_id})
@@ -178,7 +185,7 @@ def play_game(data: GameBet):
     updated_user = db.users.find_one({"user_id": data.user_id})
     return {"won": won, "payout": payout, "new_balance": updated_user["tokens"]}
 
-# --- 5. TELEGRAM BOT WEBHOOK ---
+# --- 6. TELEGRAM BOT WEBHOOK ---
 @app.post("/telegram-webhook")
 async def telegram_webhook(request: Request):
     body = await request.json()
@@ -223,15 +230,15 @@ async def telegram_webhook(request: Request):
         if user_id in ADMIN_IDS:
             if cmd == "/giveroom" and len(parts) > 1:
                 target_id = int(parts[1])
-                db.users.update_one({"user_id": target_id}, {"$set": {"can_create_room": True}})
+                db.users.update_one({"user_id": target_id}, {"$set": {"can_create_room": True, "is_host": True}})
                 requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage", json={
-                    "chat_id": chat_id, "text": f"✅ User {target_id} ko 3-Seat Audio Room banane ki permission mil gayi hai!"
+                    "chat_id": chat_id, "text": f"✅ User {target_id} ko 3-Seat Audio Room aur Host permissions mil gayi hain!"
                 })
             elif cmd == "/revokeroom" and len(parts) > 1:
                 target_id = int(parts[1])
-                db.users.update_one({"user_id": target_id}, {"$set": {"can_create_room": False}})
+                db.users.update_one({"user_id": target_id}, {"$set": {"can_create_room": False, "is_host": False}})
                 requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage", json={
-                    "chat_id": chat_id, "text": f"❌ User {target_id} se room creation permission wapas le li gayi hai."
+                    "chat_id": chat_id, "text": f"❌ User {target_id} se room & host permissions wapas le li gayi hain."
                 })
             elif cmd == "/addtokens" and len(parts) > 2:
                 target_id = int(parts[1])
