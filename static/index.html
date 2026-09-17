@@ -1,375 +1,238 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Vynora Live 1v1</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.20.0.js"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <style>
-        :root {
-            --bg-dark: #06040C;
-            --card-bg: rgba(255, 255, 255, 0.04);
-            --card-border: rgba(255, 255, 255, 0.08);
-            --primary-gradient: linear-gradient(135deg, #FF007A 0%, #7928CA 100%);
-            --banner-pink: linear-gradient(135deg, #FF007A 0%, #FF5500 100%);
-            --accent-cyan: #00F5D4;
-            --text-main: #FFFFFF;
-            --text-muted: #94A3B8;
-            --gold: #FFD700;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
-        body { background-color: var(--bg-dark); color: var(--text-main); min-height: 100vh; padding-bottom: 75px; overflow-x: hidden; }
-        .app-header { position: sticky; top: 0; z-index: 100; background: rgba(6, 4, 12, 0.95); backdrop-filter: blur(12px); padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--card-border); }
-        .brand-logo { font-weight: 800; font-size: 1.15rem; background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: flex; align-items: center; gap: 6px; }
-        .header-right { display: flex; align-items: center; gap: 8px; }
-        .wallet-badge { display: flex; align-items: center; gap: 6px; background: rgba(255, 215, 0, 0.12); border: 1px solid rgba(255, 215, 0, 0.3); padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 700; color: var(--gold); cursor: pointer; }
-        .profile-btn { width: 34px; height: 34px; border-radius: 50%; background: var(--primary-gradient); border: 2px solid var(--card-border); display: flex; align-items: center; justify-content: center; font-weight: 700; cursor: pointer; color: white; overflow: hidden; }
-        .profile-btn img { width: 100%; height: 100%; object-fit: cover; }
-        .top-app-banner { margin: 12px 16px; background: linear-gradient(135deg, #1f0b24 0%, #2e082f 50%, #10061e 100%); border: 1px solid rgba(255, 0, 122, 0.3); border-radius: 16px; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 20px rgba(255, 0, 122, 0.2); }
-        .top-app-banner h2 { font-size: 1.1rem; font-weight: 800; background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .top-app-banner p { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
-        .filter-container { display: flex; gap: 8px; padding: 0 16px 12px 16px; overflow-x: auto; }
-        .filter-pill { background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); padding: 6px 14px; border-radius: 20px; font-size: 0.78rem; color: var(--text-muted); cursor: pointer; white-space: nowrap; }
-        .filter-pill.active { background: #FF007A; color: white; border-color: #FF007A; font-weight: 700; }
-        .section-header { padding: 4px 16px 8px 16px; font-size: 0.9rem; font-weight: 700; display: flex; align-items: center; gap: 6px; }
-        .host-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; padding: 0 16px; }
-        .host-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 16px; overflow: hidden; position: relative; cursor: pointer; }
-        .host-thumb { width: 100%; height: 185px; object-fit: cover; }
-        .badge-live { position: absolute; top: 8px; left: 8px; background: rgba(0, 0, 0, 0.65); padding: 3px 8px; border-radius: 12px; font-size: 0.65rem; color: var(--accent-cyan); font-weight: 700; }
-        .badge-rate { position: absolute; top: 8px; right: 8px; background: rgba(0, 0, 0, 0.65); padding: 3px 8px; border-radius: 12px; font-size: 0.7rem; color: var(--gold); font-weight: 700; }
-        .host-info { padding: 10px; background: linear-gradient(180deg, rgba(6,4,12,0) 0%, rgba(6,4,12,0.95) 100%); margin-top: -45px; position: relative; }
-        .host-name { font-size: 0.88rem; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 4px; }
-        .call-btn { width: 100%; background: var(--primary-gradient); border: none; color: white; padding: 8px; border-radius: 10px; font-weight: 700; font-size: 0.82rem; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; }
-        .profile-container { display: none; padding: 16px; }
-        .profile-container.active { display: block; }
-        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background: rgba(6, 4, 12, 0.95); backdrop-filter: blur(16px); border-top: 1px solid var(--card-border); display: flex; justify-content: space-around; align-items: center; z-index: 150; }
-        .nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--text-muted); font-size: 0.75rem; cursor: pointer; }
-        .nav-item.active { color: #FF007A; font-weight: 700; }
-        .nav-item i { font-size: 1.2rem; }
-        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(10px); z-index: 9999 !important; display: none; justify-content: center; align-items: flex-end; }
-        .modal-overlay.active { display: flex; }
-        .modal-card { background: #130E26; border-top: 1px solid var(--card-border); border-radius: 24px 24px 0 0; width: 100%; max-width: 480px; padding: 20px; max-height: 88vh; overflow-y: auto; }
-        .input-box { width: 100%; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--card-border); padding: 12px; border-radius: 12px; color: white; margin-bottom: 10px; outline: none; }
-        
-        #video-call-screen { position: fixed; inset: 0; width: 100vw; height: 100vh; background: #000; z-index: 999; display: none; flex-direction: column; }
-        #video-call-screen.active { display: flex; }
-        #main-video-view { position: absolute; inset: 0; width: 100vw; height: 100vh; object-fit: cover; z-index: 1; }
-        #pip-video-view { position: absolute; top: 70px; right: 16px; width: 100px; height: 140px; background: #111; border-radius: 14px; overflow: hidden; border: 2px solid #FF007A; z-index: 5; display: none; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Vynora Live 1v1</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.20.0.js"></script>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+<style>
+:root {
+    --bg-dark: #06040C;
+    --card-bg: rgba(255, 255, 255, 0.04);
+    --card-border: rgba(255, 255, 255, 0.08);
+    --primary-gradient: linear-gradient(135deg, #FF007A 0%, #7928CA 100%);
+    --banner-pink: linear-gradient(135deg, #FF007A 0%, #FF5500 100%);
+    --accent-cyan: #00F5D4;
+    --text-main: #FFFFFF;
+    --text-muted: #94A3B8;
+    --gold: #FFD700;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+body { background-color: var(--bg-dark); color: var(--text-main); min-height: 100vh; padding-bottom: 75px; overflow-x: hidden; }
+.app-header { position: sticky; top: 0; z-index: 100; background: rgba(6, 4, 12, 0.95); backdrop-filter: blur(12px); padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--card-border); }
+.brand-logo { font-weight: 800; font-size: 1.15rem; background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: flex; align-items: center; gap: 6px; }
+.header-right { display: flex; align-items: center; gap: 8px; }
+.wallet-badge { display: flex; align-items: center; gap: 6px; background: rgba(255, 215, 0, 0.12); border: 1px solid rgba(255, 215, 0, 0.3); padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 700; color: var(--gold); cursor: pointer; }
+.profile-btn { width: 34px; height: 34px; border-radius: 50%; background: var(--primary-gradient); border: 2px solid var(--card-border); display: flex; align-items: center; justify-content: center; font-weight: 700; cursor: pointer; color: white; overflow: hidden; }
+.profile-btn img { width: 100%; height: 100%; object-fit: cover; }
+.top-app-banner { margin: 12px 16px; background: linear-gradient(135deg, #1f0b24 0%, #2e082f 50%, #10061e 100%); border: 1px solid rgba(255, 0, 122, 0.3); border-radius: 16px; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 20px rgba(255, 0, 122, 0.2); }
+.top-app-banner h2 { font-size: 1.1rem; font-weight: 800; background: var(--primary-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.top-app-banner p { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+.filter-container { display: flex; gap: 8px; padding: 0 16px 12px 16px; overflow-x: auto; }
+.filter-pill { background: rgba(255,255,255,0.05); border: 1px solid var(--card-border); padding: 6px 14px; border-radius: 20px; font-size: 0.78rem; color: var(--text-muted); cursor: pointer; white-space: nowrap; }
+.filter-pill.active { background: #FF007A; color: white; border-color: #FF007A; font-weight: 700; }
+.section-header { padding: 4px 16px 8px 16px; font-size: 0.9rem; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+.host-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; padding: 0 16px; }
+.host-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 16px; overflow: hidden; position: relative; cursor: pointer; }
+.host-thumb { width: 100%; height: 185px; object-fit: cover; }
+.badge-live { position: absolute; top: 8px; left: 8px; background: rgba(0, 0, 0, 0.65); padding: 3px 8px; border-radius: 12px; font-size: 0.65rem; color: var(--accent-cyan); font-weight: 700; }
+.badge-rate { position: absolute; top: 8px; right: 8px; background: rgba(0, 0, 0, 0.65); padding: 3px 8px; border-radius: 12px; font-size: 0.7rem; color: var(--gold); font-weight: 700; }
+.host-info { padding: 10px; background: linear-gradient(180deg, rgba(6,4,12,0) 0%, rgba(6,4,12,0.95) 100%); margin-top: -45px; position: relative; }
+.host-name { font-size: 0.88rem; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 4px; }
+.call-btn { width: 100%; background: var(--primary-gradient); border: none; color: white; padding: 8px; border-radius: 10px; font-weight: 700; font-size: 0.82rem; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; }
+.profile-container { display: none; padding: 16px; }
+.profile-container.active { display: block; }
+.bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background: rgba(6, 4, 12, 0.95); backdrop-filter: blur(16px); border-top: 1px solid var(--card-border); display: flex; justify-content: space-around; align-items: center; z-index: 150; }
+.nav-item { display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--text-muted); font-size: 0.7rem; cursor: pointer; }
+.nav-item.active { color: #FF007A; font-weight: 700; }
+.nav-item i { font-size: 1.1rem; }
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(10px); z-index: 9999 !important; display: none; justify-content: center; align-items: flex-end; }
+.modal-overlay.active { display: flex; }
+.modal-card { background: #130E26; border-top: 1px solid var(--card-border); border-radius: 24px 24px 0 0; width: 100%; max-width: 480px; padding: 20px; max-height: 88vh; overflow-y: auto; }
+.input-box { width: 100%; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--card-border); padding: 12px; border-radius: 12px; color: white; margin-bottom: 10px; outline: none; }
+/* WHATSAPP STYLE INCOMING CALL SCREEN */
+#whatsapp-call-screen { position: fixed; inset: 0; background: linear-gradient(135deg, #06040C 0%, #1a0b2e 100%); z-index: 99999; display: none; flex-direction: column; justify-content: space-between; align-items: center; padding: 50px 20px; text-align: center; }
+#whatsapp-call-screen.active { display: flex; }
+.wa-avatar { width: 120px; height: 120px; border-radius: 50%; border: 4px solid #00F5D4; object-fit: cover; margin-bottom: 20px; animation: pulseRing 1.5s infinite; }
+@keyframes pulseRing { 0% { box-shadow: 0 0 0 0 rgba(0, 245, 212, 0.6); } 70% { box-shadow: 0 0 0 25px rgba(0, 245, 212, 0); } 100% { box-shadow: 0 0 0 0 rgba(0, 245, 212, 0); } }
+#video-call-screen { position: fixed; inset: 0; width: 100vw; height: 100vh; background: #000; z-index: 999; display: none; flex-direction: column; }
+#video-call-screen.active { display: flex; }
+#main-video-view { position: absolute; inset: 0; width: 100vw; height: 100vh; object-fit: cover; z-index: 1; }
+#pip-video-view { position: absolute; top: 70px; right: 16px; width: 100px; height: 140px; background: #111; border-radius: 14px; overflow: hidden; border: 2px solid #FF007A; z-index: 5; cursor: pointer; display: none; }
+.live-top-bar { position: absolute; top: 16px; left: 16px; right: 16px; z-index: 10; display: flex; justify-content: space-between; align-items: center; }
+.call-timer-badge { background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 20px; font-weight: 700; color: #00F5D4; font-size: 0.9rem; }
+</style>
 </head>
 <body>
-    <header class="app-header">
-        <div class="brand-logo"><i class="fa-solid fa-video"></i> Vynora Live</div>
-        <div class="header-right">
-            <div class="wallet-badge" onclick="openRechargeModal()"><i class="fa-solid fa-coins"></i> <span id="user-tokens-val">0</span></div>
-            <div class="profile-btn" id="header-avatar" onclick="switchTab('profile')"><i class="fa-solid fa-user"></i></div>
-        </div>
-    </header>
+<div class="app-header">
+    <div class="brand-logo"><i class="fa-solid fa-gem"></i> Vynora Live</div>
+    <div class="header-right">
+        <div class="wallet-badge" onclick="openRechargeModal()"><i class="fa-solid fa-coins"></i> <span id="user-token-count">0</span></div>
+        <div class="profile-btn" id="header-avatar-btn" onclick="switchTab('profile')"><i class="fa-solid fa-user"></i></div>
+    </div>
+</div>
 
+<div id="tab-home" class="profile-container active">
     <div class="top-app-banner">
         <div>
-            <h2>Private 1v1 Video Calls</h2>
-            <p>Connect instantly with verified elite hosts</p>
+            <h2>Vynora Live 1v1</h2>
+            <p>Connect with verified creators instantly ✨</p>
         </div>
-        <button class="get-btn" onclick="openRechargeModal()" style="background:white; color:#FF007A; font-weight:800; border:none; padding:6px 14px; border-radius:14px; font-size:0.8rem; cursor:pointer;">Top Up</button>
+        <button class="get-btn" onclick="openRechargeModal()">Recharge</button>
     </div>
+    <div class="filter-container">
+        <div class="filter-pill active" onclick="filterHosts('all')">All Hosts</div>
+        <div class="filter-pill" onclick="filterHosts('online')">🟢 Online</div>
+        <div class="filter-pill" onclick="filterHosts('india')">🇮🇳 India</div>
+    </div>
+    <div class="section-header"><i class="fa-solid fa-fire text-pink"></i> Featured Creators</div>
+    <div class="host-grid" id="hosts-container"></div>
+</div>
 
-    <!-- MAIN APP TABS -->
-    <div id="tab-live-content" class="tab-content">
-        <div class="filter-container">
-            <div class="filter-pill active">All Hosts</div>
-            <div class="filter-pill">Online Now</div>
-            <div class="filter-pill">VIP</div>
+<div id="tab-profile" class="profile-container">
+    <div class="profile-header-card">
+        <div class="profile-avatar-wrapper">
+            <img id="profile-avatar-img" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop" class="profile-avatar-img">
+            <label class="cam-edit-icon"><i class="fa-solid fa-camera"></i><input type="file" id="avatar-file-input" style="display:none" onchange="uploadAvatar(this)"></label>
         </div>
-        <div class="section-header"><i class="fa-solid fa-fire text-pink-500"></i> Available Streamers</div>
-        <div class="host-grid" id="hosts-grid-box"></div>
+        <div class="user-meta">
+            <h2><span id="profile-display-id">User</span></h2>
+            <p class="user-id-text">ID: <span id="profile-uid-text">000000</span></p>
+        </div>
     </div>
+</div>
 
-    <div id="tab-profile-content" class="profile-container">
-        <div style="display:flex; align-items:center; gap:16px; margin-bottom:20px;">
-            <div style="width:70px; height:70px; border-radius:50%; overflow:hidden; border:2px solid #FF007A;">
-                <img id="profile-img-preview" src="https://via.placeholder.com/150" style="width:100%; height:100%; object-fit:cover;">
+<div class="bottom-nav">
+    <div class="nav-item active" onclick="switchTab('home')"><i class="fa-solid fa-compass"></i><span>Explore</span></div>
+    <div class="nav-item" onclick="switchTab('profile')"><i class="fa-solid fa-user"></i><span>Profile</span></div>
+</div>
+
+<div id="whatsapp-call-screen">
+    <div style="margin-top: 40px;">
+        <p style="color: #00F5D4; font-weight: 700; letter-spacing: 1px; font-size: 0.85rem;">INCOMING VIDEO CALL...</p>
+        <h2 id="wa-caller-name" style="font-size: 1.6rem; margin-top: 8px;">Host</h2>
+    </div>
+    <img id="wa-caller-avatar" src="" class="wa-avatar">
+    <div style="display: flex; gap: 40px; margin-bottom: 40px;">
+        <div onclick="rejectIncomingCall()" style="width: 65px; height: 65px; background: #FF3B30; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; cursor: pointer;"><i class="fa-solid fa-phone-slash"></i></div>
+        <div onclick="acceptIncomingCall()" style="width: 65px; height: 65px; background: #34C759; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; cursor: pointer;"><i class="fa-solid fa-phone"></i></div>
+    </div>
+</div>
+
+<div id="video-call-screen">
+    <div class="live-top-bar">
+        <div class="call-timer-badge" id="call-timer-display">00:00</div>
+        <div onclick="endCallSession()" style="background: #FF3B30; color: white; padding: 6px 16px; border-radius: 20px; font-weight: 700; cursor: pointer;"><i class="fa-solid fa-phone-slash"></i> End</div>
+    </div>
+    <div id="main-video-view"></div>
+    <div id="pip-video-view"></div>
+</div>
+
+<script>
+let tg = window.Telegram?.WebApp;
+if (tg) tg.expand();
+let currentUser = { user_id: tg?.initDataUnsafe?.user?.id || 123456789, tokens: 0 };
+let currentBookingId = null;
+let callTimerInterval = null;
+let callDurationSecs = 0;
+
+async function initApp() {
+    let res = await fetch(`/api/user/${currentUser.user_id}`);
+    let data = await res.json();
+    currentUser.tokens = data.tokens;
+    document.getElementById('user-token-count').innerText = data.tokens;
+    document.getElementById('profile-uid-text').innerText = currentUser.user_id;
+    if(data.avatar) document.getElementById('profile-avatar-img').src = data.avatar;
+    loadHosts();
+}
+
+async function loadHosts() {
+    let res = await fetch('/api/hosts');
+    let data = await res.json();
+    let container = document.getElementById('hosts-container');
+    container.innerHTML = '';
+    data.hosts.forEach(h => {
+        container.innerHTML += `
+            <div class="host-card" onclick="bookHost('${h.id}', '${h.name}', ${h.rate})">
+                <img src="${h.img}" class="host-thumb">
+                <div class="badge-live">🟢 ${h.loc}</div>
+                <div class="badge-rate">🪙 ${h.rate}/m</div>
+                <div class="host-info">
+                    <div class="host-name">${h.name}</div>
+                    <button class="call-btn"><i class="fa-solid fa-video"></i> Call Now</button>
+                </div>
             </div>
-            <div>
-                <h3 id="profile-username">User</h3>
-                <p style="font-size:0.75rem; color:var(--text-muted);">ID: <span id="profile-userid-txt"></span></p>
-            </div>
-        </div>
-        <div style="margin-bottom:15px;">
-            <label style="font-size:0.8rem; color:var(--text-muted);">Upload Profile DP:</label>
-            <input type="file" id="dp-file-input" class="input-box" accept="image/*" style="margin-top:5px;">
-            <button onclick="uploadProfileDp()" style="width:100%; background:var(--primary-gradient); border:none; padding:10px; border-radius:10px; color:white; font-weight:700; cursor:pointer;">Update DP</button>
-        </div>
-        <div style="background:var(--card-bg); border:1px solid var(--card-border); border-radius:14px; padding:15px; margin-top:20px;">
-            <h4 style="margin-bottom:10px;">📜 Call History & Payouts</h4>
-            <div id="history-container" style="font-size:0.8rem; color:var(--text-muted);">Loading history...</div>
-        </div>
-    </div>
+        `;
+    });
+}
 
-    <!-- BOTTOM NAV (Only Live & Profile) -->
-    <nav class="bottom-nav">
-        <div class="nav-item active" onclick="switchTab('live')" id="nav-live"><i class="fa-solid fa-video"></i><span>Live</span></div>
-        <div class="nav-item" onclick="switchTab('profile')" id="nav-profile"><i class="fa-solid fa-user"></i><span>Profile</span></div>
-    </nav>
+async function bookHost(hostId, hostName, rate) {
+    if(currentUser.tokens < rate) {
+        alert("Insufficient tokens! Please recharge your wallet.");
+        return;
+    }
+    let res = await fetch('/api/book-slot', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ user_id: currentUser.user_id, host_id: hostId, host_name: hostName, duration_mins: 1, token_cost: rate })
+    });
+    let data = await res.json();
+    if(data.status === 'success') {
+        currentBookingId = data.booking_id;
+        alert("Booking request sent to host! Waiting for response...");
+    } else {
+        alert(data.message);
+    }
+}
 
-    <!-- RECHARGE MODAL -->
-    <div id="recharge-modal" class="modal-overlay">
-        <div class="modal-card">
-            <h3>💳 Recharge Wallet</h3>
-            <p style="font-size:0.75rem; color:var(--text-muted); margin:6px 0 15px 0;">Select amount to top up tokens instantly via UPI / QR.</p>
-            <input type="number" id="recharge-amt-input" class="input-box" placeholder="Enter Amount in INR (e.g. 100)">
-            <input type="text" id="recharge-utr-input" class="input-box" placeholder="Enter UTR / Transaction ID">
-            <input type="file" id="recharge-screenshot" class="input-box" accept="image/*">
-            <button onclick="submitRecharge()" style="width:100%; background:var(--primary-gradient); border:none; padding:12px; border-radius:12px; color:white; font-weight:700; cursor:pointer;">Submit Recharge</button>
-            <button onclick="closeRechargeModal()" style="width:100%; background:transparent; border:none; padding:10px; color:var(--text-muted); cursor:pointer; margin-top:5px;">Cancel</button>
-        </div>
-    </div>
+function acceptIncomingCall() {
+    document.getElementById('whatsapp-call-screen').classList.remove('active');
+    document.getElementById('video-call-screen').classList.add('active');
+    startCallTimer();
+}
 
-    <!-- BOOKING MODAL -->
-    <div id="booking-modal" class="modal-overlay">
-        <div class="modal-card">
-            <h3>🔒 Book Private Call</h3>
-            <p id="booking-host-name" style="font-size:0.85rem; color:var(--accent-cyan); margin:5px 0 15px 0;"></p>
-            <label style="font-size:0.8rem; color:var(--text-muted);">Select Duration:</label>
-            <select id="booking-duration" class="input-box" onchange="updateTokenCost()" style="margin-top:5px;">
-                <option value="1">1 Minute</option>
-                <option value="3">3 Minutes</option>
-                <option value="5">5 Minutes</option>
-                <option value="10">10 Minutes</option>
-            </select>
-            <p style="font-size:0.85rem; margin:10px 0;">Total Cost: <span id="booking-total-tokens" style="color:var(--gold); font-weight:800;">50</span> Tokens</p>
-            <button onclick="confirmBooking()" style="width:100%; background:var(--primary-gradient); border:none; padding:12px; border-radius:12px; color:white; font-weight:700; cursor:pointer;">Confirm & Request Host</button>
-            <button onclick="closeBookingModal()" style="width:100%; background:transparent; border:none; padding:10px; color:var(--text-muted); cursor:pointer; margin-top:5px;">Cancel</button>
-        </div>
-    </div>
+function rejectIncomingCall() {
+    document.getElementById('whatsapp-call-screen').classList.remove('active');
+}
 
-    <!-- VIDEO CALL SCREEN -->
-    <div id="video-call-screen">
-        <div id="main-video-view"></div>
-        <div id="pip-video-view"></div>
-        <div style="position:absolute; top:20px; left:20px; z-index:10; background:rgba(0,0,0,0.6); padding:8px 14px; border-radius:20px; font-weight:bold; color:var(--accent-cyan);">
-            ⏱️ <span id="call-timer-display">00:00</span>
-        </div>
-        <div style="position:absolute; bottom:30px; left:0; right:0; display:flex; justify-content:center; gap:20px; z-index:10;">
-            <button onclick="endCall()" style="background:#EF4444; border:none; width:60px; height:60px; border-radius:50%; color:white; font-size:1.2rem; cursor:pointer;"><i class="fa-solid fa-phone-slash"></i></button>
-        </div>
-    </div>
+function startCallTimer() {
+    callDurationSecs = 0;
+    clearInterval(callTimerInterval);
+    callTimerInterval = setInterval(() => {
+        callDurationSecs++;
+        let m = Math.floor(callDurationSecs / 60).toString().padStart(2, '0');
+        let s = (callDurationSecs % 60).toString().padStart(2, '0');
+        document.getElementById('call-timer-display').innerText = `${m}:${s}`;
+    }, 1000);
+}
 
-    <script>
-        const tg = window.Telegram.WebApp;
-        tg.expand();
-        const user = tg.initDataUnsafe?.user || { id: 7001825467, first_name: "Rajnish", username: "rajnish" };
-        let currentUserTokens = 0;
-        let selectedHostId = null;
-        let selectedHostRate = 50;
-        let selectedHostName = "";
-        let agoraClient = null, localAudioTrack = null, localVideoTrack = null;
-        let callTimerInterval = null;
+async function endCallSession() {
+    clearInterval(callTimerInterval);
+    document.getElementById('video-call-screen').classList.remove('active');
+    if(currentBookingId) {
+        await fetch('/api/complete-booking', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ booking_id: currentBookingId, duration_secs: callDurationSecs })
+        });
+    }
+    alert("Call ended successfully. History sent to Group 3!");
+    location.reload();
+}
 
-        async function initApp() {
-            try {
-                const res = await fetch(`/api/user/${user.id}`);
-                const data = await res.json();
-                if(data.is_banned) {
-                    alert("Your account has been banned.");
-                    return;
-                }
-                currentUserTokens = data.tokens;
-                document.getElementById('user-tokens-val').innerText = currentUserTokens;
-                document.getElementById('profile-username').innerText = user.first_name;
-                document.getElementById('profile-userid-txt').innerText = user.id;
-                if(data.avatar) {
-                    document.getElementById('profile-img-preview').src = data.avatar;
-                    document.getElementById('header-avatar').innerHTML = `<img src="${data.avatar}" style="width:100%;height:100%;object-fit:cover;">`;
-                }
-                loadHosts();
-                loadHistory();
-            } catch(e) { console.error(e); }
-        }
+function switchTab(tab) {
+    document.querySelectorAll('.profile-container').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+    if(tab === 'home') {
+        document.getElementById('tab-home').classList.add('active');
+    } else if(tab === 'profile') {
+        document.getElementById('tab-profile').classList.add('active');
+    }
+}
 
-        async function loadHosts() {
-            try {
-                const res = await fetch('/api/hosts');
-                const data = await res.json();
-                const grid = document.getElementById('hosts-grid-box');
-                grid.innerHTML = '';
-                data.hosts.forEach(h => {
-                    grid.innerHTML += `
-                        <div class="host-card">
-                            <img src="${h.img}" class="host-thumb">
-                            <div class="badge-live">LIVE</div>
-                            <div class="badge-rate">🪙 ${h.rate}/m</div>
-                            <div class="host-info">
-                                <div class="host-name">${h.name}</div>
-                                <button class="call-btn" onclick="openBookingModal('${h.id}', '${h.name}', ${h.rate})"><i class="fa-solid fa-phone"></i> Call</button>
-                            </div>
-                        </div>
-                    `;
-                });
-            } catch(e) { console.error(e); }
-        }
-
-        async function loadHistory() {
-            try {
-                const res = await fetch(`/api/user/bookings/${user.id}`);
-                const data = await res.json();
-                const container = document.getElementById('history-container');
-                if(!data.bookings || data.bookings.length === 0) {
-                    container.innerHTML = "No call history found.";
-                    return;
-                }
-                container.innerHTML = '';
-                data.bookings.forEach(b => {
-                    container.innerHTML += `
-                        <div style="background:rgba(255,255,255,0.03); border:1px solid var(--card-border); padding:8px; border-radius:8px; margin-bottom:6px;">
-                            <div><b>Host:</b> ${b.host_name}</div>
-                            <div><b>Date:</b> ${b.formatted_time}</div>
-                            <div><b>Duration:</b> ${b.duration_mins}m | <b>Cost:</b> 🪙 ${b.token_cost}</div>
-                            <div><b>Status:</b> <span style="color:${b.status==='approved'?'var(--accent-cyan)':'var(--gold)'};">${b.status}</span></div>
-                        </div>
-                    `;
-                });
-            } catch(e) { container.innerHTML = "Failed to load history."; }
-        }
-
-        function switchTab(tab) {
-            ['live', 'profile'].forEach(t => {
-                document.getElementById(`tab-${t}-content`).style.display = (t === tab) ? 'block' : 'none';
-                document.getElementById(`nav-${t}`).className = (t === tab) ? 'nav-item active' : 'nav-item';
-            });
-            if(tab === 'profile') loadHistory();
-        }
-
-        function openRechargeModal() { document.getElementById('recharge-modal').classList.add('active'); }
-        function closeRechargeModal() { document.getElementById('recharge-modal').classList.remove('active'); }
-
-        async function submitRecharge() {
-            const amt = document.getElementById('recharge-amt-input').value;
-            const utr = document.getElementById('recharge-utr-input').value;
-            const file = document.getElementById('recharge-screenshot').files[0];
-            if(!amt || !utr || !file) { alert("Please fill all details and upload screenshot."); return; }
-            const fd = new FormData();
-            fd.append("user_id", user.id);
-            fd.append("amount_inr", amt);
-            fd.append("utr_number", utr);
-            fd.append("screenshot", file);
-            const res = await fetch('/api/recharge', { method: 'POST', body: fd });
-            const data = await res.json();
-            alert(data.message);
-            closeRechargeModal();
-        }
-
-        function openBookingModal(id, name, rate) {
-            selectedHostId = id;
-            selectedHostName = name;
-            selectedHostRate = rate;
-            document.getElementById('booking-host-name').innerText = `${name} (${rate} Tokens/min)`;
-            updateTokenCost();
-            document.getElementById('booking-modal').classList.add('active');
-        }
-        function closeBookingModal() { document.getElementById('booking-modal').classList.remove('active'); }
-        function updateTokenCost() {
-            const mins = parseInt(document.getElementById('booking-duration').value);
-            document.getElementById('booking-total-tokens').innerText = mins * selectedHostRate;
-        }
-
-        async function confirmBooking() {
-            const mins = parseInt(document.getElementById('booking-duration').value);
-            const cost = mins * selectedHostRate;
-            const res = await fetch('/api/book-slot', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ user_id: user.id, host_id: selectedHostId, host_name: selectedHostName, duration_mins: mins, token_cost: cost })
-            });
-            const data = await res.json();
-            if(data.status === 'success') {
-                alert("Booking request sent to host! Please wait for acceptance.");
-                closeBookingModal();
-                pollBookingStatus(data.booking_id, mins);
-            } else {
-                alert(data.message);
-            }
-        }
-
-        function pollBookingStatus(bookingId, durationMins) {
-            const timer = setInterval(async () => {
-                const res = await fetch(`/api/user/bookings/${user.id}`);
-                const data = await res.json();
-                const currentBooking = data.bookings.find(b => b.booking_id === bookingId);
-                if(currentBooking && currentBooking.status === 'approved') {
-                    clearInterval(timer);
-                    startCallSession(currentBooking.channel_name, durationMins, currentBooking.call_started_at);
-                } else if(currentBooking && (currentBooking.status === 'rejected' || currentBooking.status === 'expired')) {
-                    clearInterval(timer);
-                    alert("Call request was rejected or expired.");
-                }
-            }, 3000);
-        }
-
-        async function startCallSession(channelName, durationMins, callStartedAt) {
-            document.getElementById('video-call-screen').classList.add('active');
-            const res = await fetch(`/api/agora-token?channelName=${channelName}&uid=${user.id}&role=publisher`);
-            const data = await res.json();
-            
-            agoraClient = AgoraRTC.createClient({ mode: "rtc", codec: "vp8" });
-            await agoraClient.join(data.appId, data.channel, data.token, data.uid);
-            localAudioTrack = await AgoraRTC.createMicrophoneAudioTrack();
-            localVideoTrack = await AgoraRTC.createCameraVideoTrack();
-            localVideoTrack.play("pip-video-view");
-            document.getElementById('pip-video-view').style.display = 'block';
-            await agoraClient.publish([localAudioTrack, localVideoTrack]);
-
-            agoraClient.on("user-published", async (userRemote, mediaType) => {
-                await agoraClient.subscribe(userRemote, mediaType);
-                if(mediaType === 'video') userRemote.videoTrack.play("main-video-view");
-                if(mediaType === 'audio') userRemote.audioTrack.play();
-            });
-
-            const totalSecs = durationMins * 60;
-            const startTime = callStartedAt || (Date.now() / 1000);
-            
-            if(callTimerInterval) clearInterval(callTimerInterval);
-            callTimerInterval = setInterval(() => {
-                const elapsed = Math.floor((Date.now() / 1000) - startTime);
-                const remaining = totalSecs - elapsed;
-                if(remaining <= 0) {
-                    clearInterval(callTimerInterval);
-                    endCall();
-                    return;
-                }
-                const m = String(Math.floor(remaining / 60)).padStart(2, '0');
-                const s = String(remaining % 60).padStart(2, '0');
-                document.getElementById('call-timer-display').innerText = `${m}:${s}`;
-            }, 1000);
-        }
-
-        function endCall() {
-            if(callTimerInterval) clearInterval(callTimerInterval);
-            if(localAudioTrack) localAudioTrack.close();
-            if(localVideoTrack) localVideoTrack.close();
-            if(agoraClient) agoraClient.leave();
-            document.getElementById('video-call-screen').classList.remove('active');
-            window.location.reload();
-        }
-
-        async function uploadProfileDp() {
-            const file = document.getElementById('dp-file-input').files[0];
-            if(!file) { alert("Select an image first"); return; }
-            const fd = new FormData();
-            fd.append("user_id", user.id);
-            fd.append("avatar", file);
-            const res = await fetch('/api/update-profile-photo', { method: 'POST', body: fd });
-            const data = await res.json();
-            if(data.status === 'success') {
-                alert("DP updated successfully!");
-                document.getElementById('profile-img-preview').src = data.avatar_url;
-                document.getElementById('header-avatar').innerHTML = `<img src="${data.avatar_url}" style="width:100%;height:100%;object-fit:cover;">`;
-            }
-        }
-
-        initApp();
-    </script>
+initApp();
+</script>
 </body>
 </html>
