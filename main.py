@@ -15,7 +15,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN")
 GROUP_1_ID = os.getenv("GROUP_1_ID", "-100XXXXXXXXXX")
 GROUP_2_ID = os.getenv("GROUP_2_ID", "-100XXXXXXXXXX")
 GROUP_3_ID = os.getenv("GROUP_3_ID", "-100XXXXXXXXXX")
-SECOND_ADMIN_ID = 1108685585  # New Second Admin ID
+SECOND_ADMIN_ID = 1108685585
 
 AGORA_APP_ID = os.getenv("AGORA_APP_ID", "YOUR_AGORA_APP_ID")
 AGORA_APP_CERTIFICATE = os.getenv("AGORA_APP_CERTIFICATE", "YOUR_AGORA_CERTIFICATE")
@@ -33,7 +33,6 @@ def send_telegram_message(chat_id, text, reply_markup=None):
         print("Telegram Error:", e)
 
 def notify_all_admins(text, reply_markup=None):
-    # Sends notifications to groups and both primary/second admins so they have identical permissions
     groups = [GROUP_1_ID, GROUP_2_ID, GROUP_3_ID]
     for g in groups:
         if g and str(g) != "-100XXXXXXXXXX":
@@ -75,20 +74,6 @@ class ActionBookingModel(BaseModel):
 class CompleteBookingModel(BaseModel):
     booking_id: str
 
-class GiftModel(BaseModel):
-    user_id: int
-    host_id: str
-    gift_cost: int
-    gift_name: str
-    channel: str
-    sender_name: str
-
-class ChatModel(BaseModel):
-    channel: str
-    sender: str
-    text: str
-    type: str = "chat"
-
 class WithdrawModel(BaseModel):
     user_id: int
     upi_id: str
@@ -100,20 +85,17 @@ def get_user(user_id: int):
     if user and user.get("is_banned", False):
         return {"tokens": 0, "earnings": 0, "net_earnings_tokens": 0, "net_earnings_inr": 0, "avatar": "", "is_banned": True}
     if not user:
-        # 0 Free Tokens for new users as requested
         user = {"user_id": int(user_id), "tokens": 0, "earnings": 0, "avatar": "", "is_banned": False}
         users_col.insert_one(user)
-        send_telegram_message(GROUP_2_ID, f"👤 <b>New User Started Bot!</b>\nID: <code>{user_id}</code>")
-        send_telegram_message(SECOND_ADMIN_ID, f"👤 <b>New User Started Bot!</b>\nID: <code>{user_id}</code>")
+        notify_all_admins(f"👤 <b>New User Started Bot!</b>\nID: <code>{user_id}</code>")
     
     raw_earnings = user.get("earnings", 0)
     net_earnings_tokens = int(raw_earnings * 0.7)
-    net_earnings_inr = net_earnings_tokens
     return {
         "tokens": user.get("tokens", 0),
         "earnings": raw_earnings,
         "net_earnings_tokens": net_earnings_tokens,
-        "net_earnings_inr": net_earnings_inr,
+        "net_earnings_inr": net_earnings_tokens,
         "avatar": user.get("avatar", ""),
         "is_banned": False
     }
@@ -129,8 +111,14 @@ def get_host_status(user_id: int):
         ]
     })
     if host:
-        return {"is_host": True, "status": host.get("status", "pending"), "is_online": host.get("is_online", False)}
-    return {"is_host": False, "status": "none", "is_online": False}
+        return {
+            "is_host": True, 
+            "status": host.get("status", "pending"), 
+            "is_online": host.get("is_online", False),
+            "rate": host.get("rate", 50),
+            "name": host.get("name", "")
+        }
+    return {"is_host": False, "status": "none", "is_online": False, "rate": 50}
 
 @app.post("/api/host/toggle-live/{user_id}")
 def toggle_host_live(user_id: int):
@@ -150,16 +138,27 @@ def toggle_host_live(user_id: int):
 
 @app.post("/api/host/update-rate")
 def update_host_rate(data: UpdateRateModel):
-    host = hosts_col.find_one({"user_id": int(data.user_id), "status": "approved"})
+    host = hosts_col.find_one({
+        "$or": [
+            {"user_id": int(data.user_id)},
+            {"id": str(data.user_id)},
+            {"id": f"h_{data.user_id}"},
+            {"_id": f"host_{data.user_id}"}
+        ]
+    })
     if not host:
-        return {"status": "error", "message": "Approved host not found"}
-    hosts_col.update_one({"user_id": int(data.user_id)}, {"$set": {"rate": data.rate}})
+        return {"status": "error", "message": "Host not found"}
+    hosts_col.update_one({"_id": host["_id"]}, {"$set": {"rate": data.rate}})
     return {"status": "success", "message": "Call rate updated successfully!"}
 
 @app.get("/api/hosts")
 def get_hosts():
     db_hosts = list(hosts_col.find({"status": "approved"}, {"_id": 0}))
-    # 5 Dummy Hosts (Non-bookable with polite busy message)
+    for h in db_hosts:
+        h["is_dummy"] = False
+        if not h.get("id"):
+            h["id"] = f"h_{h.get('user_id')}"
+            
     dummy_hosts = [
         {"id": "dummy_1", "user_id": 9991, "name": "Sophia 💎", "age": 22, "rate": 40, "lang": "English", "loc": "UK", "img": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&auto=format&fit=crop", "bio": "International VIP Model ✨", "is_online": True, "is_dummy": True},
         {"id": "dummy_2", "user_id": 9992, "name": "Ananya 🔥", "age": 21, "rate": 50, "lang": "Hindi", "loc": "Mumbai", "img": "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400&auto=format&fit=crop", "bio": "Bollywood dancer & host 💃", "is_online": True, "is_dummy": True},
@@ -167,10 +166,9 @@ def get_hosts():
         {"id": "dummy_4", "user_id": 9994, "name": "Natasha ✨", "age": 20, "rate": 45, "lang": "Russian", "loc": "Russia", "img": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop", "bio": "Professional singer & artist 🎶", "is_online": True, "is_dummy": True},
         {"id": "dummy_5", "user_id": 9995, "name": "Priya 💫", "age": 22, "rate": 35, "lang": "Hindi", "loc": "Delhi", "img": "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=400&auto=format&fit=crop", "bio": "Friendly companion & gamer 🎮", "is_online": True, "is_dummy": True}
     ]
-    all_hosts = dummy_hosts + db_hosts
-    for h in all_hosts:
-        if not h.get("id"):
-            h["id"] = f"h_{h.get('user_id')}"
+    
+    # Real approved hosts first, dummy hosts at the bottom
+    all_hosts = db_hosts + dummy_hosts
     return {"hosts": all_hosts}
 
 @app.get("/api/agora-token")
@@ -207,7 +205,7 @@ def book_slot(data: BookingModel):
         "channel_name": channel_name,
         "status": "pending",
         "time": current_time,
-        "call_started_at": 0  # Will be set precisely when accepted and face-to-face
+        "call_started_at": 0
     }
     bookings_col.insert_one(booking_doc)
     
@@ -237,47 +235,6 @@ def book_slot(data: BookingModel):
     
     return {"status": "success", "booking_id": booking_id}
 
-@app.get("/api/host/bookings/{user_id}")
-def get_host_bookings(user_id: int):
-    try:
-        host = hosts_col.find_one({
-            "$or": [
-                {"user_id": int(user_id)},
-                {"id": str(user_id)},
-                {"id": f"h_{user_id}"},
-                {"_id": f"host_{user_id}"}
-            ]
-        })
-        if not host:
-            return {"bookings": []}
-        
-        h_ids = [str(user_id), f"h_{user_id}", f"host_{user_id}"]
-        if host.get("id"): h_ids.append(str(host.get("id")))
-        if host.get("user_id"): h_ids.append(str(host.get("user_id")))
-        
-        bookings_cursor = bookings_col.find({"host_id": {"$in": list(set(h_ids))}}).sort("time", -1)
-        host_bookings = []
-        for b in bookings_cursor:
-            b_id = str(b.get("booking_id") or b.get("_id"))
-            call_time_formatted = time.strftime('%Y-%m-%d %H:%M', time.localtime(b.get("time", time.time())))
-            host_bookings.append({
-                "booking_id": b_id,
-                "user_id": b.get("user_id"),
-                "host_id": b.get("host_id"),
-                "host_name": b.get("host_name"),
-                "duration_mins": b.get("duration_mins"),
-                "token_cost": b.get("token_cost"),
-                "channel_name": b.get("channel_name", f"private_call_{user_id}_{b.get('user_id')}"),
-                "status": b.get("status", "pending"),
-                "call_started_at": b.get("call_started_at", 0),
-                "formatted_time": call_time_formatted,
-                "time": b.get("time", 0)
-            })
-        return {"bookings": host_bookings}
-    except Exception as e:
-        print("Error in host bookings:", str(e))
-        return {"bookings": []}
-
 @app.post("/api/host/accept-booking")
 def accept_booking(data: ActionBookingModel):
     booking = bookings_col.find_one({
@@ -289,7 +246,6 @@ def accept_booking(data: ActionBookingModel):
     if not booking or booking.get("status") != "pending":
         return {"status": "error", "message": "Booking not found or already processed"}
     
-    # Synchronized timer start point when host accepts & calls connect face-to-face
     current_time = time.time()
     bookings_col.update_one(
         {"_id": booking["_id"]}, 
@@ -337,10 +293,23 @@ def complete_booking(data: CompleteBookingModel):
             {"_id": data.booking_id}
         ]
     })
-    if booking:
+    if booking and booking.get("status") != "completed":
         bookings_col.update_one({"_id": booking["_id"]}, {"$set": {"status": "completed"}})
-        return {"status": "success", "message": "Booking marked as completed"}
-    return {"status": "error", "message": "Booking not found"}
+        
+        time_str = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(booking.get("time", time.time())))
+        group3_msg = (
+            f"📊 <b>Call History & Summary Report</b>\n\n"
+            f"🆔 Booking ID: <code>{booking.get('booking_id')}</code>\n"
+            f"👤 User ID: <code>{booking.get('user_id')}</code>\n"
+            f"📹 Host ID / Name: <code>{booking.get('host_id')}</code> ({booking.get('host_name')})\n"
+            f"⏱️ Duration: {booking.get('duration_mins')} Mins\n"
+            f"🪙 Tokens Spent: {booking.get('token_cost')}\n"
+            f"📅 Date & Time: {time_str}\n"
+            f"📌 Status: COMPLETED"
+        )
+        send_telegram_message(GROUP_3_ID, group3_msg)
+        return {"status": "success", "message": "Booking marked as completed and logged"}
+    return {"status": "error", "message": "Booking not found or already completed"}
 
 @app.get("/api/user/bookings/{user_id}")
 def get_user_bookings(user_id: int):
@@ -373,13 +342,19 @@ def get_user_bookings(user_id: int):
 
 @app.post("/api/register-host")
 def register_host(data: HostRegisterModel):
+    existing = hosts_col.find_one({"user_id": int(data.user_id)})
+    if existing and existing.get("status") == "approved":
+        return {"status": "success", "message": "You are already an approved host!"}
+        
     host_data = data.dict()
     host_data["status"] = "pending"
     host_data["id"] = f"h_{data.user_id}"
     host_data["_id"] = f"host_{data.user_id}"
     host_data["user_id"] = int(data.user_id)
     host_data["is_online"] = False
-    host_data["img"] = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop"
+    
+    user = users_col.find_one({"user_id": int(data.user_id)})
+    host_data["img"] = user.get("avatar") if (user and user.get("avatar")) else "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop"
     
     hosts_col.update_one({"user_id": int(data.user_id)}, {"$set": host_data}, upsert=True)
     
@@ -412,7 +387,15 @@ async def recharge(user_id: int = Form(...), amount_inr: int = Form(...), utr_nu
 
 @app.post("/api/withdraw")
 def withdraw_earnings(data: WithdrawModel):
-    host = hosts_col.find_one({"user_id": int(data.user_id), "status": "approved"})
+    host = hosts_col.find_one({
+        "$or": [
+            {"user_id": int(data.user_id)},
+            {"id": str(data.user_id)},
+            {"id": f"h_{data.user_id}"},
+            {"_id": f"host_{data.user_id}"}
+        ],
+        "status": "approved"
+    })
     if not host:
         return {"status": "error", "message": "Withdrawal option is only available for approved hosts!"}
     
@@ -438,35 +421,6 @@ async def update_profile_photo(user_id: int = Form(...), avatar: UploadFile = Fi
     hosts_col.update_one({"user_id": int(user_id)}, {"$set": {"img": avatar_url}}, upsert=True)
     return {"status": "success", "avatar_url": avatar_url}
 
-@app.post("/api/send-gift")
-def send_gift(data: GiftModel):
-    user = users_col.find_one({"user_id": int(data.user_id)})
-    if not user or user.get("tokens", 0) < data.gift_cost:
-        return {"status": "error", "message": "Not enough tokens"}
-    users_col.update_one({"user_id": int(data.user_id)}, {"$inc": {"tokens": -data.gift_cost}})
-    clean_h = str(data.host_id).replace("h_", "").replace("host_", "")
-    host = hosts_col.find_one({
-        "$or": [
-            {"id": data.host_id},
-            {"_id": f"host_{clean_h}"},
-            {"user_id": int(clean_h) if clean_h.isdigit() else 0}
-        ]
-    })
-    if host and "user_id" in host:
-        users_col.update_one({"user_id": int(host["user_id"])}, {"$inc": {"earnings": data.gift_cost}}, upsert=True)
-    chats_col.insert_one({"channel": data.channel, "sender": data.sender_name, "text": f"sent gift {data.gift_name} (🪙 {data.gift_cost})", "type": "gift", "time": time.time()})
-    return {"status": "success"}
-
-@app.post("/api/send-chat")
-def send_chat(data: ChatModel):
-    chats_col.insert_one({"channel": data.channel, "sender": data.sender, "text": data.text, "type": data.type, "time": time.time()})
-    return {"status": "success"}
-
-@app.get("/api/get-chat/{channel}")
-def get_chat(channel: str):
-    messages = list(chats_col.find({"channel": channel}, {"_id": 0}).sort("time", 1).limit(50))
-    return {"messages": messages}
-
 @app.post("/telegram-webhook")
 async def telegram_webhook(req: Request):
     body = await req.json()
@@ -476,10 +430,6 @@ async def telegram_webhook(req: Request):
         user_id = msg["from"]["id"]
         text = msg.get("text", "").strip()
         
-        # Second Admin & Main Admin authorization check for commands
-        is_admin_user = (user_id == SECOND_ADMIN_ID or chat_id == SECOND_ADMIN_ID or chat_id in [GROUP_1_ID, GROUP_2_ID, GROUP_3_ID])
-        
-        # ADMIN COMMANDS
         if text.startswith("/ban "):
             try:
                 target_id = int(text.replace("/ban ", "").strip())
@@ -582,8 +532,7 @@ async def telegram_webhook(req: Request):
                 return {"ok": True}
             if not user:
                 users_col.insert_one({"user_id": int(user_id), "tokens": 0, "earnings": 0, "avatar": "", "is_banned": False})
-                send_telegram_message(GROUP_2_ID, f"👤 <b>New User Started Bot!</b>\nID: <code>{user_id}</code>")
-                send_telegram_message(SECOND_ADMIN_ID, f"👤 <b>New User Started Bot!</b>\nID: <code>{user_id}</code>")
+                notify_all_admins(f"👤 <b>New User Started Bot!</b>\nID: <code>{user_id}</code>")
             webapp_url = "https://vynora-bot.onrender.com/static/index.html"
             keyboard = {"inline_keyboard": [[{"text": "🚀 Open Vynora Live App", "web_app": {"url": webapp_url}}]]}
             send_telegram_message(chat_id, "✨ <b>Welcome to Vynora Live 1v1!</b>", reply_markup=keyboard)
