@@ -20,9 +20,6 @@ GROUP_3_ID = os.getenv("GROUP_3_ID", "-100XXXXXXXXXX")
 AGORA_APP_ID = os.getenv("AGORA_APP_ID", "YOUR_AGORA_APP_ID")
 AGORA_APP_CERTIFICATE = os.getenv("AGORA_APP_CERTIFICATE", "YOUR_AGORA_CERTIFICATE")
 
-# Authorized Admin ID with full permissions
-ADMIN_ID = 1108685585
-
 TELEGRAM_API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
 def send_telegram_message(chat_id, text, reply_markup=None):
@@ -154,20 +151,18 @@ def update_host_rate(data: UpdateRateModel):
 
 @app.get("/api/hosts")
 def get_hosts():
-    # Real approved hosts first (top)
     db_hosts = list(hosts_col.find({"status": "approved"}, {"_id": 0}))
     
-    # 5 International Dummy Hosts placed at the bottom with polite busy message
+    # 5 Dummy Hosts (Non-bookable with polite busy message)
     dummy_hosts = [
         {"id": "dummy_1", "user_id": 9991, "name": "Sophia 💎", "age": 22, "rate": 40, "lang": "English", "loc": "UK", "img": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&auto=format&fit=crop", "bio": "International VIP Model ✨", "is_online": True, "is_dummy": True},
-        {"id": "dummy_2", "user_id": 9992, "name": "Emily 🔥", "age": 21, "rate": 50, "lang": "English", "loc": "USA", "img": "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400&auto=format&fit=crop", "bio": "Fashion model & creator 💃", "is_online": True, "is_dummy": True},
+        {"id": "dummy_2", "user_id": 9992, "name": "Ananya 🔥", "age": 21, "rate": 50, "lang": "Hindi", "loc": "Mumbai", "img": "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400&auto=format&fit=crop", "bio": "Bollywood dancer & host 💃", "is_online": True, "is_dummy": True},
         {"id": "dummy_3", "user_id": 9993, "name": "Elena 👑", "age": 23, "rate": 60, "lang": "French", "loc": "France", "img": "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&auto=format&fit=crop", "bio": "Parisian fashion enthusiast 🌸", "is_online": True, "is_dummy": True},
         {"id": "dummy_4", "user_id": 9994, "name": "Natasha ✨", "age": 20, "rate": 45, "lang": "Russian", "loc": "Russia", "img": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop", "bio": "Professional singer & artist 🎶", "is_online": True, "is_dummy": True},
-        {"id": "dummy_5", "user_id": 9995, "name": "Yuki 💫", "age": 22, "rate": 35, "lang": "Japanese", "loc": "Japan", "img": "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=400&auto=format&fit=crop", "bio": "Tokyo lifestyle companion 🎮", "is_online": True, "is_dummy": True}
+        {"id": "dummy_5", "user_id": 9995, "name": "Priya 💫", "age": 22, "rate": 35, "lang": "Hindi", "loc": "Delhi", "img": "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=400&auto=format&fit=crop", "bio": "Friendly companion & gamer 🎮", "is_online": True, "is_dummy": True}
     ]
 
-    # Real hosts on top, Dummy hosts at the bottom
-    all_hosts = db_hosts + dummy_hosts
+    all_hosts = dummy_hosts + db_hosts
     for h in all_hosts:
         if not h.get("id"):
             h["id"] = f"h_{h.get('user_id')}"
@@ -330,7 +325,7 @@ def accept_booking(data: ActionBookingModel):
         users_col.update_one({"user_id": int(host["user_id"])}, {"$inc": {"earnings": booking["token_cost"]}}, upsert=True)
     
     webapp_url = "https://vynora-bot.onrender.com/static/index.html"
-    user_keyboard = {"inline_keyboard": [[{"text": "📞 Answer Video Call", "web_app": {"url": webapp_url}}]]}
+    user_keyboard = {"inline_keyboard": [[{"text": "📞 Answer Call", "web_app": {"url": webapp_url}}]]}
     send_telegram_message(int(booking["user_id"]), f"📞 <b>Incoming Video Call!</b> Host accepted your booking. Tap below to pick up.", reply_markup=user_keyboard)
     
     return {"status": "success", "message": "Booking accepted successfully!", "channel_name": booking.get("channel_name"), "call_started_at": current_time}
@@ -512,7 +507,7 @@ async def telegram_webhook(req: Request):
         user_id = msg["from"]["id"]
         text = msg.get("text", "").strip()
 
-        # ADMIN COMMANDS (Restricted to authorized Admin ID or processed with full privileges)
+        # ADMIN COMMANDS
         if text.startswith("/ban "):
             try:
                 target_id = int(text.replace("/ban ", "").strip())
@@ -676,7 +671,7 @@ async def telegram_webhook(req: Request):
                     users_col.update_one({"user_id": int(host["user_id"])}, {"$inc": {"earnings": booking["token_cost"]}}, upsert=True)
                 
                 webapp_url = "https://vynora-bot.onrender.com/static/index.html"
-                user_keyboard = {"inline_keyboard": [[{"text": "📞 Answer Video Call", "web_app": {"url": webapp_url}}]]}
+                user_keyboard = {"inline_keyboard": [[{"text": "📞 Answer Call", "web_app": {"url": webapp_url}}]]}
                 send_telegram_message(int(booking["user_id"]), "📞 <b>Incoming Video Call!</b> Host accepted your booking. Tap below to pick up.", reply_markup=user_keyboard)
                 requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": "✅ Booking Accepted & Call Ready"})
 
