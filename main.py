@@ -24,7 +24,8 @@ db = client["vynora_live"]
 # Dual Admins Configuration
 ADMIN_IDS = [7001825467, 1108685585]
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "YOUR_BOT_TOKEN")
-TELEGRAM_GROUP_ID = os.getenv("TELEGRAM_GROUP_ID", "YOUR_GROUP_ID") # Group jahan notifications jayengi
+TELEGRAM_GROUP_ID = os.getenv("TELEGRAM_GROUP_ID", "YOUR_GROUP_ID")
+WEBAPP_URL = os.getenv("WEBAPP_URL", "https://your-render-url.onrender.com") # Apna WebApp URL yahan daalein
 
 class UserRegister(BaseModel):
     user_id: int
@@ -38,7 +39,7 @@ class DpUpdate(BaseModel):
 class GameBet(BaseModel):
     user_id: int
     bet_amount: int
-    game_type: str  # 'car_racing', 'spin_wheel', 'dice', 'ludo'
+    game_type: str
     choice: str
 
 class CallBooking(BaseModel):
@@ -86,10 +87,9 @@ def book_call(data: CallBooking):
     if not user or not host:
         raise HTTPException(status_code=404, detail="User or Host not found")
     
-    if user.get("tokens", 0) < 50:  # Minimum 50 tokens required for call
+    if user.get("tokens", 0) < 50:
         raise HTTPException(status_code=400, detail="Insufficient tokens for call")
     
-    # Send Notification to Telegram Group for Host Approval
     notification_text = (
         f"🚨 **New 1v1 Call Request!**\n\n"
         f"👤 User: {user.get('full_name')} (ID: {data.user_id})\n"
@@ -101,12 +101,17 @@ def book_call(data: CallBooking):
         requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage", json={
             "chat_id": TELEGRAM_GROUP_ID,
             "text": notification_text,
-            "parse_mode": "Markdown"
+            "parse_mode": "Markdown",
+            "reply_markup": {
+                "inline_keyboard": [[
+                    {"text": "✅ Accept Call", "callback_data": f"accept_call_{data.host_id}_{data.user_id}"}
+                ]]
+            }
         })
     except Exception as e:
         print("Notification error:", e)
         
-    return {"status": "success", "message": "Call request sent and notification posted in group!"}
+    return {"status": "success", "message": "Call request sent!"}
 
 # --- 3. MINI GAMES API ---
 @app.post("/api/game/play")
@@ -115,10 +120,8 @@ def play_game(data: GameBet):
     if not user or user.get("tokens", 0) < data.bet_amount:
         raise HTTPException(status_code=400, detail="Insufficient tokens")
     
-    # Deduct bet
     db.users.update_one({"user_id": data.user_id}, {"$inc": {"tokens": -data.bet_amount}})
     
-    # Game Logic Simulation
     won = random.choice([True, False])
     payout = 0
     if won:
@@ -128,36 +131,53 @@ def play_game(data: GameBet):
     updated_user = db.users.find_one({"user_id": data.user_id})
     return {"won": won, "payout": payout, "new_balance": updated_user["tokens"]}
 
-# --- 4. TELEGRAM BOT WEBHOOK (Admin Commands & Call Approvals) ---
+# --- 4. TELEGRAM BOT WEBHOOK (Start Command, Call Approvals & Admin Controls) ---
 @app.post("/telegram-webhook")
 async def telegram_webhook(request: Request):
     body = await request.json()
     
-    # Handle Callback Queries (Inline buttons from group)
+    # Handle Callback Queries (Inline buttons like Accept Call)
     if "callback_query" in body:
         cq = body["callback_query"]
         data = cq["data"]
         chat_id = cq["message"]["chat"]["id"]
         
         if data.startswith("accept_call_"):
-            host_id = data.split("_")[2]
+            parts = data.split("_")
+            host_id = parts[2]
+            user_id = parts[3]
             requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage", json={
-                "chat_id": chat_id, "text": f"✅ Host {host_id} has accepted the call! Connecting session..."
+                "chat_id": chat_id, 
+                "text": f"✅ Host {host_id} has accepted the call with user {user_id}! Session connected."
             })
         return {"status": "ok"}
 
-    # Handle Text Messages (Admin Commands)
+    # Handle Text Messages (/start and Admin Commands)
     if "message" in body:
         msg = body["message"]
         chat_id = msg["chat"]["id"]
         user_id = msg["from"]["id"]
         text = msg.get("text", "")
         
+        parts = text.split()
+        cmd = parts[0] if parts else ""
+        
+        # /start Command (Bot reply with WebApp button)
+        if cmd == "/start":
+            requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage", json={
+                "chat_id": chat_id,
+                "text": "✨ Welcome to **Vynora Live**! Click the button below to open the app and start exploring live rooms and games:",
+                "parse_mode": "Markdown",
+                "reply_markup": {
+                    "inline_keyboard": [[
+                        {"text": "🚀 Open Vynora Live App", "web_app": {"url": WEBAPP_URL}}
+                    ]]
+                }
+            })
+            return {"status": "ok"}
+        
+        # Admin Commands (Dual Admins Only)
         if user_id in ADMIN_IDS:
-            parts = text.split()
-            cmd = parts[0] if parts else ""
-            
-            # Room Permissions
             if cmd == "/giveroom" and len(parts) > 1:
                 target_id = int(parts[1])
                 db.users.update_one({"user_id": target_id}, {"$set": {"can_create_room": True}})
@@ -170,7 +190,6 @@ async def telegram_webhook(request: Request):
                 requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage", json={
                     "chat_id": chat_id, "text": f"❌ User {target_id} se room creation permission wapas le li gayi hai."
                 })
-            # Token Management
             elif cmd == "/addtokens" and len(parts) > 2:
                 target_id = int(parts[1])
                 amount = int(parts[2])
@@ -185,7 +204,6 @@ async def telegram_webhook(request: Request):
                 requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage", json={
                     "chat_id": chat_id, "text": f"⚠️ Cut {amount} tokens from user {target_id}."
                 })
-            # Ban/Unban
             elif cmd == "/ban" and len(parts) > 1:
                 target_id = int(parts[1])
                 db.users.update_one({"user_id": target_id}, {"$set": {"is_banned": True}})
