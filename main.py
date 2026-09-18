@@ -67,6 +67,9 @@ class ActionBookingModel(BaseModel):
 class CompleteBookingModel(BaseModel):
     booking_id: str
 
+class StartCallModel(BaseModel):
+    booking_id: str
+
 class GiftModel(BaseModel):
     user_id: int
     host_id: str
@@ -93,7 +96,6 @@ def get_user(user_id: int):
         return {"tokens": 0, "earnings": 0, "net_earnings_tokens": 0, "net_earnings_inr": 0, "avatar": "", "is_banned": True}
         
     if not user:
-        # 0 Free Tokens for new users as requested
         user = {"user_id": int(user_id), "tokens": 0, "earnings": 0, "avatar": "", "is_banned": False}
         users_col.insert_one(user)
         send_telegram_message(GROUP_2_ID, f"👤 <b>New User Started Bot!</b>\nID: <code>{user_id}</code>")
@@ -152,8 +154,6 @@ def update_host_rate(data: UpdateRateModel):
 @app.get("/api/hosts")
 def get_hosts():
     db_hosts = list(hosts_col.find({"status": "approved"}, {"_id": 0}))
-    
-    # 5 Dummy Hosts (Non-bookable with polite busy message)
     dummy_hosts = [
         {"id": "dummy_1", "user_id": 9991, "name": "Sophia 💎", "age": 22, "rate": 40, "lang": "English", "loc": "UK", "img": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&auto=format&fit=crop", "bio": "International VIP Model ✨", "is_online": True, "is_dummy": True},
         {"id": "dummy_2", "user_id": 9992, "name": "Ananya 🔥", "age": 21, "rate": 50, "lang": "Hindi", "loc": "Mumbai", "img": "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400&auto=format&fit=crop", "bio": "Bollywood dancer & host 💃", "is_online": True, "is_dummy": True},
@@ -161,7 +161,6 @@ def get_hosts():
         {"id": "dummy_4", "user_id": 9994, "name": "Natasha ✨", "age": 20, "rate": 45, "lang": "Russian", "loc": "Russia", "img": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop", "bio": "Professional singer & artist 🎶", "is_online": True, "is_dummy": True},
         {"id": "dummy_5", "user_id": 9995, "name": "Priya 💫", "age": 22, "rate": 35, "lang": "Hindi", "loc": "Delhi", "img": "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=400&auto=format&fit=crop", "bio": "Friendly companion & gamer 🎮", "is_online": True, "is_dummy": True}
     ]
-
     all_hosts = dummy_hosts + db_hosts
     for h in all_hosts:
         if not h.get("id"):
@@ -179,7 +178,6 @@ def get_agora_token(channelName: str, uid: int, role: str):
 
 @app.post("/api/book-slot")
 def book_slot(data: BookingModel):
-    # Dummy host booking restriction with polite message
     if str(data.host_id).startswith("dummy_"):
         return {"status": "error", "message": "✨ Host is currently busy in a private international session. Please try another host!"}
 
@@ -310,7 +308,7 @@ def accept_booking(data: ActionBookingModel):
         return {"status": "error", "message": "Booking not found or already processed"}
     
     current_time = time.time()
-    bookings_col.update_one({"_id": booking["_id"]}, {"$set": {"status": "approved", "call_started_at": current_time}})
+    bookings_col.update_one({"_id": booking["_id"]}, {"$set": {"status": "approved"}})
     
     h_val = str(booking["host_id"])
     clean_h = h_val.replace("h_", "").replace("host_", "")
@@ -328,7 +326,21 @@ def accept_booking(data: ActionBookingModel):
     user_keyboard = {"inline_keyboard": [[{"text": "📞 Answer Call", "web_app": {"url": webapp_url}}]]}
     send_telegram_message(int(booking["user_id"]), f"📞 <b>Incoming Video Call!</b> Host accepted your booking. Tap below to pick up.", reply_markup=user_keyboard)
     
-    return {"status": "success", "message": "Booking accepted successfully!", "channel_name": booking.get("channel_name"), "call_started_at": current_time}
+    return {"status": "success", "message": "Booking accepted successfully!", "channel_name": booking.get("channel_name")}
+
+@app.post("/api/start-call")
+def start_call(data: StartCallModel):
+    booking = bookings_col.find_one({
+        "$or": [
+            {"booking_id": data.booking_id},
+            {"_id": data.booking_id}
+        ]
+    })
+    if booking:
+        current_time = time.time()
+        bookings_col.update_one({"_id": booking["_id"]}, {"$set": {"call_started_at": current_time}})
+        return {"status": "success", "call_started_at": current_time}
+    return {"status": "error", "message": "Booking not found"}
 
 @app.post("/api/host/reject-booking")
 def reject_booking(data: ActionBookingModel):
@@ -507,7 +519,6 @@ async def telegram_webhook(req: Request):
         user_id = msg["from"]["id"]
         text = msg.get("text", "").strip()
 
-        # ADMIN COMMANDS
         if text.startswith("/ban "):
             try:
                 target_id = int(text.replace("/ban ", "").strip())
@@ -656,8 +667,7 @@ async def telegram_webhook(req: Request):
             booking_id = data_str.replace("accept_bk_", "")
             booking = bookings_col.find_one({"booking_id": booking_id})
             if booking and booking.get("status") == "pending":
-                current_time = time.time()
-                bookings_col.update_one({"booking_id": booking_id}, {"$set": {"status": "approved", "call_started_at": current_time}})
+                bookings_col.update_one({"booking_id": booking_id}, {"$set": {"status": "approved"}})
                 h_val = str(booking["host_id"])
                 clean_h = h_val.replace("h_", "").replace("host_", "")
                 host = hosts_col.find_one({
