@@ -309,11 +309,24 @@
         </div>
     </div>
 
+    <!-- BOTTOM NAVIGATION -->
     <nav class="bottom-nav">
-        <div class="nav-item active" id="nav-home" onclick="switchTab('home')"><i class="fa-solid fa-house"></i><span>Home</span></div>
-        <div class="nav-item" onclick="openRechargeModal()"><i class="fa-solid fa-wallet"></i><span>Recharge</span></div>
-        <div class="nav-item" onclick="openSupportLink()"><i class="fa-solid fa-headset"></i><span>Support</span></div>
-        <div class="nav-item" id="nav-profile" onclick="switchTab('profile')"><i class="fa-solid fa-user"></i><span>Profile</span></div>
+        <div class="nav-item active" id="nav-home" onclick="switchTab('home')">
+            <i class="fa-solid fa-house"></i>
+            <span>Home</span>
+        </div>
+        <div class="nav-item" id="nav-recharge" onclick="openRechargeModal()">
+            <i class="fa-solid fa-wallet"></i>
+            <span>Recharge</span>
+        </div>
+        <div class="nav-item" id="nav-support" onclick="openSupportLink()">
+            <i class="fa-solid fa-headset"></i>
+            <span>Support</span>
+        </div>
+        <div class="nav-item" id="nav-profile" onclick="switchTab('profile')">
+            <i class="fa-solid fa-user"></i>
+            <span>Profile</span>
+        </div>
     </nav>
 
     <!-- HOST PROFILE DRAWER -->
@@ -780,7 +793,6 @@
             }
         }
 
-        // SMART TIMER SYNC (Resets and syncs exact time when call is answered/joined)
         async function startCallWithTimer(channelName, peerName, peerImg, durationMins, role, bookingId) {
             document.getElementById('whatsapp-call-screen').classList.remove('active');
             closeModal('host-bookings-modal');
