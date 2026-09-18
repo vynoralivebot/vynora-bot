@@ -27,8 +27,7 @@ def send_telegram_message(chat_id, text, reply_markup=None):
     if reply_markup:
         payload["reply_markup"] = reply_markup
     try:
-        res = requests.post(f"{TELEGRAM_API_URL}/sendMessage", json=payload)
-        print("Telegram Response:", res.json())
+        requests.post(f"{TELEGRAM_API_URL}/sendMessage", json=payload)
     except Exception as e:
         print("Telegram Error:", e)
 
@@ -307,7 +306,6 @@ def accept_booking(data: ActionBookingModel):
     if not booking or booking.get("status") != "pending":
         return {"status": "error", "message": "Booking not found or already processed"}
     
-    current_time = time.time()
     bookings_col.update_one({"_id": booking["_id"]}, {"$set": {"status": "approved"}})
     
     h_val = str(booking["host_id"])
