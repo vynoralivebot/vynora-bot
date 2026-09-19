@@ -1404,7 +1404,7 @@ def complete_booking(data: CompleteBookingModel):
     if data.user_id is not None and int(data.user_id) not in [int(b["user_id"]), int(b["host_id"])]:
         raise HTTPException(403, "Not a participant")
     bookings_col.update_one(
-        {"_id": b["_id"], "session_status": {"
+        {"_id": b["_id"], "session_status": {"$ne": "completed"}},
 
 
 
