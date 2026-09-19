@@ -1,228 +1,204 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="hi">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<meta name="theme-color" content="#090914">
+<meta name="theme-color" content="#080811">
 <title>Vynora Live</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://download.agora.io/sdk/release/AgoraRTC_N-4.20.0.js"></script>
 <style>
-*{box-sizing:border-box}html,body{margin:0;background:#080811;color:#fff;font-family:Inter,Arial,sans-serif}
-body{min-height:100vh;padding-bottom:82px}.app{max-width:720px;margin:auto;padding:14px}
-.top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
-.logo{font-size:22px;font-weight:900;background:linear-gradient(90deg,#ff3b9d,#7b6cff,#00e5ff);-webkit-background-clip:text;color:transparent}
-.iconbtn,.btn{border:0;color:#fff;background:#171728;border-radius:14px;padding:11px 14px;font-weight:800}
-.card{background:linear-gradient(145deg,#121224,#0e0e1c);border:1px solid #24243c;border-radius:20px;padding:15px;margin:10px 0;box-shadow:0 10px 35px #0005}
-.balance{display:flex;gap:10px}.balance .card{flex:1;text-align:center}.num{font-size:24px;font-weight:900}.muted{color:#9696ae;font-size:13px}
-.hero{padding:20px;border-radius:22px;background:linear-gradient(135deg,#2b1240,#111b38,#071e29);border:1px solid #35355b}
-.hero h1{margin:0 0 5px;font-size:26px}.hero p{margin:0;color:#bbb}
-.tabs{display:flex;gap:8px;overflow:auto;margin:14px 0}.tab{white-space:nowrap;border:1px solid #292940;background:#111120;color:#aaa;border-radius:13px;padding:9px 13px}.tab.active{background:#ff2f91;color:#fff;border-color:#ff2f91}
-.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.host{position:relative;overflow:hidden;padding:0}.host img{width:100%;height:210px;object-fit:cover;background:#1b1b2d}.hostbody{padding:12px}.online{color:#39ff91;font-size:12px;font-weight:800}.hostname{font-weight:900;font-size:17px}.rate{color:#ffd45c;margin:4px 0}.btn.primary{width:100%;background:linear-gradient(90deg,#ff2b8f,#7d5cff)}.btn.green{background:#16a66a}.btn.red{background:#d83361}.btn.cyan{background:#078da8}.btn:disabled{opacity:.45}
-input,select,textarea{width:100%;background:#0b0b18;border:1px solid #2b2b45;color:#fff;padding:12px;border-radius:12px;outline:none;margin:6px 0 10px}label{font-size:12px;color:#aaa}
-.row{display:flex;gap:8px;align-items:center}.row>*{flex:1}.actions{display:flex;gap:8px;flex-wrap:wrap}.actions .btn{flex:1;min-width:110px}
-.bottom{position:fixed;z-index:30;bottom:0;left:0;right:0;background:#0b0b16ee;backdrop-filter:blur(18px);border-top:1px solid #27273e;display:flex;justify-content:center}.bottomin{width:100%;max-width:720px;display:flex;justify-content:space-around}.nav{background:none;border:0;color:#888;padding:11px 8px;font-size:11px}.nav b{display:block;font-size:19px}.nav.active{color:#ff3b9d}
-.modal{display:none;position:fixed;z-index:50;inset:0;background:#000b;align-items:flex-end}.modal.show{display:flex}.sheet{width:100%;max-width:720px;margin:auto 0 0;background:#101020;border:1px solid #292940;border-radius:25px 25px 0 0;padding:18px;max-height:90vh;overflow:auto}.close{float:right;background:#27273a;color:#fff;border:0;border-radius:10px;padding:7px 11px}
-.call{display:none;position:fixed;z-index:100;inset:0;background:#05050b}.call.show{display:block}.remote{position:absolute;inset:0;background:#10101c}.local{position:absolute;right:12px;top:12px;width:120px;height:170px;background:#202033;border-radius:16px;overflow:hidden;border:2px solid #fff4}.video{width:100%;height:100%;object-fit:cover}.calltop{position:absolute;top:0;left:0;right:0;padding:18px;display:flex;justify-content:space-between;background:linear-gradient(#0009,transparent)}.timer{font-size:18px;font-weight:900;background:#0008;padding:8px 12px;border-radius:12px}.callbottom{position:absolute;bottom:20px;left:0;right:0;display:flex;justify-content:center;gap:12px}.circle{width:55px;height:55px;border-radius:50%;border:0;color:#fff;background:#25253a;font-size:22px}.circle.end{background:#e52e5e}.chatbox{max-height:180px;overflow:auto;background:#090914;border-radius:12px;padding:8px;margin-top:8px}.msg{padding:6px;border-bottom:1px solid #17172a;font-size:13px}
-.toast{position:fixed;z-index:200;left:50%;bottom:90px;transform:translateX(-50%);background:#202033;padding:12px 18px;border-radius:14px;display:none;max-width:90%;text-align:center}.toast.show{display:block}
-.empty{text-align:center;padding:30px;color:#85859d}.pricebtn{padding:12px;border:1px solid #33334b;background:#17172a;color:#fff;border-radius:13px}.pricebtn.selected{border-color:#ff3b9d;background:#32132a}
-@media(max-width:480px){.grid{grid-template-columns:1fr 1fr}.host img{height:175px}.num{font-size:20px}}
+*{box-sizing:border-box}body{margin:0;background:#080811;color:#fff;font-family:Arial,sans-serif;padding-bottom:78px}
+.app{max-width:760px;margin:auto;padding:14px}.top{display:flex;justify-content:space-between;align-items:center}
+.logo{font-size:23px;font-weight:900;background:linear-gradient(90deg,#ff2b91,#7b61ff,#00dfff);-webkit-background-clip:text;color:transparent}
+.card{background:#111120;border:1px solid #28283e;border-radius:20px;padding:15px;margin:10px 0}.hero{padding:20px;border-radius:23px;background:linear-gradient(135deg,#29103d,#111b38,#06222c)}
+h1,h2,h3,p{margin-top:0}.muted{color:#9999b0;font-size:13px}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.host{padding:0;overflow:hidden}.host img{width:100%;height:200px;object-fit:cover;background:#1a1a2b}.hostbody{padding:12px}.verified{color:#54dfff;font-weight:bold}.online{color:#38f58b;font-size:12px;font-weight:bold}
+.btn,.tab,.nav,.circle{border:0;color:#fff;font-weight:800}.btn{background:#24243a;padding:12px 14px;border-radius:13px}.primary{background:linear-gradient(90deg,#ff238c,#7d5cff)}.green{background:#13a86c}.red{background:#d63a63}.cyan{background:#078fa8}
+.actions{display:flex;gap:8px;flex-wrap:wrap}.actions .btn{flex:1}.row{display:flex;gap:8px;align-items:center}
+input,select{width:100%;background:#0a0a17;border:1px solid #2b2b44;color:#fff;padding:12px;border-radius:12px;margin:5px 0 9px}
+.tabs{display:flex;gap:8px;overflow:auto;margin:13px 0}.tab{white-space:nowrap;background:#131326;border:1px solid #292941;padding:10px 13px;border-radius:13px;color:#aaa}.tab.active{background:#ff2b91;color:#fff}
+.balance{display:flex;gap:10px}.balance .card{flex:1;text-align:center}.num{font-size:25px;font-weight:900}
+.bottom{position:fixed;z-index:30;bottom:0;left:0;right:0;background:#0b0b16ee;backdrop-filter:blur(15px);border-top:1px solid #29293d}.bottomin{max-width:760px;margin:auto;display:flex;justify-content:space-around}.nav{background:none;color:#888;padding:9px}.nav b{display:block;font-size:11px}.nav.active{color:#ff3b9d}
+.modal{display:none;position:fixed;z-index:50;inset:0;background:#000c;align-items:flex-end}.modal.show{display:flex}.sheet{width:100%;max-width:760px;margin:auto 0 0;background:#101020;border-radius:24px 24px 0 0;padding:18px;max-height:90vh;overflow:auto}.close{float:right;border:0;background:#29293d;color:#fff;border-radius:10px;padding:8px}
+.duration{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.duration button{padding:12px;border-radius:12px;border:1px solid #30304a;background:#17172a;color:#fff}.duration button.sel{border-color:#ff2991;background:#32132d}
+.call{display:none;position:fixed;z-index:100;inset:0;background:#05050a}.call.show{display:block}.remote{position:absolute;inset:0}.local{position:absolute;right:12px;top:12px;width:125px;height:175px;border:2px solid #fff4;border-radius:16px;overflow:hidden;background:#1d1d2d}.video{width:100%;height:100%;object-fit:cover}.calltop{position:absolute;left:0;right:0;top:0;padding:17px;display:flex;justify-content:space-between;background:linear-gradient(#000b,transparent)}.timer{background:#0009;border-radius:12px;padding:8px 12px;font-weight:900}.callbottom{position:absolute;bottom:18px;left:0;right:0;display:flex;justify-content:center;gap:12px}.circle{width:56px;height:56px;border-radius:50%;background:#29293b;font-size:21px}.circle.end{background:#e52e5e}
+.toast{position:fixed;z-index:200;left:50%;bottom:90px;transform:translateX(-50%);background:#222238;padding:12px 18px;border-radius:13px;display:none;max-width:92%;text-align:center}.toast.show{display:block}
+.live-card{position:relative;overflow:hidden}.live-dot{color:#ff3d67;font-weight:bold}.pill{display:inline-block;padding:5px 9px;border-radius:20px;background:#25253b;font-size:12px;margin:2px}
+@media(max-width:470px){.host img{height:175px}.duration{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body>
 <div class="app">
-<div class="top"><div class="logo">✦ VYNORA LIVE</div><button class="iconbtn" onclick="refreshAll()">↻</button></div>
-<div class="hero"><h1>Live Hosts 🎥</h1><p>Private 1v1 video sessions • Secure booking • Real-time timer</p></div>
+<div class="top"><div class="logo">✦ VYNORA LIVE</div><button class="btn" onclick="refreshAll()">↻</button></div>
+
+<div class="hero"><h1>Live Hosts 🎥</h1><p>1v1 Private Call • Public Live • Gifts • Secure Booking</p></div>
 <div class="balance"><div class="card">🪙<div class="num" id="tokens">0</div><div class="muted">Tokens</div></div><div class="card">💰<div class="num" id="earnings">₹0</div><div class="muted">Earnings</div></div></div>
-<div class="tabs"><button class="tab active" onclick="showSection('home',this)">🔥 Hosts</button><button class="tab" onclick="showSection('bookings',this)">📅 Bookings</button><button class="tab" onclick="showSection('history',this)">🧾 History</button><button class="tab" onclick="showSection('profile',this)">👤 Profile</button></div>
+
+<div class="tabs">
+<button class="tab active" onclick="section('home',this)">🔥 Hosts</button>
+<button class="tab" onclick="section('lives',this)">🔴 Live</button>
+<button class="tab" onclick="section('bookings',this)">📅 Bookings</button>
+<button class="tab" onclick="section('history',this)">🧾 History</button>
+<button class="tab" onclick="section('profile',this)">👤 Profile</button>
+</div>
 
 <section id="home">
-<div class="row"><input id="hostSearch" placeholder="🔎 Search host..." oninput="renderHosts()"><select id="hostFilter" onchange="renderHosts()"><option value="all">All</option><option value="online">Online</option></select></div>
-<div id="hosts" class="grid"><div class="empty">Loading hosts…</div></div>
+<div class="row"><input id="search" placeholder="🔎 Search host" oninput="renderHosts()"><select id="filter" onchange="renderHosts()"><option value="all">All</option><option value="online">Online</option><option value="verified">Verified</option></select></div>
+<div id="hosts" class="grid"><div class="muted">Loading…</div></div>
 </section>
 
-<section id="bookings" style="display:none"><div id="bookingList"><div class="empty">Loading bookings…</div></div></section>
-<section id="history" style="display:none"><div id="historyList"><div class="empty">Loading history…</div></div></section>
+<section id="lives" style="display:none"><div id="livesList"></div></section>
+<section id="bookings" style="display:none"><div id="bookingList"></div></section>
+<section id="history" style="display:none"><div id="historyList"></div></section>
 
 <section id="profile" style="display:none">
-<div class="card"><div class="row"><div><div class="muted">Telegram User</div><h2 id="profileName">User</h2><div class="muted" id="profileId"></div></div><button class="iconbtn" onclick="openModal('profileModal')">✏️</button></div></div>
+<div class="card"><div class="row"><div style="flex:1"><div class="muted">USER PROFILE</div><h2 id="profileName">User</h2><div id="profileBadge" class="pill">👤 User</div><div class="muted" id="profileId"></div></div><button class="btn" onclick="openModal('profileModal')">✏️</button></div></div>
 <div class="actions"><button class="btn primary" onclick="openRecharge()">🪙 Recharge</button><button class="btn cyan" onclick="openWithdraw()">💸 Withdraw</button><button class="btn" onclick="openHost()">👑 Host Panel</button></div>
-<div class="card"><h3>⚙️ Account</h3><p class="muted">Keep your Telegram account active. All private sessions are controlled by the server.</p><button class="btn" onclick="openModal('supportModal')">🆘 Support</button></div>
+<div class="card"><h3>🆘 Support</h3><p class="muted">Account, recharge, withdrawal ya call issue ke liye support.</p><a class="btn primary" style="display:block;text-align:center;text-decoration:none" href="https://t.me/VynoraSupport" target="_blank">Contact Support</a></div>
 </section>
 </div>
 
-<div class="bottom"><div class="bottomin"><button class="nav active" onclick="showSection('home',null,this)">🏠<b>Home</b></button><button class="nav" onclick="showSection('bookings',null,this)">📅<b>Bookings</b></button><button class="nav" onclick="showSection('history',null,this)">🧾<b>History</b></button><button class="nav" onclick="showSection('profile',null,this)">👤<b>Profile</b></button></div></div>
+<div class="bottom"><div class="bottomin">
+<button class="nav active" onclick="section('home',null,this)">🏠<b>Home</b></button>
+<button class="nav" onclick="section('lives',null,this)">🔴<b>Live</b></button>
+<button class="nav" onclick="section('bookings',null,this)">📅<b>Bookings</b></button>
+<button class="nav" onclick="section('profile',null,this)">👤<b>Profile</b></button>
+</div></div>
 
-<div id="bookingModal" class="modal"><div class="sheet"><button class="close" onclick="closeModal('bookingModal')">✕</button><h2>📞 Private Session</h2><div id="bookingHost"></div><p class="muted">Select duration</p><div class="actions" id="durationButtons"></div><button class="btn primary" style="width:100%;margin-top:12px" onclick="confirmBooking()">🔒 Book Private Call</button></div></div>
+<div id="bookingModal" class="modal"><div class="sheet"><button class="close" onclick="closeModal('bookingModal')">✕</button><h2>📞 Private 1v1</h2><div id="bookingHost"></div><h3>⏱️ Select Time</h3><div class="duration" id="duration"></div><button class="btn primary" style="width:100%;margin-top:12px" onclick="confirmBooking()">🔒 Confirm Booking</button></div></div>
 
-<div id="rechargeModal" class="modal"><div class="sheet"><button class="close" onclick="closeModal('rechargeModal')">✕</button><h2>🪙 Recharge</h2><p class="muted">UPI: <b>vynoralive@slc</b><br>Name: <b>RajnishKumar</b></p><input id="rechargeAmount" type="number" placeholder="Amount ₹"><input id="rechargeTxn" placeholder="Transaction ID"><input id="rechargeScreenshot" type="file" accept="image/*"><button class="btn primary" style="width:100%" onclick="submitRecharge()">Submit Recharge</button></div></div>
+<div id="profileModal" class="modal"><div class="sheet"><button class="close" onclick="closeModal('profileModal')">✕</button><h2>👤 My Profile</h2><p class="muted">Apni profile photo upload karein.</p><input id="photoFile" type="file" accept="image/*"><button class="btn primary" style="width:100%" onclick="uploadPhoto()">📸 Update Photo</button></div></div>
 
-<div id="withdrawModal" class="modal"><div class="sheet"><button class="close" onclick="closeModal('withdrawModal')">✕</button><h2>💸 Withdraw</h2><input id="withdrawAmount" type="number" placeholder="Amount ₹"><input id="withdrawUpi" placeholder="UPI ID"><button class="btn primary" style="width:100%" onclick="submitWithdraw()">Request Withdrawal</button></div></div>
+<div id="rechargeModal" class="modal"><div class="sheet"><button class="close" onclick="closeModal('rechargeModal')">✕</button><h2>🪙 Recharge</h2><p class="muted">UPI: <b>vynoralive@slc</b><br>Name: <b>RajnishKumar</b></p><input id="rchAmount" type="number" placeholder="Amount ₹"><input id="rchTxn" placeholder="Transaction ID"><input id="rchFile" type="file" accept="image/*"><button class="btn primary" style="width:100%" onclick="submitRecharge()">Submit Recharge</button></div></div>
 
-<div id="profileModal" class="modal"><div class="sheet"><button class="close" onclick="closeModal('profileModal')">✕</button><h2>👤 Profile</h2><input id="profilePhoto" type="file" accept="image/*"><button class="btn primary" style="width:100%" onclick="uploadPhoto()">Update Photo</button></div></div>
+<div id="withdrawModal" class="modal"><div class="sheet"><button class="close" onclick="closeModal('withdrawModal')">✕</button><h2>💸 Withdrawal</h2><p class="muted">Minimum ₹700 • Daily limit ₹3000</p><input id="wdAmount" type="number" placeholder="Amount ₹"><input id="wdUpi" placeholder="UPI ID"><button class="btn primary" style="width:100%" onclick="submitWithdraw()">Request Withdrawal</button></div></div>
 
-<div id="hostModal" class="modal"><div class="sheet"><button class="close" onclick="closeModal('hostModal')">✕</button><h2>👑 Host Panel</h2><div id="hostStatus">Loading…</div><label>Rate / minute</label><input id="hostRate" type="number" placeholder="30"><div class="actions"><button class="btn primary" onclick="updateHostRate()">Save Rate</button><button class="btn green" onclick="toggleHostLive()">Toggle Online</button></div><hr><h3>📥 Incoming Bookings</h3><div id="hostBookings">Loading…</div></div></div>
-
-<div id="supportModal" class="modal"><div class="sheet"><button class="close" onclick="closeModal('supportModal')">✕</button><h2>🆘 Vynora Support</h2><p>Technical/account help ke liye official support par contact karein.</p><a class="btn primary" style="display:block;text-align:center;text-decoration:none" href="https://t.me/VynoraSupport" target="_blank">Open @VynoraSupport</a></div></div>
+<div id="hostModal" class="modal"><div class="sheet"><button class="close" onclick="closeModal('hostModal')">✕</button><h2>👑 Verified Host Panel</h2><div id="hostStatus"></div><label>🪙 Token rate / minute</label><input id="hostRate" type="number"><button class="btn primary" style="width:100%" onclick="saveRate()">Save Rate</button><button class="btn green" style="width:100%;margin-top:8px" onclick="toggleOnline()">🟢 Online / Offline</button><hr><h3>🔴 Public Live</h3><input id="liveTitle" placeholder="Live title"><div class="row"><input id="privateCost" type="number" value="30" placeholder="Private Live join tokens"><button class="btn cyan" onclick="startLive()">Go Live</button></div><button class="btn red" style="width:100%;margin-top:8px" onclick="stopLive()">Stop Live</button><hr><h3>📥 Private Bookings</h3><div id="hostBookings"></div></div></div>
 
 <div id="callScreen" class="call">
 <div class="remote" id="remoteVideo"></div><div class="local" id="localVideo"></div>
-<div class="calltop"><b id="callPeer">Private Call</b><span class="timer" id="callTimer">Waiting…</span></div>
-<div class="callbottom"><button class="circle" onclick="toggleMic()">🎙️</button><button class="circle" onclick="toggleCam()">📹</button><button class="circle end" onclick="leaveCall()">📞</button></div>
+<div class="calltop"><b id="callPeer">Private Call</b><span class="timer" id="callTimer">Connecting…</span></div>
+<div class="callbottom"><button class="circle" onclick="toggleMic()">🎙️</button><button class="circle" onclick="toggleCam()">📹</button><button class="circle" onclick="openGift()">🎁</button><button class="circle end" onclick="leaveCall()">📞</button></div>
 </div>
+
+<div id="giftModal" class="modal"><div class="sheet"><button class="close" onclick="closeModal('giftModal')">✕</button><h2>🎁 Send Gift</h2><div class="duration"><button onclick="sendGift('🌹 Rose',10)">🌹 Rose<br>10 🪙</button><button onclick="sendGift('💎 Diamond',50)">💎 Diamond<br>50 🪙</button><button onclick="sendGift('👑 Crown',100)">👑 Crown<br>100 🪙</button><button onclick="sendGift('💖 Heart',30)">💖 Heart<br>30 🪙</button></div></div></div>
+
+<div id="liveCall" class="call"><div id="liveRemote" class="remote"></div><div class="calltop"><b id="livePeer">🔴 Public Live</b></div><div class="callbottom"><button class="circle" onclick="openGift()">🎁</button><button class="circle end" onclick="leavePublicLive()">📞</button></div></div>
 <div id="toast" class="toast"></div>
 
 <script>
-const tg=window.Telegram?.WebApp; try{tg?.ready();tg?.expand()}catch(e){}
+const tg=window.Telegram?.WebApp;try{tg?.ready();tg?.expand()}catch(e){}
 const userId=Number(tg?.initDataUnsafe?.user?.id||7001825467);
-let user={},hosts=[],selectedHost=null,selectedDuration=1,currentBookingId=null,pendingApprovedBooking=null;
-let agoraClient=null,localTracks=[],remoteUsers={},timerHandle=null,sessionPollHandle=null,callRole=null,participantRole=null,callStarted=false;
-const API=location.origin;
+let user={},hosts=[],selectedHost=null,selectedDuration=1;
+let currentBookingId=null,pendingBooking=null,agoraClient=null,localTracks=[],sessionPoll=null,participantRole=null;
+let currentGiftReceiver=0,currentGiftChannel='',liveAgoraClient=null,hostLiveAgoraClient=null,hostLiveChannel='',hostLiveActive=false;
 
-function toast(m){const e=document.getElementById('toast');e.textContent=m;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2600)}
-async function api(url,opt={}){const r=await fetch(url,opt);let d={};try{d=await r.json()}catch(e){}if(!r.ok)throw new Error(d.message||`HTTP ${r.status}`);return d}
+function $(id){return document.getElementById(id)}
+function toast(x){$('toast').textContent=x;$('toast').classList.add('show');setTimeout(()=>$('toast').classList.remove('show'),2500)}
 function esc(v){return String(v??'').replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]))}
-function showSection(id,tab,nav){['home','bookings','history','profile'].forEach(x=>document.getElementById(x).style.display=x===id?'block':'none');document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.nav').forEach(x=>x.classList.remove('active'));if(tab)tab.classList.add('active');if(nav)nav.classList.add('active')}
-function openModal(id){document.getElementById(id).classList.add('show')}
-function closeModal(id){document.getElementById(id).classList.remove('show')}
+async function api(url,opt={}){const r=await fetch(url,opt);let d={};try{d=await r.json()}catch(e){}if(!r.ok)throw Error(d.message||`HTTP ${r.status}`);return d}
+function openModal(id){$(id).classList.add('show')}function closeModal(id){$(id).classList.remove('show')}
+function section(id,tab,nav){['home','lives','bookings','history','profile'].forEach(x=>$(x).style.display=x===id?'block':'none');document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.nav').forEach(x=>x.classList.remove('active'));if(tab)tab.classList.add('active');if(nav)nav.classList.add('active')}
 
-async function loadUser(){
- try{user=await api(`/api/user/${userId}`);document.getElementById('tokens').textContent=user.tokens??user.balance??0;document.getElementById('earnings').textContent='₹'+(user.earnings??user.wallet??0);document.getElementById('profileName').textContent=user.name||user.first_name||`User #${userId}`;document.getElementById('profileId').textContent=`ID: ${userId}`;}catch(e){toast(e.message)}
-}
-async function loadHosts(){
- try{const d=await api('/api/hosts');hosts=Array.isArray(d)?d:(d.hosts||d.data||[]);renderHosts()}catch(e){document.getElementById('hosts').innerHTML='<div class="empty">Hosts load nahi ho paaye.</div>'}
-}
-function hostId(h){return h.user_id??h.host_id??h.id}
-function hostOnline(h){return h.is_online??h.online??h.live??h.status==='online'}
-function hostName(h){return h.name??h.host_name??`Host #${hostId(h)}`}
-function hostImg(h){return h.photo_url||h.profile_photo||h.image||h.photo||'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop'}
-function hostRate(h){return Number(h.rate??h.rate_per_minute??h.price_per_minute??30)}
-function renderHosts(){
- const q=(document.getElementById('hostSearch').value||'').toLowerCase(),f=document.getElementById('hostFilter').value;
- const arr=hosts.filter(h=>(!q||hostName(h).toLowerCase().includes(q))&&(f==='all'||hostOnline(h)));
- document.getElementById('hosts').innerHTML=arr.length?arr.map(h=>`<div class="card host"><img src="${esc(hostImg(h))}"><div class="hostbody"><div class="online">${hostOnline(h)?'● ONLINE':'○ OFFLINE'}</div><div class="hostname">${esc(hostName(h))}</div><div class="rate">🪙 ${hostRate(h)} / min</div><button class="btn primary" ${hostOnline(h)?'':'disabled'} onclick="openBooking(${JSON.stringify(String(hostId(h)))})">📞 Call</button></div></div>`).join(''):'<div class="empty">No hosts found.</div>';
-}
-function openBooking(id){selectedHost=hosts.find(h=>String(hostId(h))===String(id));if(!selectedHost)return;selectedDuration=1;document.getElementById('bookingHost').innerHTML=`<div class="card"><div class="row"><img src="${esc(hostImg(selectedHost))}" style="width:58px;height:58px;border-radius:14px;object-fit:cover"><div><b>${esc(hostName(selectedHost))}</b><div class="muted">🪙 ${hostRate(selectedHost)}/minute</div></div></div></div>`;document.getElementById('durationButtons').innerHTML=[1,5,10,15,20,25,30].map(m=>`<button class="pricebtn ${m===1?'selected':''}" onclick="selectDuration(${m},this)">${m} min<br><small>${m*hostRate(selectedHost)} 🪙</small></button>`).join('');openModal('bookingModal')}
-function selectDuration(m,b){selectedDuration=m;document.querySelectorAll('.pricebtn').forEach(x=>x.classList.remove('selected'));b.classList.add('selected')}
-async function confirmBooking(){
- if(!selectedHost)return;
- const hid=hostId(selectedHost),cost=selectedDuration*hostRate(selectedHost);
- try{const d=await api('/api/book-slot',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:userId,host_id:hid,host_name:hostName(selectedHost),duration_mins:selectedDuration,token_cost:cost})});
- closeModal('bookingModal');toast('✅ Booking sent. Host approval ka wait karein.');await refreshAll();if(d.booking_id)currentBookingId=d.booking_id}catch(e){toast(e.message)}
-}
-async function loadBookings(){
- try{const d=await api(`/api/user/bookings/${userId}`);const arr=Array.isArray(d)?d:(d.bookings||d.data||[]);document.getElementById('bookingList').innerHTML=arr.length?arr.map(b=>bookingHtml(b,false)).join(''):'<div class="empty">No bookings.</div>';const approved=arr.find(b=>['approved','active'].includes(String(b.status).toLowerCase())&&b.channel_name);if(approved&&!document.getElementById('callScreen').classList.contains('show')){pendingApprovedBooking=approved}}catch(e){console.log(e)}
-}
-function bookingHtml(b,hostSide){
- const status=String(b.status||'').toUpperCase(),dur=b.duration_mins??b.duration??1;
- const action=(!hostSide&&['APPROVED','ACTIVE'].includes(status))?`<button class="btn green" onclick="answerBooking('${esc(b.booking_id)}')">📞 Answer Call</button>`:'';
- return `<div class="card"><div class="row"><div style="flex:2"><b>${esc(b.host_name||b.user_name||'Private Call')}</b><div class="muted">⏱ ${dur} min • 🪙 ${b.token_cost??0}</div><div class="muted">${status}</div></div>${action}</div></div>`;
-}
-async function answerBooking(id){
- try{const d=await api(`/api/user/bookings/${userId}`);const arr=Array.isArray(d)?d:(d.bookings||[]);const b=arr.find(x=>String(x.booking_id)===String(id));if(!b)return toast('Booking nahi mili');pendingApprovedBooking=b;startCallWithTimer(b.channel_name,b.host_name||'Host',b.host_img||'',Number(b.duration_mins||1),'subscriber',b.booking_id,'user')}catch(e){toast(e.message)}
-}
-async function loadHistory(){
- try{const d=await api(`/api/user/bookings/${userId}`);const arr=Array.isArray(d)?d:(d.bookings||[]);document.getElementById('historyList').innerHTML=arr.length?arr.map(b=>`<div class="card"><b>${esc(b.host_name||'Private Call')}</b><div class="muted">${String(b.status||'').toUpperCase()} • ${b.duration_mins||1} min • ${b.booking_id||''}</div></div>`).join(''):'<div class="empty">No history.</div>'}catch(e){}
-}
-async function openHost(){
- openModal('hostModal');await loadHostStatus();await loadHostBookings()
-}
-async function loadHostStatus(){
- try{const d=await api(`/api/host/status/${userId}`);document.getElementById('hostStatus').innerHTML=`<div class="card">👑 ${d.is_host||d.registered?'Host Active':'Host not registered'}<br>🟢 ${d.is_online||d.online?'Online':'Offline'}</div>`;document.getElementById('hostRate').value=d.rate??d.rate_per_minute??30}catch(e){document.getElementById('hostStatus').textContent=e.message}
-}
-async function updateHostRate(){try{await api('/api/host/update-rate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:userId,rate:Number(document.getElementById('hostRate').value)})});toast('✅ Rate updated');loadHosts()}catch(e){toast(e.message)}}
-async function toggleHostLive(){try{await api(`/api/host/toggle-live/${userId}`,{method:'POST'});toast('✅ Status updated');loadHostStatus();loadHosts()}catch(e){toast(e.message)}}
-async function loadHostBookings(){
- try{const d=await api(`/api/host/bookings/${userId}`);const arr=Array.isArray(d)?d:(d.bookings||[]);document.getElementById('hostBookings').innerHTML=arr.length?arr.map(b=>`<div class="card"><b>👤 ${esc(b.user_name||'User #'+b.user_id)}</b><div class="muted">⏱ ${b.duration_mins||1} min • ${String(b.status||'').toUpperCase()}</div>${String(b.status)==='pending'?`<div class="actions"><button class="btn green" onclick="hostAction('${esc(b.booking_id)}','accept')">Accept</button><button class="btn red" onclick="hostAction('${esc(b.booking_id)}','reject')">Reject</button></div>`:''}</div>`).join(''):'<div class="empty">No bookings.</div>'}catch(e){document.getElementById('hostBookings').textContent=e.message}
-}
-async function hostAction(id,action){
- try{const d=await api(`/api/host/${action}-booking`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({booking_id:id,host_id:userId,user_id:userId})});toast(action==='accept'?'✅ Booking accepted':'Booking rejected');if(action==='accept'&&d.channel_name){const dur=Number(d.duration_mins||d.booking?.duration_mins||30);pendingApprovedBooking={booking_id:id,channel_name:d.channel_name,duration_mins:dur};startCallWithTimer(d.channel_name,'User','',dur,'publisher',id,'host')}else loadHostBookings()}catch(e){toast(e.message)}
-}
+async function loadUser(){try{user=await api(`/api/user/${userId}`);$('tokens').textContent=user.tokens??0;$('earnings').textContent='₹'+(user.earnings??0);$('profileName').textContent=user.name||`User #${userId}`;$('profileId').textContent=`ID: ${userId}`;$('profileBadge').textContent=user.verified?'✓ Verified Host':'👤 User'}catch(e){toast(e.message)}}
+async function loadHosts(){try{const d=await api('/api/hosts');hosts=d.hosts||[];renderHosts()}catch(e){$('hosts').innerHTML='<div class="muted">Hosts load nahi ho paaye.</div>'}}
+function hname(h){return h.name||`Host #${h.user_id}`}
+function himg(h){return h.photo_url||'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500'}
+function hrate(h){return Number(h.rate||30)}
+function renderHosts(){const q=($('search').value||'').toLowerCase(),f=$('filter').value;const a=hosts.filter(h=>(!q||hname(h).toLowerCase().includes(q))&&(f==='all'||(f==='online'&&h.is_online)||(f==='verified'&&h.verified)));$('hosts').innerHTML=a.length?a.map(h=>`<div class="card host"><img src="${esc(himg(h))}"><div class="hostbody"><div>${h.is_online?'🟢 <span class="online">ONLINE</span>':'⚫ OFFLINE'} ${h.verified?'<span class="verified">✓ Verified</span>':''}</div><h3>${esc(hname(h))}</h3><div class="muted">🪙 ${hrate(h)} tokens/min</div>${h.public_live?'<span class="pill">🔴 Public Live</span>':''}${h.private_live?`<span class="pill">🔐 Private Live ${h.private_live_cost} 🪙</span>`:''}<button class="btn primary" style="width:100%;margin-top:8px" ${h.is_online?'':'disabled'} onclick="openBooking(${h.user_id})">📞 Private Call</button>${h.public_live?`<button class="btn red" style="width:100%;margin-top:6px" onclick="joinPublic(${h.user_id})">🔴 Join Live</button>`:''}</div></div>`).join(''):'<div class="muted">No hosts found.</div>'}
 
-/* ==================== IMPORTANT PRIVATE CALL TIMER FLOW ====================
-   Timer is NOT started at booking or accept time.
-   /api/start-call is called only after the participant successfully joins Agora.
-   Backend starts session_started_at only when BOTH user and host have joined.
-*/
-async function notifyServerCallJoined(bookingId,role){
- if(!bookingId)return null;
- try{return await api('/api/start-call',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({booking_id:bookingId,user_id:userId,role})})}
- catch(e){console.error('start-call',e);return null}
-}
-async function startCallWithTimer(channelName,peerName,peerImg,durationMins,agoraRole,bookingId,participant){
- currentBookingId=bookingId;participantRole=participant;callRole=agoraRole;callStarted=false;
- document.getElementById('callPeer').textContent='📞 '+(peerName||'Private Call');document.getElementById('callTimer').textContent='Connecting…';document.getElementById('callScreen').classList.add('show');
- await startVideoCall(channelName,String(userId),agoraRole,bookingId,durationMins,participant);
-}
-async function startVideoCall(channelName,uid,role,bookingId,durationMins,participant){
+function openBooking(id){selectedHost=hosts.find(h=>Number(h.user_id)===Number(id));if(!selectedHost)return;selectedDuration=1;$('bookingHost').innerHTML=`<div class="card"><div class="row"><img src="${esc(himg(selectedHost))}" style="width:58px;height:58px;border-radius:14px;object-fit:cover"><div><b>${esc(hname(selectedHost))}</b><div class="verified">${selectedHost.verified?'✓ Verified Host':'Host'}</div><div class="muted">🪙 ${hrate(selectedHost)}/min</div></div></div></div>`;$('duration').innerHTML=[1,2,5,10,15,20,30].map(m=>`<button class="${m===1?'sel':''}" onclick="pickDuration(${m},this)">${m} Minute<br><small>${m*hrate(selectedHost)} 🪙</small></button>`).join('');openModal('bookingModal')}
+function pickDuration(m,b){selectedDuration=m;document.querySelectorAll('#duration button').forEach(x=>x.classList.remove('sel'));b.classList.add('sel')}
+async function confirmBooking(){if(!selectedHost)return;try{const d=await api('/api/book-slot',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:userId,host_id:selectedHost.user_id,host_name:hname(selectedHost),duration_mins:selectedDuration,token_cost:selectedDuration*hrate(selectedHost)})});closeModal('bookingModal');toast('✅ Booking sent. Host approval ka wait karein.');await refreshAll()}catch(e){toast(e.message)}}
+
+async function loadBookings(){try{const d=await api(`/api/user/bookings/${userId}`),a=d.bookings||[];$('bookingList').innerHTML=a.length?a.map(b=>{const st=String(b.status||'').toUpperCase();return `<div class="card"><div class="row"><div style="flex:1"><b>${esc(b.host_name||'Private Call')}</b><div class="muted">⏱ ${b.duration_mins} min • 🪙 ${b.token_cost}</div><div class="pill">${st}</div></div>${['APPROVED','ACTIVE'].includes(st)?`<button class="btn green" onclick="answerBooking('${esc(b.booking_id)}')">📞 Join</button>`:''}</div></div>`}).join(''):'<div class="muted">No bookings.</div>'}catch(e){}}
+async function answerBooking(id){try{const d=await api(`/api/user/bookings/${userId}`),b=(d.bookings||[]).find(x=>String(x.booking_id)===String(id));if(!b)return;pendingBooking=b;startPrivateCall(b,'user')}catch(e){toast(e.message)}}
+async function loadHistory(){try{const d=await api(`/api/user/bookings/${userId}`),a=d.bookings||[];$('historyList').innerHTML=a.map(b=>`<div class="card"><b>${esc(b.host_name||'Private Call')}</b><div class="muted">${String(b.status||'').toUpperCase()} • ${b.duration_mins} min • ${b.booking_id}</div></div>`).join('')||'<div class="muted">No history.</div>'}catch(e){}}
+
+async function openHost(){openModal('hostModal');await loadHostStatus();await loadHostBookings()}
+async function loadHostStatus(){try{const d=await api(`/api/host/status/${userId}`);$('hostRate').value=d.rate||30;$('privateCost').value=d.private_live_cost||30;$('hostStatus').innerHTML=`<div class="card">👑 ${d.verified?'✓ Verified Host':'Host'}<br>${d.is_online?'🟢 Online':'⚫ Offline'}<br>${d.public_live?'🔴 Public Live Active':'⚪ Public Live Off'}</div>`}catch(e){$('hostStatus').textContent=e.message}}
+async function saveRate(){try{await api('/api/host/update-rate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:userId,rate:Number($('hostRate').value)})});toast('✅ Rate updated');loadHosts()}catch(e){toast(e.message)}}
+async function toggleOnline(){try{await api(`/api/host/toggle-live/${userId}`,{method:'POST'});toast('✅ Online status updated');loadHostStatus();loadHosts()}catch(e){toast(e.message)}}
+async function loadHostBookings(){try{const d=await api(`/api/host/bookings/${userId}`),a=d.bookings||[];$('hostBookings').innerHTML=a.length?a.map(b=>`<div class="card"><b>👤 ${esc(b.user_name||'User #'+b.user_id)}</b><div class="muted">⏱ ${b.duration_mins} min • ${String(b.status).toUpperCase()}</div>${b.status==='pending'?`<div class="actions"><button class="btn green" onclick="hostAction('${b.booking_id}','accept')">Accept</button><button class="btn red" onclick="hostAction('${b.booking_id}','reject')">Reject</button></div>`:''}${['approved','active'].includes(b.status)?`<button class="btn cyan" style="width:100%;margin-top:7px" onclick="startPrivateCall(${JSON.stringify(b)},'host')">📞 Join User</button>`:''}</div>`).join(''):'<div class="muted">No bookings.</div>'}catch(e){}}
+async function hostAction(id,action){try{const d=await api(`/api/host/${action}-booking`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({booking_id:id,host_id:userId})});if(action==='accept'&&d.channel_name){const b={booking_id:id,channel_name:d.channel_name,duration_mins:d.duration_mins,host_name:'User'};toast('✅ Booking accepted');startPrivateCall(b,'host')}else{toast('Booking rejected');loadHostBookings()}}catch(e){toast(e.message)}}
+
+/* ============================================================
+   PRIVATE CALL:
+   Server timer starts only when BOTH participants have joined.
+   No countdown during pending/approval.
+   ============================================================ */
+async function notifyJoin(bookingId,role){return api('/api/start-call',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({booking_id:bookingId,user_id:userId,role})})}
+async function startPrivateCall(b,role){
+ currentBookingId=b.booking_id;pendingBooking=b;participantRole=role;$('callPeer').textContent=role==='host'?'📞 User Private Call':'📞 '+(b.host_name||'Host');$('callTimer').textContent='Connecting…';$('callScreen').classList.add('show');
  try{
-  const tokenData=await api(`/api/agora-token?channelName=${encodeURIComponent(channelName)}&uid=${encodeURIComponent(uid)}&role=${encodeURIComponent(role)}`);
-  const token=tokenData.token||tokenData.agora_token,appId=tokenData.appId||tokenData.app_id||tokenData.appID;
-  if(!appId||!token)throw new Error('Agora token nahi mila');
+  const td=await api(`/api/agora-token?channelName=${encodeURIComponent(b.channel_name)}&uid=${userId}&role=publisher&booking_id=${encodeURIComponent(b.booking_id)}&user_id=${userId}`);
   agoraClient=AgoraRTC.createClient({mode:'rtc',codec:'vp8'});
-  agoraClient.on('user-published',async(u,mediaType)=>{await agoraClient.subscribe(u,mediaType);remoteUsers[u.uid]=u;if(mediaType==='video'){const el=document.getElementById('remoteVideo');el.innerHTML='';u.videoTrack?.play(el)}if(mediaType==='audio')u.audioTrack?.play()});
-  agoraClient.on('user-unpublished',u=>{if(remoteUsers[u.uid])delete remoteUsers[u.uid]});
-  await agoraClient.join(appId,channelName,token,Number(uid));
-  // THIS is the real participant join point.
-  const joined=await notifyServerCallJoined(bookingId,participant);
-  if(role==='publisher'){
-   const mic=await AgoraRTC.createMicrophoneAudioTrack(),cam=await AgoraRTC.createCameraVideoTrack();localTracks=[mic,cam];cam.play(document.getElementById('localVideo'));await agoraClient.publish(localTracks)
-   // publish complete; notify again so backend sees the host/user as connected even if its first request raced.
-   await notifyServerCallJoined(bookingId,participant);
-  }
-  startServerSessionTimer(bookingId,durationMins);
- }catch(e){console.error(e);toast('❌ Call connect nahi hua: '+e.message);leaveCall(false)}
+  agoraClient.on('user-published',async(u,mt)=>{await agoraClient.subscribe(u,mt);if(mt==='video'){const el=$('remoteVideo');el.innerHTML='';u.videoTrack?.play(el)}if(mt==='audio')u.audioTrack?.play()});
+  await agoraClient.join(td.appId,b.channel_name,td.token,userId);
+  const join=await notifyJoin(b.booking_id,role);
+  // Both sides publish camera/mic. The backend does NOT start time until both join.
+  const mic=await AgoraRTC.createMicrophoneAudioTrack(),cam=await AgoraRTC.createCameraVideoTrack();localTracks=[mic,cam];cam.play($('localVideo'));await agoraClient.publish(localTracks);
+  await notifyJoin(b.booking_id,role);
+  startSessionTimer(b.booking_id);
+ }catch(e){toast('❌ Call connect nahi hua: '+e.message);await leaveCall(false)}
 }
-async function startServerSessionTimer(bookingId,durationMins){
- clearInterval(sessionPollHandle);clearInterval(timerHandle);
- async function poll(){
-  try{
-   const d=await api(`/api/session/${encodeURIComponent(bookingId)}`);
-   let remaining=Number(d.remaining_seconds??d.remaining??-1);
-   const active=Boolean(d.session_started_at||d.started||d.status==='active'||d.session_status==='active');
-   if(remaining<0 && !active){document.getElementById('callTimer').textContent='Waiting for other participant…';return}
-   if(remaining<0)remaining=Number(durationMins)*60;
-   if(active)callStarted=true;
-   if(remaining<=0){document.getElementById('callTimer').textContent='00:00';toast('⏱️ Session time complete');return leaveCall(true)}
-   const mm=Math.floor(remaining/60),ss=remaining%60;document.getElementById('callTimer').textContent=`${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
-  }catch(e){console.log('session poll',e)}
- }
- await poll();sessionPollHandle=setInterval(poll,1000);
-}
-async function cleanupAgoraCall(){
- clearInterval(timerHandle);clearInterval(sessionPollHandle);timerHandle=null;sessionPollHandle=null;
- try{localTracks.forEach(t=>{t.stop();t.close()});localTracks=[];if(agoraClient)await agoraClient.leave()}catch(e){}
- agoraClient=null;remoteUsers={};
- document.getElementById('localVideo').innerHTML='';document.getElementById('remoteVideo').innerHTML='';
-}
-async function leaveCall(complete=true){
- const bookingToComplete=currentBookingId;
- await cleanupAgoraCall();
- document.getElementById('callScreen').classList.remove('show');
- if(complete&&bookingToComplete){try{await api('/api/complete-booking',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({booking_id:bookingToComplete,user_id:userId})})}catch(e){console.log(e)}}
- currentBookingId=null;pendingApprovedBooking=null;callStarted=false;participantRole=null;await refreshAll();
-}
+async function startSessionTimer(id){
+ clearInterval(sessionPoll);let ticks=0;
+ async function poll(){try{const d=await api(`/api/session/${encodeURIComponent(id)}`);if(Number(d.remaining_seconds)<0){$('callTimer').textContent=d.host_joined&&d.user_joined?'Starting…':'Waiting for other participant…';return}let r=Math.max(0,Number(d.remaining_seconds));const m=Math.floor(r/60),s=r%60;$('callTimer').textContent=`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;if(r<=0){clearInterval(sessionPoll);toast('⏱️ Session complete');leaveCall(true)}}catch(e){}}await poll();sessionPoll=setInterval(poll,1000)}
+async function cleanupAgora(){clearInterval(sessionPoll);sessionPoll=null;try{localTracks.forEach(t=>{t.stop();t.close()});localTracks=[];if(agoraClient)await agoraClient.leave()}catch(e){}agoraClient=null;$('remoteVideo').innerHTML='';$('localVideo').innerHTML=''}
+async function leaveCall(complete=true){const id=currentBookingId;await cleanupAgora();$('callScreen').classList.remove('show');if(complete&&id){try{await api('/api/complete-booking',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({booking_id:id,user_id:userId})})}catch(e){}}currentBookingId=null;pendingBooking=null;participantRole=null;refreshAll()}
 async function toggleMic(){const t=localTracks.find(x=>x.trackMediaType==='audio');if(t)await t.setEnabled(!t.enabled)}
 async function toggleCam(){const t=localTracks.find(x=>x.trackMediaType==='video');if(t)await t.setEnabled(!t.enabled)}
 
-function openRecharge(){document.getElementById('rechargeAmount').value='';document.getElementById('rechargeTxn').value='';openModal('rechargeModal')}
-async function submitRecharge(){
- const amount=Number(document.getElementById('rechargeAmount').value),txn=document.getElementById('rechargeTxn').value.trim(),file=document.getElementById('rechargeScreenshot').files[0];
- if(!amount)return toast('Amount डालें');
+function openGift(){if(pendingBooking){currentGiftReceiver=participantRole==='host'?pendingBooking.user_id:pendingBooking.host_id;currentGiftChannel=pendingBooking.channel_name;openModal('giftModal');return}if(currentGiftReceiver&&currentGiftChannel){openModal('giftModal');return}toast('Gift is available inside a live/session')}
+async function sendGift(name,cost){try{await api('/api/send-gift',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({channel:currentGiftChannel,sender_id:userId,receiver_id:Number(currentGiftReceiver),gift_name:name,token_cost:cost})});closeModal('giftModal');toast(`🎁 ${name} sent`);loadUser()}catch(e){toast(e.message)}}
+
+async function startLive(){
  try{
-  let body={user_id:userId,amount,transaction_id:txn};
-  if(file){const fr=new FileReader();fr.onload=async()=>{body.screenshot=fr.result;await sendRecharge(body)};fr.readAsDataURL(file)}else await sendRecharge(body)
+  const d=await api('/api/public-live/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+   host_user_id:userId,
+   title:$('liveTitle').value||'🔴 Public Live',
+   private_enabled:true,
+   private_token_cost:Number($('privateCost').value||30)
+  })});
+  hostLiveChannel=d.channel_name;hostLiveActive=true;
+  const td=await api(`/api/agora-token?channelName=${encodeURIComponent(d.channel_name)}&uid=${userId}&role=publisher`);
+  hostLiveAgoraClient=AgoraRTC.createClient({mode:'rtc',codec:'vp8'});
+  hostLiveAgoraClient.on('user-published',async(u,mt)=>{});
+  await hostLiveAgoraClient.join(td.appId,d.channel_name,td.token,userId);
+  const mic=await AgoraRTC.createMicrophoneAudioTrack();
+  const cam=await AgoraRTC.createCameraVideoTrack();
+  window.hostLiveTracks=[mic,cam];
+  await hostLiveAgoraClient.publish([mic,cam]);
+  toast('🔴 Public Live started');
+  loadHosts();loadLives();loadHostStatus();
+ }catch(e){toast('❌ Live start: '+e.message)}
+}
+async function stopLive(){
+ try{
+  if(window.hostLiveTracks){window.hostLiveTracks.forEach(t=>{try{t.stop();t.close()}catch(e){}});window.hostLiveTracks=[]}
+  if(hostLiveAgoraClient){await hostLiveAgoraClient.leave();hostLiveAgoraClient=null}
+  await api(`/api/public-live/stop/${userId}`,{method:'POST'});
+  hostLiveActive=false;hostLiveChannel='';
+  toast('Live stopped');loadHosts();loadLives();loadHostStatus()
  }catch(e){toast(e.message)}
 }
-async function sendRecharge(body){try{await api('/api/recharge',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});closeModal('rechargeModal');toast('✅ Recharge request submitted');}catch(e){toast(e.message)}}
-function openWithdraw(){openModal('withdrawModal')}
-async function submitWithdraw(){try{await api('/api/withdraw',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:userId,amount:Number(document.getElementById('withdrawAmount').value),upi_id:document.getElementById('withdrawUpi').value.trim()})});closeModal('withdrawModal');toast('✅ Withdrawal request submitted');loadUser()}catch(e){toast(e.message)}}
-async function uploadPhoto(){const f=document.getElementById('profilePhoto').files[0];if(!f)return toast('Photo select karein');const fr=new FileReader();fr.onload=async()=>{try{await api('/api/update-profile-photo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:userId,photo:fr.result,filename:f.name})});closeModal('profileModal');toast('✅ Photo updated');loadUser()}catch(e){toast(e.message)}};fr.readAsDataURL(f)}
+async function loadLives(){try{const d=await api('/api/public-live'),a=d.lives||[];$('livesList').innerHTML=a.length?a.map(x=>`<div class="card live-card"><h3><span class="live-dot">● LIVE</span> ${esc(x.host_name)}</h3><div class="muted">${esc(x.title)}</div>${x.private_enabled?`<span class="pill">🔐 Private Join ${x.private_live_cost} 🪙</span>`:''}<div class="actions" style="margin-top:10px"><button class="btn red" onclick="joinPublic(${x.host_user_id})">🔴 Watch Live</button>${x.private_enabled?`<button class="btn primary" onclick="joinPrivateLive(${x.host_user_id})">🔐 Join Private</button>`:''}</div></div>`).join(''):'<div class="muted">Abhi koi public live nahi hai.</div>'}catch(e){$('livesList').innerHTML='<div class="muted">Live list load nahi hui.</div>'}}
+async function joinPrivateLive(hostId){try{const d=await api('/api/public-live/join-private',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:userId,host_user_id:hostId})});currentGiftReceiver=Number(hostId);currentGiftChannel=d.channel_name;await openPublicAgora(d.token,d.appId,d.channel_name,`🔐 Private Live • Host #${hostId}`);loadUser()}catch(e){toast(e.message)}}
+async function joinPublic(hostId){try{const ch=`host_live_${hostId}`;const d=await api(`/api/agora-token?channelName=${encodeURIComponent(ch)}&uid=${userId}&role=subscriber`);currentGiftReceiver=Number(hostId);currentGiftChannel=ch;await openPublicAgora(d.token,d.appId,ch,'🔴 Public Live');}catch(e){toast(e.message)}}
+async function openPublicAgora(token,appId,ch,title){$('livePeer').textContent=title;$('liveCall').classList.add('show');liveAgoraClient=AgoraRTC.createClient({mode:'rtc',codec:'vp8'});liveAgoraClient.on('user-published',async(u,mt)=>{await liveAgoraClient.subscribe(u,mt);if(mt==='video')u.videoTrack?.play($('liveRemote'));if(mt==='audio')u.audioTrack?.play()});await liveAgoraClient.join(appId,ch,token,userId)}
+async function leavePublicLive(){try{if(liveAgoraClient)await liveAgoraClient.leave()}catch(e){}liveAgoraClient=null;$('liveCall').classList.remove('show');$('liveRemote').innerHTML='';currentGiftReceiver=0;currentGiftChannel=''}
 
-async function refreshAll(){await Promise.all([loadUser(),loadHosts(),loadBookings(),loadHistory()]);if(document.getElementById('hostModal').classList.contains('show'))loadHostBookings()}
-setInterval(loadBookings,5000);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshAll()});
-refreshAll();
+function openRecharge(){$('rchAmount').value='';openModal('rechargeModal')}
+function fileData(file){return new Promise((res,rej)=>{if(!file)return res('');const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(file)})}
+async function submitRecharge(){try{const amount=Number($('rchAmount').value),f=$('rchFile').files[0];const shot=await fileData(f);await api('/api/recharge',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:userId,amount,transaction_id:$('rchTxn').value,screenshot:shot})});closeModal('rechargeModal');toast('✅ Recharge request submitted')}catch(e){toast(e.message)}}
+function openWithdraw(){openModal('withdrawModal')}
+async function submitWithdraw(){try{await api('/api/withdraw',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:userId,amount:Number($('wdAmount').value),upi_id:$('wdUpi').value})});closeModal('withdrawModal');toast('✅ Withdrawal request submitted');loadUser()}catch(e){toast(e.message)}}
+async function uploadPhoto(){try{const f=$('photoFile').files[0];if(!f)return toast('Photo select karein');const photo=await fileData(f);const d=await api('/api/update-profile-photo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:userId,photo,filename:f.name})});closeModal('profileModal');toast('✅ Profile photo updated');loadUser()}catch(e){toast('❌ Photo upload: '+e.message)}}
+
+async function refreshAll(){await Promise.all([loadUser(),loadHosts(),loadBookings(),loadHistory(),loadLives()]);if($('hostModal').classList.contains('show')){loadHostStatus();loadHostBookings()}}
+setInterval(loadBookings,5000);setInterval(loadLives,5000);refreshAll();
 </script>
 </body>
 </html>
