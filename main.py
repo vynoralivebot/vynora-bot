@@ -877,9 +877,9 @@ def telegram_polling_worker():
                     "telegram_started": True,
                 }})
 
-                if is_admin(sender_id) and text.startswith("/"):
-                    admin_command(chat_id, text)
-                elif text.startswith("/start"):
+                # /start and /help must work for admins too.
+                # Admin-only command handling comes after these normal user commands.
+                if text.startswith("/start"):
                     telegram_start_message(chat_id, first_name, sender.get("username", ""), first_start=not was_started)
                 elif text.startswith("/help"):
                     telegram_send(chat_id,
@@ -889,6 +889,8 @@ def telegram_polling_worker():
                         "🔴 Hosts can start Public Live\n"
                         "🎁 Gifts are available during live/calls."
                     )
+                elif is_admin(sender_id) and text.startswith("/"):
+                    admin_command(chat_id, text)
                 else:
                     telegram_send(chat_id,
                         "👋 Vynora Live me welcome!\n\n"
@@ -1402,10 +1404,7 @@ def complete_booking(data: CompleteBookingModel):
     if data.user_id is not None and int(data.user_id) not in [int(b["user_id"]), int(b["host_id"])]:
         raise HTTPException(403, "Not a participant")
     bookings_col.update_one(
-        {"_id": b["_id"], "session_status": {"$ne": "completed"}},
-        {"$set": {"status": "completed", "session_status": "completed", "session_ended_at": now()}},
-    )
-    credit_host_once(b)
+        {"_id": b["_id"], "session_status": {"
 
 
 
