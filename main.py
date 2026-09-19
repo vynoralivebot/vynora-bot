@@ -1372,7 +1372,8 @@ def start_call(data: StartCallModel):
         raise HTTPException(400, "Booking is not approved")
 
     scheduled_start = float(b.get("scheduled_start", 0) or 0)
-    scheduled_end = float(b.get("scheduled_end", scheduled_start + i
+    scheduled_end = float(
+        b.get("scheduled_end", scheduled_
 
 
 
