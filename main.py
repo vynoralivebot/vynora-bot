@@ -51,7 +51,7 @@ AGORA_APP_CERTIFICATE = os.getenv("AGORA_APP_CERTIFICATE", "").strip()
 WEB_APP_URL = os.getenv("WEB_APP_URL", "").strip()
 ADMIN_IDS = {int(x.strip()) for x in os.getenv("ADMIN_IDS", "7778606261,7001825467").split(",") if x.strip().isdigit()}
 
-# Telegram workflow groups / team access. Add these in Render Environment.
+# Telegram workflow groups. Add these in Render Environment.
 GROUP_1_ID = os.getenv("GROUP_1_ID", os.getenv("HOST_RECHARGE_GROUP_ID", "")).strip()
 GROUP_2_ID = os.getenv("GROUP_2_ID", os.getenv("NEW_USER_GROUP_ID", "")).strip()
 GROUP_3_ID = os.getenv("GROUP_3_ID", os.getenv("TEAM_GROUP_ID", "")).strip()
@@ -67,13 +67,15 @@ GROUP2 = _group_id(GROUP_2_ID)
 GROUP3 = _group_id(GROUP_3_ID)
 
 
-PLATFORM_CUT = float(os.getenv("PLATFORM_CUT", "0.30"))
-AGENCY_CUT = float(os.getenv("AGENCY_CUT", "0.10"))
+HOST_SHARE = min(1.0, max(0.0, float(os.getenv("HOST_SHARE", "0.60"))))
+PLATFORM_CUT = 1.0 - HOST_SHARE
+AGENCY_CUT = 0.0
 DEFAULT_RATE = int(os.getenv("DEFAULT_RATE", "30"))
 UPI_ID = os.getenv("UPI_ID", "vynoralive@slc").strip()
 UPI_NAME = os.getenv("UPI_NAME", "RajnishKumar").strip()
 REQUIRE_USER_APPROVAL = os.getenv("REQUIRE_USER_APPROVAL", "false").lower() == "true"
-RECHARGE_PLANS = {50: 100, 100: 220, 300: 700, 500: 1200, 1000: 2500, 2000: 5200}
+RECHARGE_PLANS = {50: 50, 100: 105, 200: 210, 300: 320, 500: 550, 1000: 1150, 1500: 1750, 2000: 2400}
+BOOKING_PRICES = {1: 20, 3: 50, 6: 100, 10: 160, 15: 240, 20: 320, 30: 450}
 MAX_BOOKING_MINUTES = 30
 
 UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "./uploads"))
@@ -159,6 +161,7 @@ class BookingModel(BaseModel):
     host_name: str = ""
     duration_mins: int = Field(ge=1, le=30)
     token_cost: int = Field(ge=1)
+    scheduled_start: float = Field(gt=0)
 
 
 class ActionBookingModel(BaseModel):
@@ -181,6 +184,11 @@ class CompleteBookingModel(BaseModel):
 class RateModel(BaseModel):
     user_id: int
     rate: int = Field(ge=1, le=100000)
+
+
+class PrivateFeeModel(BaseModel):
+    user_id: int
+    private_live_cost: int = Field(ge=1, le=100000)
 
 
 class WithdrawModel(BaseModel):
@@ -285,6 +293,7 @@ def normalize_host(h):
         "public_live": bool(h.get("public_live", False)),
         "private_live": bool(h.get("private_live", False)),
         "private_live_cost": int(h.get("private_live_cost", 30)),
+        "host_total_coins": int(h.get("host_total_coins", 0)),
         "dummy": bool(h.get("dummy", False)),
     }
 
@@ -367,6 +376,44 @@ def telegram_send(chat_id, text, reply_markup=None):
     if reply_markup:
         payload["reply_markup"] = reply_markup
     return telegram_api("sendMessage", payload)
+
+
+def call_webapp_keyboard():
+    if not WEB_APP_URL:
+        return None
+    return {"inline_keyboard": [[{"text": "📞 Open Vynora Live", "web_app": {"url": WEB_APP_URL}}]]}
+
+def booking_time_text(ts):
+    try:
+        return datetime.fromtimestamp(float(ts), ZoneInfo("Asia/Kolkata")).strftime("%d %b %Y, %I:%M %p")
+    except Exception:
+        return "-"
+
+def notify_booking_accepted(b):
+    text=("✅ BOOKING ACCEPTED\n\n"
+          f"👤 Host: {b.get('host_name','Host')}\n"
+          f"⏱️ Duration: {b.get('duration_mins',1)} minutes\n"
+          f"💵 Booking: ₹{b.get('booking_price_inr',b.get('token_cost',0))}\n"
+          f"🕐 Time: {booking_time_text(b.get('scheduled_start'))}\n\n"
+          "📞 Call will become available at the booked time.\n"
+          "Both participants must join for the timer to start.")
+    telegram_send(int(b["user_id"]), text, call_webapp_keyboard())
+    telegram_send(int(b["host_id"]), "✅ BOOKING CONFIRMED\n\n"
+                  f"👤 User: {user_name(int(b['user_id']))}\n"
+                  f"⏱️ Duration: {b.get('duration_mins',1)} minutes\n"
+                  f"💵 Booking: ₹{b.get('booking_price_inr',b.get('token_cost',0))}\n"
+                  f"🕐 Time: {booking_time_text(b.get('scheduled_start'))}\n\n"
+                  "📞 Join at the booked time. The timer starts only after both participants join.", call_webapp_keyboard())
+
+def notify_booking_start(b):
+    telegram_send(int(b["user_id"]), "📞 YOUR BOOKING IS READY\n\n"
+                  f"👤 Host: {b.get('host_name','Host')}\n"
+                  f"⏱️ {b.get('duration_mins',1)} minutes\n\n"
+                  "Join now. The session timer starts when both you and the host are connected.", call_webapp_keyboard())
+    telegram_send(int(b["host_id"]), "📞 BOOKING IS READY\n\n"
+                  f"👤 User: {user_name(int(b['user_id']))}\n"
+                  f"⏱️ {b.get('duration_mins',1)} minutes\n\n"
+                  "Join now. The session timer starts when both participants are connected.", call_webapp_keyboard())
 
 
 def india_now_text():
@@ -493,7 +540,7 @@ def has_live_access(user_id: int) -> bool:
         return True
     u = users_col.find_one({"user_id": int(user_id)}) or {}
     h = hosts_col.find_one({"user_id": int(user_id)}) or {}
-    return bool(u.get("live_access") or h.get("live_access") or (h.get("is_host") and h.get("verified")))
+    return bool(u.get("live_access") or h.get("live_access"))
 
 
 def admin_help_text():
@@ -940,7 +987,8 @@ def get_user(user_id: int):
         "admin_display_name": "VYNORA ADMIN" if is_admin(user_id) else "",
         "live_access": has_live_access(user_id),
         "host_total_calls": host_calls,
-        "host_total_tokens": host_tokens,
+        "host_total_tokens": int(u.get("host_total_coins", host_tokens)),
+        "host_private_live_cost": int(u.get("private_live_cost", 30)),
     }
 
 
@@ -965,7 +1013,8 @@ def public_config():
         "upi_name": UPI_NAME,
         "support": "https://t.me/VynoraSupport",
         "recharge_plans": [{"amount": a, "tokens": t} for a, t in RECHARGE_PLANS.items()],
-        "private_durations": [1, 2, 5, 10, 15, 20, 30],
+        "booking_plans": [{"minutes": m, "price": p} for m, p in BOOKING_PRICES.items()],
+        "host_share_percent": int(round(HOST_SHARE * 100)),
         "admin_badge": "👑 VYNORA ADMIN",
         "host_badge": "✓ VERIFIED HOST",
         "team_badge": "",
@@ -1043,7 +1092,7 @@ def host_status(user_id: int):
     if not h:
         return {
             "is_host": False, "registered": False, "is_online": False,
-            "verified": False, "rate": DEFAULT_RATE
+            "verified": False, "rate": DEFAULT_RATE, "private_live_cost": 30, "host_total_coins": 0
         }
     n = normalize_host(h)
     return {
@@ -1057,6 +1106,7 @@ def host_status(user_id: int):
         "public_live": n["public_live"],
         "private_live": n["private_live"],
         "private_live_cost": n["private_live_cost"],
+        "host_total_coins": n.get("host_total_coins", 0),
     }
 
 
@@ -1076,7 +1126,7 @@ def register_host(data: HostRegisterModel):
         "approved": bool(existing.get("approved", False)),
         "application_status": "approved" if existing.get("verified") else "pending",
         "is_online": False, "public_live": False, "private_live": False,
-        "private_live_cost": int(existing.get("private_live_cost", 30)),
+        "private_live_cost": int(data.rate or existing.get("private_live_cost", 30) or 30),
         "photo_url": photo,
         "age": data.age, "country": data.country, "language": data.language,
         "experience": data.experience, "availability": data.availability,
@@ -1090,6 +1140,7 @@ def register_host(data: HostRegisterModel):
         "name": doc["name"], "photo_url": photo,
         "host_application": True, "host_approved": bool(doc["verified"]),
         "is_host": bool(doc["verified"]), "verified": bool(doc["verified"]),
+        "private_live_cost": doc["private_live_cost"],
     }})
     if not doc["verified"] and existing_status != "pending":
         notify_host_application(doc)
@@ -1105,6 +1156,18 @@ def update_host_rate(data: RateModel):
     if result.matched_count == 0:
         raise HTTPException(404, "Host not registered")
     return {"status": "success", "rate": data.rate}
+
+
+@APP.post("/api/host/update-private-fee")
+def update_private_fee(data: PrivateFeeModel):
+    h = host_doc(data.user_id)
+    if not h or not h.get("is_host") or not h.get("verified"):
+        raise HTTPException(403, "Verified host only")
+    fee = int(data.private_live_cost)
+    hosts_col.update_one({"user_id": data.user_id}, {"$set": {"private_live_cost": fee, "updated_at": now()}})
+    users_col.update_one({"user_id": data.user_id}, {"$set": {"private_live_cost": fee}})
+    live_col.update_one({"host_user_id": data.user_id, "active": True}, {"$set": {"private_live_cost": fee, "private_enabled": True}})
+    return {"status": "success", "private_live_cost": fee}
 
 
 @APP.post("/api/host/toggle-live/{user_id}")
@@ -1126,23 +1189,32 @@ def book_slot(data: BookingModel):
         u = ensure_user(data.user_id)
         if not u.get("approved"):
             raise HTTPException(403, "Your account is awaiting admin approval")
-    if data.duration_mins not in [1, 2, 5, 10, 15, 20, 30]:
-        raise HTTPException(400, "Select a valid session duration")
+    if data.duration_mins not in BOOKING_PRICES:
+        raise HTTPException(400, "Select a valid booking duration")
+    if data.scheduled_start < now() - 30:
+        raise HTTPException(400, "Please select a future date and time")
     h = host_doc(oid_int(data.host_id))
     if oid_int(data.host_id) < 0:
         raise HTTPException(400, "This demo host is from another country and cannot be booked")
     if not h or not h.get("is_host", True):
         raise HTTPException(404, "Host not found")
     host_id = int(h["user_id"])
-    if not bool(h.get("is_online", h.get("online", False))):
-        raise HTTPException(400, "Host is offline")
     if host_id == data.user_id:
         raise HTTPException(400, "Self booking is not allowed")
 
-    rate = int(h.get("rate") or DEFAULT_RATE)
-    real_cost = calculate_cost(rate, data.duration_mins)
-    if data.token_cost != real_cost:
-        data.token_cost = real_cost
+    real_cost = int(BOOKING_PRICES[data.duration_mins])
+    scheduled_end = float(data.scheduled_start) + int(data.duration_mins) * 60
+
+    # Reject overlapping pending/approved/active bookings for the same host.
+    for existing in bookings_col.find({
+        "host_id": host_id,
+        "status": {"$in": ["pending", "approved", "active"]},
+        "scheduled_start": {"$exists": True},
+    }, {"scheduled_start": 1, "duration_mins": 1}):
+        ex_start = float(existing.get("scheduled_start", 0))
+        ex_end = float(existing.get("scheduled_end", ex_start + int(existing.get("duration_mins", 1)) * 60))
+        if ex_start < scheduled_end and ex_end > float(data.scheduled_start):
+            raise HTTPException(409, "This host already has a booking at that time")
 
     # Atomic token deduction prevents double spending.
     user = users_col.find_one_and_update(
@@ -1162,7 +1234,10 @@ def book_slot(data: BookingModel):
         "host_name": h.get("name") or data.host_name or f"Host #{host_id}",
         "host_img": h.get("photo_url", ""),
         "duration_mins": int(data.duration_mins),
+        "booking_price_inr": real_cost,
         "token_cost": real_cost,
+        "scheduled_start": float(data.scheduled_start),
+        "scheduled_end": scheduled_end,
         "channel_name": channel,
         "status": "pending",
         "session_status": "waiting",
@@ -1177,7 +1252,8 @@ def book_slot(data: BookingModel):
     }
     bookings_col.insert_one(doc)
     return {"status": "success", "booking_id": booking_id, "channel_name": channel,
-            "duration_mins": data.duration_mins, "token_cost": real_cost}
+            "duration_mins": data.duration_mins, "booking_price_inr": real_cost,
+            "token_cost": real_cost, "scheduled_start": float(data.scheduled_start)}
 
 
 def _find_booking(booking_id: str):
@@ -1238,6 +1314,7 @@ def accept_common(booking_id: str, host_id: int):
     )
     if not updated:
         raise HTTPException(409, "Booking was already accepted/rejected")
+    notify_booking_accepted(updated)
     return updated
 
 
@@ -1268,6 +1345,9 @@ def reject_booking(data: ActionBookingModel):
     bookings_col.update_one({"_id": b["_id"]}, {"$set": {"status": "rejected", "session_status": "rejected"}})
     # Refund exactly once.
     users_col.update_one({"user_id": int(b["user_id"])}, {"$inc": {"tokens": int(b["token_cost"])}})
+    telegram_send(int(b["user_id"]), "❌ BOOKING DECLINED\n\n"
+                  f"Host: {b.get('host_name','Host')}\n"
+                  f"₹{b.get('booking_price_inr',b.get('token_cost',0))} / {b.get('duration_mins',1)} min was refunded to your token wallet.")
     return {"status": "success"}
 
 
@@ -1291,126 +1371,8 @@ def start_call(data: StartCallModel):
     if b.get("status") not in ("approved", "active"):
         raise HTTPException(400, "Booking is not approved")
 
-    stamp = now()
-    field = "user_joined_at" if role == "user" else "host_joined_at"
-    bookings_col.update_one(
-        {"_id": b["_id"], "$or": [{field: None}, {field: {"$exists": False}}]},
-        {"$set": {field: stamp}},
-    )
-
-    # Re-read after recording this participant.
-    b = bookings_col.find_one({"_id": b["_id"]})
-    both = b.get("user_joined_at") is not None and b.get("host_joined_at") is not None
-
-    if both and not b.get("session_started_at"):
-        # Atomic: only the first request can establish the official start.
-        actual_start = max(float(b["user_joined_at"]), float(b["host_joined_at"]))
-        bookings_col.update_one(
-            {
-                "_id": b["_id"],
-                "session_status": "waiting",
-                "$or": [{"session_started_at": None}, {"session_started_at": {"$exists": False}}],
-            },
-            {"$set": {
-                "session_started_at": actual_start,
-                "session_status": "active",
-                "status": "active",
-            }},
-        )
-        b = bookings_col.find_one({"_id": b["_id"]})
-
-    remaining = remaining_for_booking(b)
-    return {
-        "status": "success",
-        "role": role,
-        "user_joined": b.get("user_joined_at") is not None,
-        "host_joined": b.get("host_joined_at") is not None,
-        "session_started_at": b.get("session_started_at"),
-        "remaining_seconds": remaining,
-        "session_status": b.get("session_status", "waiting"),
-    }
-
-
-@APP.get("/api/session/{booking_id}")
-def get_session(booking_id: str):
-    b = _find_booking(booking_id)
-    if not b:
-        raise HTTPException(404, "Booking not found")
-
-    remaining = remaining_for_booking(b)
-    if b.get("session_started_at") and remaining is not None and remaining <= 0:
-        _complete_expired(b)
-        b = bookings_col.find_one({"_id": b["_id"]}) or b
-        remaining = 0
-
-    return {
-        "status": "success",
-        "booking_id": booking_id,
-        "session_status": b.get("session_status", "waiting"),
-        "booking_status": b.get("status"),
-        "session_started_at": b.get("session_started_at"),
-        "user_joined": b.get("user_joined_at") is not None,
-        "host_joined": b.get("host_joined_at") is not None,
-        "remaining_seconds": remaining if remaining is not None else -1,
-        "duration_mins": int(b.get("duration_mins", 1)),
-    }
-
-
-def credit_host_once(b):
-    if b.get("earnings_credited"):
-        return
-    gross = float(b.get("token_cost", 0))
-    host_share = gross * (1.0 - PLATFORM_CUT)
-    agency = host_share * AGENCY_CUT
-    final_host = host_share - agency
-
-    result = bookings_col.update_one(
-        {"_id": b["_id"], "earnings_credited": {"$ne": True}},
-        {"$set": {
-            "earnings_credited": True,
-            "platform_share": gross * PLATFORM_CUT,
-            "host_share": host_share,
-            "agency_commission": agency,
-            "host_final": final_host,
-        }},
-    )
-    if result.modified_count:
-        hosts_col.update_one({"user_id": int(b["host_id"])}, {"$inc": {"earnings": final_host}})
-        users_col.update_one({"user_id": int(b["host_id"])}, {"$inc": {"earnings": final_host}})
-
-
-def _complete_expired(b):
-    bookings_col.update_one(
-        {"_id": b["_id"], "session_status": {"$in": ["active", "waiting"]}},
-        {"$set": {"status": "completed", "session_status": "completed", "session_ended_at": now()}},
-    )
-    credit_host_once(b)
-    hosts_col.update_one({"user_id": int(b["host_id"])}, {"$set": {"is_online": True, "online": True}})
-
-
-@APP.post("/api/complete-booking")
-def complete_booking(data: CompleteBookingModel):
-    b = _find_booking(data.booking_id)
-    if not b:
-        raise HTTPException(404, "Booking not found")
-    if data.user_id is not None and int(data.user_id) not in [int(b["user_id"]), int(b["host_id"])]:
-        raise HTTPException(403, "Not a participant")
-    bookings_col.update_one(
-        {"_id": b["_id"], "session_status": {"$ne": "completed"}},
-        {"$set": {"status": "completed", "session_status": "completed", "session_ended_at": now()}},
-    )
-    credit_host_once(b)
-    hosts_col.update_one({"user_id": int(b["host_id"])}, {"$set": {"is_online": True, "online": True}})
-    return {"status": "success"}
-
-
-# ------------------------- Agora --------------------------------
-
-def make_agora_token(channel: str, uid: int, ttl: int = 3600):
-    if not AGORA_APP_ID or not AGORA_APP_CERTIFICATE:
-        raise HTTPException(500, "Agora credentials are not configured")
-    if RtcTokenBuilder is None:
-        raise HTTPException(500, "agora-token-builder package is missing")
+    scheduled_start = float(b.get("scheduled_start", 0) or 0)
+    scheduled_end = float(b.get("scheduled_end", scheduled_start + i
 
 
 
