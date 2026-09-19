@@ -1373,7 +1373,6 @@ def start_call(data: StartCallModel):
 
     scheduled_start = float(b.get("scheduled_start", 0) or 0)
     scheduled_end = float(
-        b.get("scheduled_end", scheduled_
 
 
 
