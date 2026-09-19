@@ -7,7 +7,8 @@ import threading
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -253,10 +254,17 @@ def remaining_for_booking(b):
     return max(0, int(started + duration - now()))
 
 
+# Render start command uses: uvicorn main:app
+app = APP
+
 # ------------------------- Health -----------------------------
 
 @APP.get("/")
 def root():
+    # Telegram Mini App / browser entry point.
+    index_file = Path(__file__).with_name("index.html")
+    if index_file.exists():
+        return FileResponse(str(index_file), media_type="text/html")
     return {"status": "ok", "service": "vynora-live"}
 
 
@@ -949,6 +957,19 @@ def expiry_worker():
 
 
 threading.Thread(target=expiry_worker, daemon=True).start()
+
+
+# ------------------------- Web App fallback --------------------
+
+@APP.get("/{web_path:path}")
+def web_app_fallback(web_path: str):
+    # Do not swallow unknown API endpoints.
+    if web_path.startswith("api/") or web_path in {"health", "healthz", "docs", "redoc", "openapi.json"}:
+        raise HTTPException(404, "Not Found")
+    index_file = Path(__file__).with_name("index.html")
+    if index_file.exists():
+        return FileResponse(str(index_file), media_type="text/html")
+    raise HTTPException(404, "index.html not found")
 
 
 # ------------------------- Start --------------------------------
