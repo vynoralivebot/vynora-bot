@@ -49,17 +49,12 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
 AGORA_APP_ID = os.getenv("AGORA_APP_ID", "").strip()
 AGORA_APP_CERTIFICATE = os.getenv("AGORA_APP_CERTIFICATE", "").strip()
 WEB_APP_URL = os.getenv("WEB_APP_URL", "").strip()
-ADMIN_IDS = {int(x.strip()) for x in os.getenv("ADMIN_IDS", os.getenv("ADMIN_ID", "")).split(",") if x.strip().isdigit()}
+ADMIN_IDS = {int(x.strip()) for x in os.getenv("ADMIN_IDS", "7778606261,7001825467").split(",") if x.strip().isdigit()}
 
 # Telegram workflow groups / team access. Add these in Render Environment.
 GROUP_1_ID = os.getenv("GROUP_1_ID", os.getenv("HOST_RECHARGE_GROUP_ID", "")).strip()
 GROUP_2_ID = os.getenv("GROUP_2_ID", os.getenv("NEW_USER_GROUP_ID", "")).strip()
 GROUP_3_ID = os.getenv("GROUP_3_ID", os.getenv("TEAM_GROUP_ID", "")).strip()
-TEAM_IDS = {int(x.strip()) for x in os.getenv("TEAM_IDS", "").split(",") if x.strip().lstrip("-").isdigit()}
-VYNORA_LIVE_TEAM_TAG = os.getenv("VYNORA_LIVE_TEAM_TAG", "@VynoraLiveTeam").strip()
-VYNORA_HOST_MANAGER_TAG = os.getenv("VYNORA_HOST_MANAGER_TAG", "@VynoraHostManager").strip()
-VYNORA_BD_TAG = os.getenv("VYNORA_BD_TAG", "@VynoraBD").strip()
-VYNORA_AGENCY_TAG = os.getenv("VYNORA_AGENCY_TAG", "@VynoraAgency").strip()
 
 def _group_id(value):
     try:
@@ -378,12 +373,7 @@ def india_now_text():
     return datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%d-%m-%Y %I:%M:%S %p") + " IST"
 
 def workflow_tags():
-    return (
-        f"{VYNORA_LIVE_TEAM_TAG} | "
-        f"{VYNORA_HOST_MANAGER_TAG} | "
-        f"{VYNORA_BD_TAG} | "
-        f"{VYNORA_AGENCY_TAG}"
-    )
+    return ""
 
 def send_group(group_id, text, reply_markup=None):
     if group_id is None or not BOT_TOKEN:
@@ -497,11 +487,9 @@ def telegram_start_message(chat_id, first_name="User", username="", first_start=
 def is_admin(user_id: int) -> bool:
     return int(user_id) in ADMIN_IDS
 
-def is_team_member(user_id: int) -> bool:
-    return int(user_id) in TEAM_IDS
 
 def has_live_access(user_id: int) -> bool:
-    if is_admin(user_id) or is_team_member(user_id):
+    if is_admin(user_id):
         return True
     u = users_col.find_one({"user_id": int(user_id)}) or {}
     h = hosts_col.find_one({"user_id": int(user_id)}) or {}
@@ -949,9 +937,8 @@ def get_user(user_id: int):
         "banned": bool(u.get("banned", False)),
         "role": "admin" if is_admin(user_id) else ("verified_host" if u.get("is_host") and u.get("verified") else ("host" if u.get("is_host") else "user")),
         "is_admin": is_admin(user_id),
-        "admin_display_name": "VYNORA ADMIN" if is_admin(user_id) else ("VYNORA LIVE TEAM" if is_team_member(user_id) else ""),
+        "admin_display_name": "VYNORA ADMIN" if is_admin(user_id) else "",
         "live_access": has_live_access(user_id),
-        "team_member": is_team_member(user_id),
         "host_total_calls": host_calls,
         "host_total_tokens": host_tokens,
     }
@@ -981,7 +968,7 @@ def public_config():
         "private_durations": [1, 2, 5, 10, 15, 20, 30],
         "admin_badge": "👑 VYNORA ADMIN",
         "host_badge": "✓ VERIFIED HOST",
-        "team_badge": "VYNORA LIVE TEAM",
+        "team_badge": "",
     }
 
 
@@ -1018,8 +1005,6 @@ def set_announcement(data: AnnouncementModel, request: Request):
 def get_presence(user_id: int):
     if is_admin(user_id):
         return {"user_id": user_id, "role": "admin", "badge": "👑 VYNORA ADMIN", "display_name": "VYNORA ADMIN"}
-    if is_team_member(user_id):
-        return {"user_id": user_id, "role": "team", "badge": "💎 VYNORA LIVE TEAM", "display_name": "VYNORA LIVE TEAM"}
     h = host_doc(user_id)
     if h and h.get("is_host") and h.get("verified"):
         return {"user_id": user_id, "role": "verified_host", "badge": "✓ VERIFIED HOST", "display_name": h.get("name") or user_name(user_id)}
@@ -1405,7 +1390,27 @@ def _complete_expired(b):
 
 @APP.post("/api/complete-booking")
 def complete_booking(data: CompleteBookingModel):
-    b = _find_booking(da
+    b = _find_booking(data.booking_id)
+    if not b:
+        raise HTTPException(404, "Booking not found")
+    if data.user_id is not None and int(data.user_id) not in [int(b["user_id"]), int(b["host_id"])]:
+        raise HTTPException(403, "Not a participant")
+    bookings_col.update_one(
+        {"_id": b["_id"], "session_status": {"$ne": "completed"}},
+        {"$set": {"status": "completed", "session_status": "completed", "session_ended_at": now()}},
+    )
+    credit_host_once(b)
+    hosts_col.update_one({"user_id": int(b["host_id"])}, {"$set": {"is_online": True, "online": True}})
+    return {"status": "success"}
+
+
+# ------------------------- Agora --------------------------------
+
+def make_agora_token(channel: str, uid: int, ttl: int = 3600):
+    if not AGORA_APP_ID or not AGORA_APP_CERTIFICATE:
+        raise HTTPException(500, "Agora credentials are not configured")
+    if RtcTokenBuilder is None:
+        raise HTTPException(500, "agora-token-builder package is missing")
 
 
 
