@@ -4,6 +4,7 @@ import uuid
 import base64
 import re
 import threading
+import requests
 from pathlib import Path
 from typing import Optional
 
@@ -256,6 +257,127 @@ def remaining_for_booking(b):
 
 # Render start command uses: uvicorn main:app
 app = APP
+
+
+# ------------------------- Telegram Bot ------------------------
+
+def telegram_api(method, payload=None, timeout=20):
+    if not BOT_TOKEN:
+        return None
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/{method}"
+    try:
+        r = requests.post(url, json=payload or {}, timeout=timeout)
+        return r.json()
+    except Exception:
+        return None
+
+
+def telegram_send(chat_id, text, reply_markup=None):
+    payload = {"chat_id": int(chat_id), "text": text}
+    if reply_markup:
+        payload["reply_markup"] = reply_markup
+    return telegram_api("sendMessage", payload)
+
+
+def telegram_start_message(chat_id, first_name="User"):
+    name = first_name or "User"
+    keyboard = None
+    if WEB_APP_URL.startswith("https://"):
+        keyboard = {
+            "inline_keyboard": [[
+                {"text": "🚀 Open Vynora Live App", "web_app": {"url": WEB_APP_URL}}
+            ]]
+        }
+    elif WEB_APP_URL:
+        keyboard = {
+            "inline_keyboard": [[
+                {"text": "🚀 Open Vynora Live App", "url": WEB_APP_URL}
+            ]]
+        }
+
+    return telegram_send(
+        chat_id,
+        f"✨ Welcome to Vynora Live 1v1, {name}!\n\n"
+        "📞 Private 1-to-1 video call\n"
+        "🔴 Public Live + Gifting\n"
+        "🎁 Gifts & Tokens\n"
+        "⏱️ 1–30 minute private sessions\n\n"
+        "👇 नीचे button दबाकर app खोलें.",
+        keyboard,
+    )
+
+
+def telegram_polling_worker():
+    if not BOT_TOKEN:
+        print("BOT_TOKEN not configured; Telegram polling disabled.")
+        return
+
+    # The bot cannot use getUpdates while an old webhook is active.
+    telegram_api("deleteWebhook", {"drop_pending_updates": False})
+    offset = 0
+    print("Telegram bot polling started.")
+
+    while True:
+        try:
+            result = telegram_api(
+                "getUpdates",
+                {
+                    "offset": offset,
+                    "timeout": 25,
+                    "allowed_updates": ["message"],
+                },
+                timeout=35,
+            )
+            if not result or not result.get("ok"):
+                time.sleep(3)
+                continue
+
+            for update in result.get("result", []):
+                offset = int(update["update_id"]) + 1
+                msg = update.get("message") or {}
+                chat = msg.get("chat") or {}
+                chat_id = chat.get("id")
+                if chat_id is None:
+                    continue
+
+                text = (msg.get("text") or "").strip()
+                first_name = (msg.get("from") or {}).get("first_name", "User")
+
+                if text.startswith("/start"):
+                    telegram_start_message(chat_id, first_name)
+                elif text.startswith("/help"):
+                    telegram_send(
+                        chat_id,
+                        "🆘 Vynora Live Help\n\n"
+                        "🚀 /start — Open Vynora Live\n"
+                        "📞 Book a private call from the app\n"
+                        "🔴 Hosts can start Public Live\n"
+                        "🎁 Gifts are available during live/calls.",
+                    )
+                else:
+                    telegram_send(
+                        chat_id,
+                        "👋 Vynora Live me welcome!\n\n"
+                        "App खोलने के लिए नीचे button दबाएँ या /start भेजें.",
+                        (
+                            {"inline_keyboard": [[
+                                {"text": "🚀 Open Vynora Live App",
+                                 "web_app": {"url": WEB_APP_URL}}
+                            ]]}
+                            if WEB_APP_URL.startswith("https://") else
+                            {"inline_keyboard": [[
+                                {"text": "🚀 Open Vynora Live App",
+                                 "url": WEB_APP_URL}
+                            ]]} if WEB_APP_URL else None
+                        ),
+                    )
+        except Exception as exc:
+            print(f"Telegram polling error: {exc}")
+            time.sleep(5)
+
+
+if BOT_TOKEN:
+    threading.Thread(target=telegram_polling_worker, daemon=True).start()
 
 # ------------------------- Health -----------------------------
 
