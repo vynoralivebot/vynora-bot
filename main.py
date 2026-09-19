@@ -378,7 +378,12 @@ def india_now_text():
     return datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%d-%m-%Y %I:%M:%S %p") + " IST"
 
 def workflow_tags():
-    return f"{VYNORA_LIVE_TEAM_TAG} | {VYNORA_HOST_MANAGER_TAG} | {VYNORA_BD_TAG} | {VYNORA_AGENCY_TAG}"
+    return (
+        f"{VYNORA_LIVE_TEAM_TAG} | "
+        f"{VYNORA_HOST_MANAGER_TAG} | "
+        f"{VYNORA_BD_TAG} | "
+        f"{VYNORA_AGENCY_TAG}"
+    )
 
 def send_group(group_id, text, reply_markup=None):
     if group_id is None or not BOT_TOKEN:
@@ -977,9 +982,6 @@ def public_config():
         "admin_badge": "👑 VYNORA ADMIN",
         "host_badge": "✓ VERIFIED HOST",
         "team_badge": "VYNORA LIVE TEAM",
-        "host_manager_tag": VYNORA_HOST_MANAGER_TAG,
-        "bd_tag": VYNORA_BD_TAG,
-        "agency_tag": VYNORA_AGENCY_TAG,
     }
 
 
@@ -1402,6 +1404,8 @@ def _complete_expired(b):
 
 
 @APP.post("/api/complete-booking")
+def complete_booking(data: CompleteBookingModel):
+    b = _find_booking(da
 
 
 
