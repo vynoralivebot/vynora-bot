@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -47,10 +47,15 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
 AGORA_APP_ID = os.getenv("AGORA_APP_ID", "").strip()
 AGORA_APP_CERTIFICATE = os.getenv("AGORA_APP_CERTIFICATE", "").strip()
 WEB_APP_URL = os.getenv("WEB_APP_URL", "").strip()
+ADMIN_IDS = {int(x.strip()) for x in os.getenv("ADMIN_IDS", os.getenv("ADMIN_ID", "")).split(",") if x.strip().isdigit()}
 
 PLATFORM_CUT = float(os.getenv("PLATFORM_CUT", "0.30"))
 AGENCY_CUT = float(os.getenv("AGENCY_CUT", "0.10"))
 DEFAULT_RATE = int(os.getenv("DEFAULT_RATE", "30"))
+UPI_ID = os.getenv("UPI_ID", "vynoralive@slc").strip()
+UPI_NAME = os.getenv("UPI_NAME", "RajnishKumar").strip()
+REQUIRE_USER_APPROVAL = os.getenv("REQUIRE_USER_APPROVAL", "false").lower() == "true"
+RECHARGE_PLANS = {50: 100, 100: 220, 300: 700, 500: 1200, 1000: 2500, 2000: 5200}
 MAX_BOOKING_MINUTES = 30
 
 UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "./uploads"))
@@ -79,6 +84,52 @@ try:
 except Exception:
     pass
 
+# ------------------------- Account safety middleware ---------
+# Banned users/hosts are rejected server-side, not only hidden in the UI.
+async def _read_request_json(request: Request):
+    try:
+        body = await request.body()
+        if body:
+            import json
+            data = json.loads(body.decode("utf-8"))
+        else:
+            data = {}
+        async def receive():
+            return {"type": "http.request", "body": body, "more_body": False}
+        request._receive = receive
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+@APP.middleware("http")
+async def banned_account_guard(request: Request, call_next):
+    if request.url.path.startswith("/api/"):
+        data = await _read_request_json(request) if request.method in {"POST", "PUT", "PATCH"} else {}
+        candidate_ids = set()
+        for key in ("user_id", "host_user_id", "host_id", "sender_id", "receiver_id"):
+            value = data.get(key)
+            if value is not None:
+                try:
+                    candidate_ids.add(oid_int(value) or int(value))
+                except Exception:
+                    pass
+        for key in ("user_id", "host_user_id"):
+            value = request.query_params.get(key)
+            if value:
+                try:
+                    candidate_ids.add(int(value))
+                except Exception:
+                    pass
+        m = re.search(r"/api/(?:user|host/status|public-live/stop)/(-?\d+)", request.url.path)
+        if m:
+            candidate_ids.add(int(m.group(1)))
+        for uid in candidate_ids:
+            u = users_col.find_one({"user_id": uid}, {"banned": 1})
+            h = hosts_col.find_one({"user_id": uid}, {"banned": 1})
+            if (u and u.get("banned")) or (h and h.get("banned")):
+                return JSONResponse({"detail": "Account is blocked by admin", "banned": True}, status_code=403)
+    return await call_next(request)
 
 # ------------------------- Models ----------------------------
 
@@ -198,6 +249,7 @@ def normalize_host(h):
         "public_live": bool(h.get("public_live", False)),
         "private_live": bool(h.get("private_live", False)),
         "private_live_cost": int(h.get("private_live_cost", 30)),
+        "dummy": bool(h.get("dummy", False)),
     }
 
 
@@ -232,6 +284,8 @@ def ensure_user(user_id: int, name: str = ""):
             "name": name or f"User #{user_id}",
             "tokens": 0,
             "earnings": 0.0,
+            "approved": False,
+            "banned": False,
             "created_at": now(),
         }},
         upsert=True,
@@ -283,18 +337,16 @@ def telegram_start_message(chat_id, first_name="User"):
     name = first_name or "User"
     keyboard = None
     if WEB_APP_URL.startswith("https://"):
-        keyboard = {
-            "inline_keyboard": [[
-                {"text": "🚀 Open Vynora Live App", "web_app": {"url": WEB_APP_URL}}
-            ]]
-        }
+        keyboard = {"inline_keyboard": [[{"text": "🚀 Open Vynora Live App", "web_app": {"url": WEB_APP_URL}}]]}
     elif WEB_APP_URL:
-        keyboard = {
-            "inline_keyboard": [[
-                {"text": "🚀 Open Vynora Live App", "url": WEB_APP_URL}
-            ]]
-        }
+        keyboard = {"inline_keyboard": [[{"text": "🚀 Open Vynora Live App", "url": WEB_APP_URL}]]}
 
+    ensure_user(int(chat_id), name)
+    users_col.update_one(
+        {"user_id": int(chat_id)},
+        {"$set": {"telegram_chat_id": int(chat_id), "first_name": name, "telegram_started": True}},
+        upsert=True,
+    )
     return telegram_send(
         chat_id,
         f"✨ Welcome to Vynora Live 1v1, {name}!\n\n"
@@ -307,27 +359,257 @@ def telegram_start_message(chat_id, first_name="User"):
     )
 
 
+def is_admin(user_id: int) -> bool:
+    return int(user_id) in ADMIN_IDS
+
+
+def admin_help_text():
+    return (
+        "🛠 Vynora Live Admin Commands\n\n"
+        "/addtoken USER_ID AMOUNT — token जोड़ें\n"
+        "/removetoken USER_ID AMOUNT — token हटाएँ\n"
+        "/settoken USER_ID AMOUNT — token set करें\n"
+        "/addhost USER_ID [RATE] — host add/approve\n"
+        "/removehost USER_ID — host हटाएँ\n"
+        "/approvehost USER_ID — host approve/verify\n"
+        "/approveuser USER_ID — user approve\n"
+        "/ban USER_ID [reason] — user/host ban\n"
+        "/unban USER_ID — ban हटाएँ\n"
+        "/block USER_ID [reason] — ban का alias\n"
+        "/unblock USER_ID — unban का alias\n"
+        "/user USER_ID — user details\n"
+        "/announce MESSAGE — सभी registered Telegram users को message\n"
+        "/announceusers MESSAGE — users को message\n"
+        "/announcehosts MESSAGE — hosts को message\n"
+        "/offer MESSAGE — सभी registered users को offer message\n"
+        "/approverecharge RECHARGE_ID — recharge approve\n"
+        "/rejectrecharge RECHARGE_ID — recharge reject\n"
+        "/stats — users/hosts/banned counts\n"
+        "/helpadmin — यह list\n\n"
+        "ℹ️ Broadcast उन्हीं users को जाएगा जिन्होंने bot में /start करके Telegram chat register किया है."
+    )
+
+
+def _parse_int(value):
+    try:
+        return int(str(value).strip())
+    except Exception:
+        return None
+
+
+def admin_command(chat_id: int, text: str):
+    parts = text.strip().split()
+    cmd = parts[0].split("@")[0].lower()
+    args = parts[1:]
+
+    if cmd in {"/helpadmin", "/adminhelp"}:
+        telegram_send(chat_id, admin_help_text())
+        return
+
+    if cmd == "/stats":
+        users = users_col.count_documents({})
+        hosts = hosts_col.count_documents({"is_host": True})
+        banned = users_col.count_documents({"banned": True})
+        verified = hosts_col.count_documents({"is_host": True, "verified": True})
+        telegram_send(chat_id, f"📊 Vynora Stats\n\n👤 Users: {users}\n🎙 Hosts: {hosts}\n✅ Verified hosts: {verified}\n🚫 Banned: {banned}")
+        return
+
+    if cmd in {"/addtoken", "/removetoken", "/settoken"}:
+        if len(args) != 2:
+            telegram_send(chat_id, f"Usage: {cmd} USER_ID AMOUNT")
+            return
+        uid, amount = _parse_int(args[0]), _parse_int(args[1])
+        if not uid or amount is None or amount < 0:
+            telegram_send(chat_id, "❌ User ID/amount invalid.")
+            return
+        ensure_user(uid)
+        if cmd == "/addtoken":
+            users_col.update_one({"user_id": uid}, {"$inc": {"tokens": amount}})
+            action = f"+{amount}"
+        elif cmd == "/removetoken":
+            r = users_col.update_one({"user_id": uid, "tokens": {"$gte": amount}}, {"$inc": {"tokens": -amount}})
+            if r.modified_count == 0 and amount > 0:
+                telegram_send(chat_id, "❌ User के पास इतने tokens नहीं हैं.")
+                return
+            action = f"-{amount}"
+        else:
+            users_col.update_one({"user_id": uid}, {"$set": {"tokens": amount}})
+            action = f"={amount}"
+        u = users_col.find_one({"user_id": uid}) or {}
+        telegram_send(chat_id, f"✅ User {uid}: tokens {action}\n💰 Current balance: {int(u.get('tokens', 0))}")
+        return
+
+    if cmd in {"/addhost", "/approvehost"}:
+        if not args:
+            telegram_send(chat_id, f"Usage: {cmd} USER_ID [RATE]")
+            return
+        uid = _parse_int(args[0])
+        rate = _parse_int(args[1]) if len(args) > 1 else DEFAULT_RATE
+        if not uid or not rate or rate < 1:
+            telegram_send(chat_id, "❌ User ID/rate invalid.")
+            return
+        u = ensure_user(uid)
+        name = u.get("name") or u.get("first_name") or f"Host #{uid}"
+        doc = {
+            "user_id": uid, "name": name, "rate": rate, "is_host": True,
+            "verified": True, "approved": True, "is_online": False,
+            "public_live": False, "private_live": False,
+            "private_live_cost": 30, "photo_url": u.get("profile_photo", ""),
+        }
+        hosts_col.update_one({"user_id": uid}, {"$set": doc}, upsert=True)
+        users_col.update_one({"user_id": uid}, {"$set": {"is_host": True, "verified": True, "host_approved": True, "rate": rate}}, upsert=True)
+        telegram_send(chat_id, f"✅ Host approved/added\n👤 ID: {uid}\n🎙 Name: {name}\n💰 Rate: ₹{rate}/min")
+        return
+
+    if cmd == "/removehost":
+        if len(args) != 1:
+            telegram_send(chat_id, "Usage: /removehost USER_ID")
+            return
+        uid = _parse_int(args[0])
+        if not uid:
+            telegram_send(chat_id, "❌ Invalid user ID.")
+            return
+        hosts_col.delete_one({"user_id": uid})
+        users_col.update_one({"user_id": uid}, {"$set": {"is_host": False, "verified": False, "host_approved": False, "is_online": False}})
+        telegram_send(chat_id, f"✅ Host removed: {uid}")
+        return
+
+    if cmd == "/approveuser":
+        if len(args) != 1:
+            telegram_send(chat_id, "Usage: /approveuser USER_ID")
+            return
+        uid = _parse_int(args[0])
+        if not uid:
+            telegram_send(chat_id, "❌ Invalid user ID.")
+            return
+        ensure_user(uid)
+        users_col.update_one({"user_id": uid}, {"$set": {"approved": True, "banned": False}})
+        telegram_send(chat_id, f"✅ User approved: {uid}")
+        return
+
+    if cmd in {"/ban", "/block"}:
+        if not args:
+            telegram_send(chat_id, f"Usage: {cmd} USER_ID [reason]")
+            return
+        uid = _parse_int(args[0])
+        if not uid:
+            telegram_send(chat_id, "❌ Invalid user ID.")
+            return
+        reason = " ".join(args[1:]).strip() or "Admin action"
+        ensure_user(uid)
+        users_col.update_one({"user_id": uid}, {"$set": {"banned": True, "ban_reason": reason}})
+        hosts_col.update_one({"user_id": uid}, {"$set": {"banned": True, "is_online": False, "public_live": False}})
+        telegram_send(chat_id, f"🚫 Banned: {uid}\nReason: {reason}")
+        return
+
+    if cmd in {"/unban", "/unblock"}:
+        if len(args) != 1:
+            telegram_send(chat_id, f"Usage: {cmd} USER_ID")
+            return
+        uid = _parse_int(args[0])
+        if not uid:
+            telegram_send(chat_id, "❌ Invalid user ID.")
+            return
+        users_col.update_one({"user_id": uid}, {"$set": {"banned": False, "ban_reason": ""}})
+        hosts_col.update_one({"user_id": uid}, {"$set": {"banned": False}})
+        telegram_send(chat_id, f"✅ Unbanned: {uid}")
+        return
+
+    if cmd == "/user":
+        if len(args) != 1:
+            telegram_send(chat_id, "Usage: /user USER_ID")
+            return
+        uid = _parse_int(args[0])
+        if not uid:
+            telegram_send(chat_id, "❌ Invalid user ID.")
+            return
+        u = users_col.find_one({"user_id": uid}) or {}
+        h = hosts_col.find_one({"user_id": uid}) or {}
+        telegram_send(chat_id, (
+            f"👤 User {uid}\n"
+            f"Name: {u.get('name') or u.get('first_name') or '-'}\n"
+            f"Username: @{u.get('username', '').lstrip('@') or '-'}\n"
+            f"Tokens: {int(u.get('tokens', 0))}\n"
+            f"Approved: {'Yes' if u.get('approved') else 'No'}\n"
+            f"Banned: {'Yes' if u.get('banned') else 'No'}\n"
+            f"Host: {'Yes' if h.get('is_host') or u.get('is_host') else 'No'}\n"
+            f"Verified: {'Yes' if h.get('verified') or u.get('verified') else 'No'}"
+        ))
+        return
+
+    if cmd in {"/approverecharge", "/rejectrecharge"}:
+        if len(args) != 1:
+            telegram_send(chat_id, f"Usage: {cmd} RECHARGE_ID")
+            return
+        rid = args[0].strip()
+        r = recharges_col.find_one({"recharge_id": rid})
+        if not r:
+            telegram_send(chat_id, "❌ Recharge not found")
+            return
+        if r.get("status") != "pending":
+            telegram_send(chat_id, f"⚠️ Recharge already {r.get('status')}")
+            return
+        if cmd == "/approverecharge":
+            users_col.update_one({"user_id": int(r["user_id"])}, {"$inc": {"tokens": int(r.get("tokens", 0))}})
+            recharges_col.update_one({"_id": r["_id"]}, {"$set": {"status": "approved", "approved_at": now(), "approved_by": int(chat_id)}})
+            telegram_send(chat_id, f"✅ Recharge approved\n👤 User: {r['user_id']}\n🪙 Tokens added: {int(r.get('tokens', 0))}")
+            telegram_send(int(r["user_id"]), f"🎉 Recharge approved!\n🪙 {int(r.get('tokens', 0))} tokens आपके wallet में add किए गए हैं.")
+        else:
+            recharges_col.update_one({"_id": r["_id"]}, {"$set": {"status": "rejected", "rejected_at": now(), "rejected_by": int(chat_id)}})
+            telegram_send(chat_id, f"❌ Recharge rejected: {rid}")
+        return
+
+    if cmd in {"/announce", "/offer", "/announceusers", "/announcehosts"}:
+        message = text.split(None, 1)[1].strip() if len(text.split(None, 1)) > 1 else ""
+        if not message:
+            telegram_send(chat_id, f"Usage: {cmd} MESSAGE")
+            return
+        prefix = "🎁 SPECIAL OFFER\n\n" if cmd == "/offer" else "📢 ANNOUNCEMENT\n\n"
+        query = {"telegram_chat_id": {"$exists": True}}
+        if cmd == "/announcehosts":
+            query["is_host"] = True
+        elif cmd == "/announceusers":
+            query["is_host"] = {"$ne": True}
+        recipients = set()
+        for d in users_col.find(query, {"telegram_chat_id": 1}):
+            cid = d.get("telegram_chat_id")
+            if cid is not None:
+                recipients.add(int(cid))
+        # Also include Telegram chats stored on host records if they exist.
+        if cmd == "/announcehosts":
+            for d in hosts_col.find({"is_host": True, "telegram_chat_id": {"$exists": True}}, {"telegram_chat_id": 1}):
+                cid = d.get("telegram_chat_id")
+                if cid is not None:
+                    recipients.add(int(cid))
+        sent = failed = 0
+        for cid in recipients:
+            result = telegram_send(cid, prefix + message)
+            if result and result.get("ok"):
+                sent += 1
+            else:
+                failed += 1
+            time.sleep(0.05)
+        telegram_send(chat_id, f"✅ Broadcast complete\n📨 Sent: {sent}\n⚠️ Failed: {failed}\n👥 Target chats: {len(recipients)}")
+        return
+
+    telegram_send(chat_id, "❓ Unknown admin command. /helpadmin भेजें.")
+
+
 def telegram_polling_worker():
     if not BOT_TOKEN:
         print("BOT_TOKEN not configured; Telegram polling disabled.")
         return
 
-    # The bot cannot use getUpdates while an old webhook is active.
     telegram_api("deleteWebhook", {"drop_pending_updates": False})
     offset = 0
     print("Telegram bot polling started.")
 
     while True:
         try:
-            result = telegram_api(
-                "getUpdates",
-                {
-                    "offset": offset,
-                    "timeout": 25,
-                    "allowed_updates": ["message"],
-                },
-                timeout=35,
-            )
+            result = telegram_api("getUpdates", {
+                "offset": offset, "timeout": 25,
+                "allowed_updates": ["message"],
+            }, timeout=35)
             if not result or not result.get("ok"):
                 time.sleep(3)
                 continue
@@ -341,36 +623,35 @@ def telegram_polling_worker():
                     continue
 
                 text = (msg.get("text") or "").strip()
-                first_name = (msg.get("from") or {}).get("first_name", "User")
+                sender = msg.get("from") or {}
+                first_name = sender.get("first_name", "User")
+                sender_id = int(sender.get("id", chat_id))
 
-                if text.startswith("/start"):
+                # Save Telegram identity so later broadcasts can reach this user.
+                ensure_user(sender_id, first_name)
+                users_col.update_one({"user_id": sender_id}, {"$set": {
+                    "telegram_chat_id": int(chat_id),
+                    "first_name": first_name,
+                    "username": sender.get("username", ""),
+                    "telegram_started": True,
+                }})
+
+                if is_admin(sender_id) and text.startswith("/"):
+                    admin_command(chat_id, text)
+                elif text.startswith("/start"):
                     telegram_start_message(chat_id, first_name)
                 elif text.startswith("/help"):
-                    telegram_send(
-                        chat_id,
+                    telegram_send(chat_id,
                         "🆘 Vynora Live Help\n\n"
                         "🚀 /start — Open Vynora Live\n"
                         "📞 Book a private call from the app\n"
                         "🔴 Hosts can start Public Live\n"
-                        "🎁 Gifts are available during live/calls.",
+                        "🎁 Gifts are available during live/calls."
                     )
                 else:
-                    telegram_send(
-                        chat_id,
+                    telegram_send(chat_id,
                         "👋 Vynora Live me welcome!\n\n"
-                        "App खोलने के लिए नीचे button दबाएँ या /start भेजें.",
-                        (
-                            {"inline_keyboard": [[
-                                {"text": "🚀 Open Vynora Live App",
-                                 "web_app": {"url": WEB_APP_URL}}
-                            ]]}
-                            if WEB_APP_URL.startswith("https://") else
-                            {"inline_keyboard": [[
-                                {"text": "🚀 Open Vynora Live App",
-                                 "url": WEB_APP_URL}
-                            ]]} if WEB_APP_URL else None
-                        ),
-                    )
+                        "App खोलने के लिए /start भेजें.")
         except Exception as exc:
             print(f"Telegram polling error: {exc}")
             time.sleep(5)
@@ -402,6 +683,8 @@ def health():
 @APP.get("/api/user/{user_id}")
 def get_user(user_id: int):
     u = ensure_user(user_id)
+    host_calls = bookings_col.count_documents({"host_id": int(user_id), "status": "completed"})
+    host_tokens = sum(int(x.get("token_cost", 0)) for x in bookings_col.find({"host_id": int(user_id), "status": "completed"}, {"token_cost": 1}))
     return {
         "user_id": user_id,
         "name": u.get("name") or u.get("first_name") or f"User #{user_id}",
@@ -412,6 +695,10 @@ def get_user(user_id: int):
         "profile_photo": u.get("profile_photo", ""),
         "is_host": bool(u.get("is_host", False)),
         "verified": bool(u.get("verified", False)),
+        "approved": bool(u.get("approved", False)),
+        "banned": bool(u.get("banned", False)),
+        "host_total_calls": host_calls,
+        "host_total_tokens": host_tokens,
     }
 
 
@@ -429,22 +716,34 @@ def update_profile_photo(data: dict):
 
 # ------------------------- Hosts -------------------------------
 
+@APP.get("/api/config")
+def public_config():
+    return {"upi_id": UPI_ID, "upi_name": UPI_NAME, "recharge_plans": [{"amount": a, "tokens": t} for a, t in RECHARGE_PLANS.items()]}
+
+
 @APP.get("/api/hosts")
 def get_hosts():
     out = []
     seen = set()
-    for h in hosts_col.find({"is_host": True}).sort("verified", -1):
+    # Real verified hosts first.
+    for h in hosts_col.find({"is_host": True, "dummy": {"$ne": True}}).sort([("verified", -1), ("is_online", -1), ("updated_at", -1)]):
+        uid = int(h["user_id"])
+        if uid not in seen:
+            seen.add(uid)
+            out.append(normalize_host(h))
+    for h in users_col.find({"is_host": True, "dummy": {"$ne": True}}).sort([("verified", -1), ("is_online", -1)]):
         uid = int(h["user_id"])
         if uid not in seen:
             seen.add(uid)
             out.append(normalize_host(h))
 
-    # Keep the endpoint useful even if hosts are stored only in users.
-    for h in users_col.find({"is_host": True}).sort("verified", -1):
-        uid = int(h["user_id"])
-        if uid not in seen:
-            seen.add(uid)
-            out.append(normalize_host(h))
+    # Demo hosts are always at the bottom and can never be booked.
+    dummy_hosts = [
+        {"user_id": -900001, "name": "Angel • Demo", "rate": 50, "is_host": True, "verified": True, "is_online": True, "public_live": False, "private_live": False, "dummy": True, "photo_url": "https://i.pravatar.cc/500?img=47"},
+        {"user_id": -900002, "name": "Sofia • Demo", "rate": 40, "is_host": True, "verified": True, "is_online": True, "public_live": False, "private_live": False, "dummy": True, "photo_url": "https://i.pravatar.cc/500?img=32"},
+        {"user_id": -900003, "name": "Mia • Demo", "rate": 60, "is_host": True, "verified": True, "is_online": True, "public_live": False, "private_live": False, "dummy": True, "photo_url": "https://i.pravatar.cc/500?img=44"},
+    ]
+    out.extend(normalize_host(h) for h in dummy_hosts)
     return {"hosts": out}
 
 
@@ -523,9 +822,15 @@ def toggle_host_live(user_id: int):
 
 @APP.post("/api/book-slot")
 def book_slot(data: BookingModel):
+    if REQUIRE_USER_APPROVAL:
+        u = ensure_user(data.user_id)
+        if not u.get("approved"):
+            raise HTTPException(403, "Your account is awaiting admin approval")
     if data.duration_mins not in [1, 2, 5, 10, 15, 20, 30]:
         raise HTTPException(400, "Select a valid session duration")
     h = host_doc(oid_int(data.host_id))
+    if oid_int(data.host_id) < 0:
+        raise HTTPException(400, "This demo host is from another country and cannot be booked")
     if not h or not h.get("is_host", True):
         raise HTTPException(404, "Host not found")
     host_id = int(h["user_id"])
@@ -909,8 +1214,10 @@ def send_gift(data: GiftModel):
 
 @APP.post("/api/public-live/start")
 def public_live_start(data: LiveStartModel):
+    if int(data.host_user_id) < 0:
+        raise HTTPException(403, "Demo host cannot start live")
     h = host_doc(data.host_user_id)
-    if not h:
+    if not h or not h.get("verified", False):
         raise HTTPException(404, "Host not registered")
     channel = f"host_live_{data.host_user_id}"
     doc = {
@@ -999,23 +1306,20 @@ def join_private_live(data: LiveJoinModel):
 
 @APP.post("/api/recharge")
 def recharge(data: RechargeModel):
-    if data.amount < 1:
-        raise HTTPException(400, "Invalid amount")
-    screenshot_url = ""
-    if data.screenshot:
-        screenshot_url = save_base64_image(data.screenshot, f"recharge_{data.user_id}")
-    recharge_id = uuid.uuid4().hex
+    amount = int(data.amount)
+    if amount not in RECHARGE_PLANS:
+        raise HTTPException(400, "Please select a valid recharge plan")
+    if not data.transaction_id.strip() or not data.screenshot:
+        raise HTTPException(400, "UTR and payment screenshot are required")
+    screenshot_url = save_base64_image(data.screenshot, f"recharge_{data.user_id}")
+    recharge_id = uuid.uuid4().hex[:12]
     doc = {
-        "recharge_id": recharge_id,
-        "user_id": data.user_id,
-        "amount": float(data.amount),
-        "transaction_id": data.transaction_id.strip(),
-        "screenshot_url": screenshot_url,
-        "status": "pending",
-        "created_at": now(),
+        "recharge_id": recharge_id, "user_id": data.user_id, "amount": amount,
+        "tokens": RECHARGE_PLANS[amount], "transaction_id": data.transaction_id.strip(),
+        "screenshot_url": screenshot_url, "status": "pending", "created_at": now(),
     }
     recharges_col.insert_one(doc)
-    return {"status": "success", "recharge_id": recharge_id}
+    return {"status": "success", "recharge_id": recharge_id, "tokens_pending": RECHARGE_PLANS[amount]}
 
 
 @APP.post("/api/withdraw")
@@ -1099,7 +1403,6 @@ def web_app_fallback(web_path: str):
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "10000"))
     uvicorn.run(APP, host="0.0.0.0", port=port)
-
 
 
 
