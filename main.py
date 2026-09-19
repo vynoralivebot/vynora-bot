@@ -56,10 +56,6 @@ GROUP_1_ID = os.getenv("GROUP_1_ID", os.getenv("HOST_RECHARGE_GROUP_ID", "")).st
 GROUP_2_ID = os.getenv("GROUP_2_ID", os.getenv("NEW_USER_GROUP_ID", "")).strip()
 GROUP_3_ID = os.getenv("GROUP_3_ID", os.getenv("TEAM_GROUP_ID", "")).strip()
 TEAM_IDS = {int(x.strip()) for x in os.getenv("TEAM_IDS", "").split(",") if x.strip().lstrip("-").isdigit()}
-VYNORA_LIVE_TEAM_TAG = os.getenv("VYNORA_LIVE_TEAM_TAG", "@VynoraLiveTeam").strip()
-VYNORA_HOST_MANAGER_TAG = os.getenv("VYNORA_HOST_MANAGER_TAG", "@VynoraHostManager").strip()
-VYNORA_BD_TAG = os.getenv("VYNORA_BD_TAG", "@VynoraBD").strip()
-VYNORA_AGENCY_TAG = os.getenv("VYNORA_AGENCY_TAG", "@VynoraAgency").strip()
 
 def _group_id(value):
     try:
@@ -378,7 +374,7 @@ def india_now_text():
     return datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%d-%m-%Y %I:%M:%S %p") + " IST"
 
 def workflow_tags():
-    return f"{VYNORA_LIVE_TEAM_TAG} | {VYNORA_HOST_MANAGER_TAG} | {VYNORA_BD_TAG} | {VYNORA_AGENCY_TAG}"
+    return ""
 
 def send_group(group_id, text, reply_markup=None):
     if group_id is None or not BOT_TOKEN:
@@ -977,9 +973,6 @@ def public_config():
         "admin_badge": "👑 VYNORA ADMIN",
         "host_badge": "✓ VERIFIED HOST",
         "team_badge": "VYNORA LIVE TEAM",
-        "host_manager_tag": VYNORA_HOST_MANAGER_TAG,
-        "bd_tag": VYNORA_BD_TAG,
-        "agency_tag": VYNORA_AGENCY_TAG,
     }
 
 
@@ -1402,6 +1395,17 @@ def _complete_expired(b):
 
 
 @APP.post("/api/complete-booking")
+def complete_booking(data: CompleteBookingModel):
+    b = _find_booking(data.booking_id)
+    if not b:
+        raise HTTPException(404, "Booking not found")
+    if data.user_id is not None and int(data.user_id) not in [int(b["user_id"]), int(b["host_id"])]:
+        raise HTTPException(403, "Not a participant")
+    bookings_col.update_one(
+        {"_id": b["_id"], "session_status": {"$ne": "completed"}},
+        {"$set": {"status": "completed", "session_status": "completed", "session_ended_at": now()}},
+    )
+    credit_host_once(b)
 
 
 
