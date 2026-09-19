@@ -1,695 +1,2886 @@
+# ============================================================
+# 🚀 VYNORA LIVE 1v1 - PROFESSIONAL MAIN.PY
+# ============================================================
+# Features:
+# 📞 Private 1v1 Video Call
+# ⏱️ Exact Session Timer
+# 👤 User + Host Join Tracking
+# 💰 Host Earnings
+# 💳 Wallet / Recharge
+# 🎁 Gifts
+# 💬 Private Chat
+# 🤖 Telegram Host Approval
+# 💸 Withdrawal
+# 🔐 Basic Participant Verification
+# ============================================================
+
 import os
 import time
 import uuid
-from fastapi import FastAPI, UploadFile, File, Form, Request
+import logging
+import traceback
+from typing import Optional, Any
+
+from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
-import requests
-from agora_token_builder import RtcTokenBuilder
-from database import users_col, hosts_col, bookings_col, recharges_col, withdrawals_col, chats_col
+from pydantic import BaseModel, Field
+from dotenv import load_dotenv
 
-app = FastAPI()
+from database import (
+    users_col,
+    hosts_col,
+    bookings_col,
+    recharges_col,
+    withdrawals_col,
+    chats_col,
+)
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# Agora
+try:
+    from agora_token_builder import RtcTokenBuilder
+except Exception:
+    RtcTokenBuilder = None
 
-BOT_TOKEN = os.getenv("BOT_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN")
-GROUP_1_ID = os.getenv("GROUP_1_ID", "-100XXXXXXXXXX") 
-GROUP_2_ID = os.getenv("GROUP_2_ID", "-100XXXXXXXXXX") 
-GROUP_3_ID = os.getenv("GROUP_3_ID", "-100XXXXXXXXXX") 
 
-AGORA_APP_ID = os.getenv("AGORA_APP_ID", "YOUR_AGORA_APP_ID")
-AGORA_APP_CERTIFICATE = os.getenv("AGORA_APP_CERTIFICATE", "YOUR_AGORA_CERTIFICATE")
+# ============================================================
+# ⚙️ CONFIG
+# ============================================================
 
-TELEGRAM_API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
+load_dotenv()
 
-def send_telegram_message(chat_id, text, reply_markup=None):
-    payload = {"chat_id": int(chat_id), "text": text, "parse_mode": "HTML"}
+APP_NAME = "Vynora Live 1v1"
+
+PORT = int(os.getenv("PORT", "8000"))
+
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+ADMIN_TELEGRAM_ID = os.getenv("ADMIN_TELEGRAM_ID", "")
+
+AGORA_APP_ID = os.getenv("AGORA_APP_ID", "")
+AGORA_APP_CERTIFICATE = os.getenv("AGORA_APP_CERTIFICATE", "")
+
+PLATFORM_FEE_PERCENT = float(
+    os.getenv("PLATFORM_FEE_PERCENT", "30")
+)
+
+HOST_EARNING_PERCENT = 100 - PLATFORM_FEE_PERCENT
+
+DEFAULT_DURATION_MINS = int(
+    os.getenv("DEFAULT_DURATION_MINS", "10")
+)
+
+DEFAULT_HOST_RATE = float(
+    os.getenv("DEFAULT_HOST_RATE", "1")
+)
+
+UPLOAD_DIR = os.getenv(
+    "UPLOAD_DIR",
+    "static/uploads"
+)
+
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+
+# ============================================================
+# 📝 LOGGING
+# ============================================================
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(message)s"
+)
+
+logger = logging.getLogger(APP_NAME)
+
+
+# ============================================================
+# 🚀 FASTAPI
+# ============================================================
+
+app = FastAPI(
+    title=APP_NAME,
+    version="2.0.0",
+    description="Professional Vynora Live 1v1 Video Call Backend"
+)
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# ============================================================
+# 🧰 HELPERS
+# ============================================================
+
+def now_ts() -> float:
+    """Current Unix timestamp."""
+    return time.time()
+
+
+def safe_int(value: Any, default: int = 0) -> int:
+    try:
+        return int(value)
+    except Exception:
+        return default
+
+
+def safe_float(value: Any, default: float = 0) -> float:
+    try:
+        return float(value)
+    except Exception:
+        return default
+
+
+def clean_host_id(host_id: Any) -> str:
+    """
+    Supports:
+    host_123
+    h_123
+    123
+    """
+    value = str(host_id)
+
+    value = value.replace("host_", "")
+    value = value.replace("h_", "")
+
+    return value
+
+
+def serialize_doc(doc: Optional[dict]):
+    if not doc:
+        return None
+
+    result = dict(doc)
+
+    if "_id" in result:
+        result["_id"] = str(result["_id"])
+
+    return result
+
+
+def serialize_many(cursor):
+    return [serialize_doc(x) for x in cursor]
+
+
+def get_user(user_id: int):
+    return users_col.find_one({
+        "user_id": int(user_id)
+    })
+
+
+def get_host(host_id: Any):
+    host = hosts_col.find_one({
+        "host_id": str(host_id)
+    })
+
+    if not host:
+        host = hosts_col.find_one({
+            "user_id": safe_int(host_id, -1)
+        })
+
+    return host
+
+
+def get_booking(booking_id: str):
+    return bookings_col.find_one({
+        "booking_id": str(booking_id)
+    })
+
+
+def calculate_host_earning(token_cost: float) -> float:
+    """
+    Example:
+    100 tokens
+    30% platform fee
+    Host gets 70 tokens
+    """
+
+    return round(
+        float(token_cost) *
+        HOST_EARNING_PERCENT / 100,
+        2
+    )
+
+
+# ============================================================
+# 🤖 TELEGRAM
+# ============================================================
+
+def telegram_api(method: str, payload: dict):
+    """
+    Simple Telegram API helper.
+    """
+    if not TELEGRAM_BOT_TOKEN:
+        logger.warning("Telegram bot token not configured.")
+        return None
+
+    try:
+        import requests
+
+        url = (
+            f"https://api.telegram.org/"
+            f"bot{TELEGRAM_BOT_TOKEN}/{method}"
+        )
+
+        response = requests.post(
+            url,
+            json=payload,
+            timeout=15
+        )
+
+        return response.json()
+
+    except Exception as e:
+        logger.error(
+            "Telegram API error: %s",
+            e
+        )
+
+        return None
+
+
+def send_telegram_message(
+    chat_id: int,
+    text: str,
+    reply_markup: Optional[dict] = None
+):
+    payload = {
+        "chat_id": int(chat_id),
+        "text": text,
+        "parse_mode": "HTML",
+    }
+
     if reply_markup:
         payload["reply_markup"] = reply_markup
-    try:
-        requests.post(f"{TELEGRAM_API_URL}/sendMessage", json=payload)
-    except Exception as e:
-        print("Telegram Error:", e)
 
-@app.on_event("startup")
-def set_webhook_on_startup():
-    render_url = "https://vynora-bot.onrender.com/telegram-webhook"
-    webhook_api = f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook?url={render_url}"
-    try:
-        requests.get(webhook_api)
-    except Exception as e:
-        print("Webhook setup error:", e)
+    return telegram_api(
+        "sendMessage",
+        payload
+    )
+
+
+def answer_callback_query(
+    callback_query_id: str
+):
+    return telegram_api(
+        "answerCallbackQuery",
+        {
+            "callback_query_id": callback_query_id
+        }
+    )
+
+
+# ============================================================
+# 🏠 ROOT
+# ============================================================
+
+@app.get("/")
+def root():
+    return {
+        "status": "online",
+        "app": APP_NAME,
+        "version": "2.0.0",
+        "message": "🚀 Vynora Live Backend Running"
+    }
+
+
+@app.get("/health")
+def health():
+    return {
+        "status": "healthy",
+        "timestamp": now_ts()
+    }
+
+
+# ============================================================
+# 👤 USER
+# ============================================================
+
+class UserModel(BaseModel):
+    user_id: int
+    name: Optional[str] = ""
+    username: Optional[str] = ""
+
+
+@app.post("/api/user/register")
+def register_user(data: UserModel):
+
+    existing = get_user(data.user_id)
+
+    if existing:
+        users_col.update_one(
+            {"user_id": data.user_id},
+            {
+                "$set": {
+                    "name": data.name,
+                    "username": data.username,
+                    "updated_at": now_ts()
+                }
+            }
+        )
+
+        return {
+            "status": "success",
+            "message": "👤 User updated successfully"
+        }
+
+    users_col.insert_one({
+        "user_id": data.user_id,
+        "name": data.name,
+        "username": data.username,
+        "tokens": 0,
+        "created_at": now_ts(),
+        "updated_at": now_ts()
+    })
+
+    return {
+        "status": "success",
+        "message": "🎉 User registered successfully"
+    }
+
+
+@app.get("/api/user/{user_id}")
+def user_details(user_id: int):
+
+    user = get_user(user_id)
+
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail="User not found"
+        )
+
+    return {
+        "status": "success",
+        "user": serialize_doc(user)
+    }
+
+
+@app.get("/api/user/{user_id}/wallet")
+def user_wallet(user_id: int):
+
+    user = get_user(user_id)
+
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail="User not found"
+        )
+
+    return {
+        "status": "success",
+        "tokens": safe_float(
+            user.get("tokens", 0)
+        )
+    }
+
+
+# ============================================================
+# 👩 HOST
+# ============================================================
 
 class HostRegisterModel(BaseModel):
     user_id: int
+    host_id: Optional[str] = None
     name: str
-    age: int
-    rate: int
-    lang: str
-    loc: str
-    bio: str
+    username: Optional[str] = ""
+    rate: float = DEFAULT_HOST_RATE
+    duration_mins: int = DEFAULT_DURATION_MINS
 
-class UpdateRateModel(BaseModel):
-    user_id: int
-    rate: int
+
+@app.post("/api/host/register")
+def register_host(data: HostRegisterModel):
+
+    host_id = (
+        data.host_id
+        or f"host_{data.user_id}"
+    )
+
+    existing = hosts_col.find_one({
+        "host_id": host_id
+    })
+
+    host_doc = {
+        "host_id": host_id,
+        "user_id": data.user_id,
+        "name": data.name,
+        "username": data.username,
+        "rate": data.rate,
+        "duration_mins": data.duration_mins,
+        "online": False,
+        "approved": False,
+        "updated_at": now_ts()
+    }
+
+    if existing:
+
+        hosts_col.update_one(
+            {"_id": existing["_id"]},
+            {"$set": host_doc}
+        )
+
+    else:
+
+        host_doc["created_at"] = now_ts()
+
+        hosts_col.insert_one(
+            host_doc
+        )
+
+    return {
+        "status": "success",
+        "host_id": host_id,
+        "message": "👩 Host profile saved successfully"
+    }
+
+
+@app.post("/api/host/status")
+def host_status(data: dict):
+
+    host_id = str(
+        data.get("host_id")
+    )
+
+    online = bool(
+        data.get("online", False)
+    )
+
+    result = hosts_col.update_one(
+        {"host_id": host_id},
+        {
+            "$set": {
+                "online": online,
+                "updated_at": now_ts()
+            }
+        }
+    )
+
+    if result.matched_count == 0:
+        raise HTTPException(
+            status_code=404,
+            detail="Host not found"
+        )
+
+    return {
+        "status": "success",
+        "online": online,
+        "message": (
+            "🟢 Host is now online"
+            if online
+            else "🔴 Host is now offline"
+        )
+    }
+
+
+@app.get("/api/hosts")
+def get_hosts():
+
+    hosts = list(
+        hosts_col.find({
+            "approved": {
+                "$ne": False
+            }
+        })
+    )
+
+    output = []
+
+    for host in hosts:
+
+        item = serialize_doc(host)
+
+        item["host_id"] = str(
+            host.get(
+                "host_id",
+                host.get("user_id", "")
+            )
+        )
+
+        item["rate"] = safe_float(
+            host.get(
+                "rate",
+                DEFAULT_HOST_RATE
+            )
+        )
+
+        item["duration_mins"] = safe_int(
+            host.get(
+                "duration_mins",
+                DEFAULT_DURATION_MINS
+            )
+        )
+
+        item["online"] = bool(
+            host.get("online", False)
+        )
+
+        output.append(item)
+
+    return {
+        "status": "success",
+        "hosts": output
+    }
+
+
+# ============================================================
+# 📞 BOOKING MODELS
+# ============================================================
 
 class BookingModel(BaseModel):
     user_id: int
     host_id: str
     host_name: str
-    duration_mins: int
-    token_cost: int
+    duration_mins: int = Field(
+        default=DEFAULT_DURATION_MINS,
+        ge=1,
+        le=180
+    )
+    token_cost: float = Field(
+        default=0,
+        ge=0
+    )
+
 
 class ActionBookingModel(BaseModel):
     booking_id: str
+    host_id: Optional[str] = None
 
-class CompleteBookingModel(BaseModel):
-    booking_id: str
 
-class StartCallModel(BaseModel):
-    booking_id: str
-
-class GiftModel(BaseModel):
-    user_id: int
-    host_id: str
-    gift_cost: int
-    gift_name: str
-    channel: str
-    sender_name: str
-
-class ChatModel(BaseModel):
-    channel: str
-    sender: str
-    text: str
-    type: str = "chat"
-
-class WithdrawModel(BaseModel):
-    user_id: int
-    upi_id: str
-    tokens: int
-
-@app.get("/api/user/{user_id}")
-def get_user(user_id: int):
-    user = users_col.find_one({"user_id": int(user_id)})
-    if user and user.get("is_banned", False):
-        return {"tokens": 0, "earnings": 0, "net_earnings_tokens": 0, "net_earnings_inr": 0, "avatar": "", "is_banned": True}
-        
-    if not user:
-        user = {"user_id": int(user_id), "tokens": 0, "earnings": 0, "avatar": "", "is_banned": False}
-        users_col.insert_one(user)
-        send_telegram_message(GROUP_2_ID, f"👤 <b>New User Started Bot!</b>\nID: <code>{user_id}</code>")
-    
-    raw_earnings = user.get("earnings", 0)
-    net_earnings_tokens = int(raw_earnings * 0.7)
-    net_earnings_inr = net_earnings_tokens
-
-    return {
-        "tokens": user.get("tokens", 0), 
-        "earnings": raw_earnings,
-        "net_earnings_tokens": net_earnings_tokens,
-        "net_earnings_inr": net_earnings_inr,
-        "avatar": user.get("avatar", ""),
-        "is_banned": False
-    }
-
-@app.get("/api/host/status/{user_id}")
-def get_host_status(user_id: int):
-    host = hosts_col.find_one({
-        "$or": [
-            {"user_id": int(user_id)},
-            {"id": str(user_id)},
-            {"id": f"h_{user_id}"},
-            {"_id": f"host_{user_id}"}
-        ]
-    })
-    if host:
-        return {"is_host": True, "status": host.get("status", "pending"), "is_online": host.get("is_online", False)}
-    return {"is_host": False, "status": "none", "is_online": False}
-
-@app.post("/api/host/toggle-live/{user_id}")
-def toggle_host_live(user_id: int):
-    host = hosts_col.find_one({
-        "$or": [
-            {"user_id": int(user_id)},
-            {"id": str(user_id)},
-            {"id": f"h_{user_id}"},
-            {"_id": f"host_{user_id}"}
-        ]
-    })
-    if not host or host.get("status") != "approved":
-        return {"status": "error", "message": "Host not found or not approved"}
-    new_status = not host.get("is_online", False)
-    hosts_col.update_one({"_id": host["_id"]}, {"$set": {"is_online": new_status}})
-    return {"status": "success", "is_online": new_status}
-
-@app.post("/api/host/update-rate")
-def update_host_rate(data: UpdateRateModel):
-    host = hosts_col.find_one({"user_id": int(data.user_id), "status": "approved"})
-    if not host:
-        return {"status": "error", "message": "Approved host not found"}
-    hosts_col.update_one({"user_id": int(data.user_id)}, {"$set": {"rate": data.rate}})
-    return {"status": "success", "message": "Call rate updated successfully!"}
-
-@app.get("/api/hosts")
-def get_hosts():
-    db_hosts = list(hosts_col.find({"status": "approved"}, {"_id": 0}))
-    dummy_hosts = [
-        {"id": "dummy_1", "user_id": 9991, "name": "Sophia 💎", "age": 22, "rate": 40, "lang": "English", "loc": "UK", "img": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&auto=format&fit=crop", "bio": "International VIP Model ✨", "is_online": True, "is_dummy": True},
-        {"id": "dummy_2", "user_id": 9992, "name": "Ananya 🔥", "age": 21, "rate": 50, "lang": "Hindi", "loc": "Mumbai", "img": "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400&auto=format&fit=crop", "bio": "Bollywood dancer & host 💃", "is_online": True, "is_dummy": True},
-        {"id": "dummy_3", "user_id": 9993, "name": "Elena 👑", "age": 23, "rate": 60, "lang": "French", "loc": "France", "img": "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&auto=format&fit=crop", "bio": "Parisian fashion enthusiast 🌸", "is_online": True, "is_dummy": True},
-        {"id": "dummy_4", "user_id": 9994, "name": "Natasha ✨", "age": 20, "rate": 45, "lang": "Russian", "loc": "Russia", "img": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop", "bio": "Professional singer & artist 🎶", "is_online": True, "is_dummy": True},
-        {"id": "dummy_5", "user_id": 9995, "name": "Priya 💫", "age": 22, "rate": 35, "lang": "Hindi", "loc": "Delhi", "img": "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=400&auto=format&fit=crop", "bio": "Friendly companion & gamer 🎮", "is_online": True, "is_dummy": True}
-    ]
-    all_hosts = dummy_hosts + db_hosts
-    for h in all_hosts:
-        if not h.get("id"):
-            h["id"] = f"h_{h.get('user_id')}"
-    return {"hosts": all_hosts}
-
-@app.get("/api/agora-token")
-def get_agora_token(channelName: str, uid: int, role: str):
-    privilege_expired_ts = int(time.time()) + 3600
-    rtc_role = 1 if role == "publisher" else 2
-    token = RtcTokenBuilder.buildTokenWithUid(
-        AGORA_APP_ID, AGORA_APP_CERTIFICATE, channelName, int(uid), rtc_role, privilege_expired_ts
-    )
-    return {"status": "success", "token": token, "appId": AGORA_APP_ID, "channel": channelName, "uid": int(uid)}
+# ============================================================
+# 📞 BOOK SLOT
+# ============================================================
 
 @app.post("/api/book-slot")
 def book_slot(data: BookingModel):
-    if str(data.host_id).startswith("dummy_"):
-        return {"status": "error", "message": "✨ Host is currently busy in a private international session. Please try another host!"}
 
-    user = users_col.find_one({"user_id": int(data.user_id)})
-    if not user or user.get("tokens", 0) < data.token_cost:
-        return {"status": "error", "message": f"Insufficient tokens! You need {data.token_cost} tokens. Please recharge."}
+    user = get_user(
+        data.user_id
+    )
 
-    users_col.update_one({"user_id": int(data.user_id)}, {"$inc": {"tokens": -data.token_cost}})
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail="User not found"
+        )
 
-    booking_id = str(uuid.uuid4())[:8]
-    clean_host_id = str(data.host_id).replace("h_", "").replace("host_", "")
-    channel_name = f"private_call_{clean_host_id}_{data.user_id}"
+    host = get_host(
+        data.host_id
+    )
 
-    current_time = time.time()
-    booking_doc = {
-        "booking_id": booking_id,
-        "user_id": int(data.user_id),
-        "host_id": data.host_id,
-        "host_name": data.host_name,
-        "duration_mins": data.duration_mins,
-        "token_cost": data.token_cost,
-        "channel_name": channel_name,
-        "status": "pending",
-        "time": current_time,
-        "call_started_at": current_time
-    }
-    bookings_col.insert_one(booking_doc)
+    if not host:
+        raise HTTPException(
+            status_code=404,
+            detail="Host not found"
+        )
 
-    host = hosts_col.find_one({
-        "$or": [
-            {"id": data.host_id},
-            {"_id": f"host_{clean_host_id}"},
-            {"user_id": int(clean_host_id) if clean_host_id.isdigit() else 0}
-        ]
-    })
-    
-    if host:
-        host_telegram_id = host.get("user_id") or (int(clean_host_id) if clean_host_id.isdigit() else None)
-        if host_telegram_id:
-            keyboard = {
-                "inline_keyboard": [
-                    [
-                        {"text": "✅ Accept & Join", "callback_data": f"accept_bk_{booking_id}"},
-                        {"text": "❌ Reject", "callback_data": f"reject_bk_{booking_id}"}
-                    ]
-                ]
+    # --------------------------------------------------------
+    # Use selected booking plan if token_cost provided.
+    # Otherwise calculate from host rate.
+    # --------------------------------------------------------
+
+    token_cost = safe_float(
+        data.token_cost
+    )
+
+    if token_cost <= 0:
+
+        host_rate = safe_float(
+            host.get(
+                "rate",
+                DEFAULT_HOST_RATE
+            )
+        )
+
+        duration = safe_int(
+            host.get(
+                "duration_mins",
+                data.duration_mins
+            )
+        )
+
+        token_cost = round(
+            host_rate * duration,
+            2
+        )
+
+    else:
+        duration = data.duration_mins
+
+    current_tokens = safe_float(
+        user.get("tokens", 0)
+    )
+
+    if current_tokens < token_cost:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"❌ Insufficient tokens. "
+                f"Required: {token_cost}, "
+                f"Available: {current_tokens}"
+            )
+        )
+
+    # --------------------------------------------------------
+    # 🔐 ATOMIC TOKEN DEDUCTION
+    # --------------------------------------------------------
+
+    wallet_result = users_col.update_one(
+        {
+            "user_id": data.user_id,
+            "tokens": {
+                "$gte": token_cost
             }
-            msg = f"🔔 <b>New Private Booking Request!</b>\n\n👤 User ID: <code>{data.user_id}</code>\n⏱️ Duration: {data.duration_mins} Mins\n🪙 Cost: {data.token_cost} Tokens"
-            send_telegram_message(host_telegram_id, msg, reply_markup=keyboard)
-            
-            group_msg = f"📌 <b>New Booking Received!</b>\nHost: {data.host_name}\nUser ID: <code>{data.user_id}</code>\nDuration: {data.duration_mins} Mins\nTokens: {data.token_cost}"
-            send_telegram_message(GROUP_1_ID, group_msg)
-            send_telegram_message(GROUP_3_ID, group_msg)
+        },
+        {
+            "$inc": {
+                "tokens": -token_cost
+            }
+        }
+    )
 
-    return {"status": "success", "booking_id": booking_id}
+    if wallet_result.modified_count != 1:
 
-@app.get("/api/host/bookings/{user_id}")
-def get_host_bookings(user_id: int):
-    try:
-        host = hosts_col.find_one({
-            "$or": [
-                {"user_id": int(user_id)},
-                {"id": str(user_id)},
-                {"id": f"h_{user_id}"},
-                {"_id": f"host_{user_id}"}
-            ]
-        })
-        if not host:
-            return {"bookings": []}
-        
-        h_ids = [str(user_id), f"h_{user_id}", f"host_{user_id}"]
-        if host.get("id"):
-            h_ids.append(str(host.get("id")))
-        if host.get("user_id"):
-            h_ids.append(str(host.get("user_id")))
-            h_ids.append(f"h_{host.get('user_id')}")
+        raise HTTPException(
+            status_code=400,
+            detail="❌ Token deduction failed. Please try again."
+        )
 
-        now = time.time()
-        all_host_bookings = list(bookings_col.find({"host_id": {"$in": list(set(h_ids))}}))
-        for b in all_host_bookings:
-            start_time = b.get("time") or 0
-            if b.get("status") == "pending" and start_time > 0 and (now - start_time) > 600:
-                bookings_col.update_one({"_id": b["_id"]}, {"$set": {"status": "expired"}})
-                users_col.update_one({"user_id": int(b["user_id"])}, {"$inc": {"tokens": b["token_cost"]}})
-                send_telegram_message(int(b["user_id"]), f"❌ Booking expired. Host did not accept within 10 minutes. {b['token_cost']} tokens refunded.")
-                host_tg_id = host.get("user_id") or (int(user_id) if str(user_id).isdigit() else None)
-                if host_tg_id:
-                    send_telegram_message(host_tg_id, f"⚠️ Booking request from User {b['user_id']} expired because you didn't accept it within 10 minutes.")
-            elif b.get("status") == "approved":
-                duration_secs = b.get("duration_mins", 1) * 60
-                call_start = b.get("call_started_at", start_time)
-                if call_start == 0 or now > (call_start + duration_secs + 120):
-                    bookings_col.update_one({"_id": b["_id"]}, {"$set": {"status": "completed"}})
+    # --------------------------------------------------------
+    # 📞 CREATE PRIVATE CHANNEL
+    # --------------------------------------------------------
 
-        bookings_cursor = bookings_col.find({"host_id": {"$in": list(set(h_ids))}}).sort("time", -1)
-        host_bookings = []
-        for b in bookings_cursor:
-            b_id = str(b.get("booking_id") or b.get("_id"))
-            call_time_formatted = time.strftime('%Y-%m-%d %H:%M', time.localtime(b.get("time", time.time())))
-            host_bookings.append({
-                "booking_id": b_id,
-                "user_id": b.get("user_id"),
-                "host_id": b.get("host_id"),
-                "host_name": b.get("host_name"),
-                "duration_mins": b.get("duration_mins"),
-                "token_cost": b.get("token_cost"),
-                "channel_name": b.get("channel_name", f"private_call_{user_id}_{b.get('user_id')}"),
-                "status": b.get("status", "pending"),
-                "call_started_at": b.get("call_started_at", b.get("time", time.time())),
-                "formatted_time": call_time_formatted,
-                "time": b.get("time", 0)
-            })
-        return {"bookings": host_bookings}
-    except Exception as e:
-        print("Error in host bookings:", str(e))
-        return {"bookings": []}
+    booking_id = str(
+        uuid.uuid4()
+    )[:12]
 
-@app.post("/api/host/accept-booking")
-def accept_booking(data: ActionBookingModel):
-    booking = bookings_col.find_one({
-        "$or": [
-            {"booking_id": data.booking_id},
-            {"_id": data.booking_id}
-        ]
-    })
-    
-    if not booking or booking.get("status") != "pending":
-        return {"status": "error", "message": "Booking not found or already processed"}
-    
-    bookings_col.update_one({"_id": booking["_id"]}, {"$set": {"status": "approved"}})
-    
-    h_val = str(booking["host_id"])
-    clean_h = h_val.replace("h_", "").replace("host_", "")
-    host = hosts_col.find_one({
-        "$or": [
-            {"id": h_val},
-            {"_id": f"host_{clean_h}"},
-            {"user_id": int(clean_h) if clean_h.isdigit() else 0}
-        ]
-    })
-    if host and "user_id" in host:
-        users_col.update_one({"user_id": int(host["user_id"])}, {"$inc": {"earnings": booking["token_cost"]}}, upsert=True)
-    
-    webapp_url = "https://vynora-bot.onrender.com/static/index.html"
-    user_keyboard = {"inline_keyboard": [[{"text": "📞 Answer Call", "web_app": {"url": webapp_url}}]]}
-    send_telegram_message(int(booking["user_id"]), f"📞 <b>Incoming Video Call!</b> Host accepted your booking. Tap below to pick up.", reply_markup=user_keyboard)
-    
-    return {"status": "success", "message": "Booking accepted successfully!", "channel_name": booking.get("channel_name")}
+    clean_id = clean_host_id(
+        data.host_id
+    )
 
-@app.post("/api/start-call")
-def start_call(data: StartCallModel):
-    booking = bookings_col.find_one({
-        "$or": [
-            {"booking_id": data.booking_id},
-            {"_id": data.booking_id}
-        ]
-    })
-    if booking:
-        current_time = time.time()
-        bookings_col.update_one({"_id": booking["_id"]}, {"$set": {"call_started_at": current_time}})
-        return {"status": "success", "call_started_at": current_time}
-    return {"status": "error", "message": "Booking not found"}
+    channel_name = (
+        f"private_call_"
+        f"{clean_id}_"
+        f"{data.user_id}_"
+        f"{booking_id}"
+    )
 
-@app.post("/api/host/reject-booking")
-def reject_booking(data: ActionBookingModel):
-    booking = bookings_col.find_one({
-        "$or": [
-            {"booking_id": data.booking_id},
-            {"_id": data.booking_id}
-        ]
-    })
-    
-    if not booking:
-        return {"status": "error", "message": "Booking not found"}
-    
-    bookings_col.update_one({"_id": booking["_id"]}, {"$set": {"status": "rejected"}})
-    users_col.update_one({"user_id": int(booking["user_id"])}, {"$inc": {"tokens": booking["token_cost"]}})
-    
-    send_telegram_message(int(booking["user_id"]), f"❌ Booking rejected. {booking['token_cost']} tokens refunded.")
-    return {"status": "success", "message": "Booking rejected and tokens refunded!"}
+    current_time = now_ts()
 
-@app.post("/api/complete-booking")
-def complete_booking(data: CompleteBookingModel):
-    booking = bookings_col.find_one({
-        "$or": [
-            {"booking_id": data.booking_id},
-            {"_id": data.booking_id}
-        ]
-    })
-    if booking:
-        bookings_col.update_one({"_id": booking["_id"]}, {"$set": {"status": "completed"}})
-        return {"status": "success", "message": "Booking marked as completed"}
-    return {"status": "error", "message": "Booking not found"}
+    # --------------------------------------------------------
+    # 🚨 IMPORTANT TIMER FIX
+    #
+    # Booking time != Call start time
+    #
+    # session_started_at stays None
+    # until BOTH participants join Agora.
+    # --------------------------------------------------------
+
+    booking_doc = {
+
+        "booking_id": booking_id,
+
+        "user_id": int(
+            data.user_id
+        ),
+
+        "host_id": str(
+            data.host_id
+        ),
+
+        "host_name": data.host_name,
+
+        "duration_mins": int(
+            duration
+        ),
+
+        "token_cost": float(
+            token_cost
+        ),
+
+        "channel_name": channel_name,
+
+        "status": "pending",
+
+        "session_status": "waiting",
+
+        "created_at": current_time,
+
+        "accepted_at": None,
+
+        "user_joined_at": None,
+
+        "host_joined_at": None,
+
+        "session_started_at": None,
+
+        "session_ended_at": None,
+
+        "earnings_credited": False,
+
+        "call_started_at": None,
+
+        "last_updated_at": current_time
+    }
+
+    bookings_col.insert_one(
+        booking_doc
+    )
+
+    # --------------------------------------------------------
+    # 📩 Notify host
+    # --------------------------------------------------------
+
+    host_user_id = host.get(
+        "user_id"
+    )
+
+    if host_user_id:
+
+        keyboard = {
+            "inline_keyboard": [[
+                {
+                    "text": "✅ Accept Call",
+                    "callback_data":
+                        f"accept_bk_{booking_id}"
+                },
+                {
+                    "text": "❌ Reject",
+                    "callback_data":
+                        f"reject_bk_{booking_id}"
+                }
+            ]]
+        }
+
+        send_telegram_message(
+            int(host_user_id),
+            (
+                "📞 <b>New Private Call Request</b>\n\n"
+                f"👤 User ID: <code>{data.user_id}</code>\n"
+                f"⏱️ Duration: <b>{duration} min</b>\n"
+                f"💰 Tokens: <b>{token_cost}</b>\n\n"
+                "👇 Please choose an option:"
+            ),
+            keyboard
+        )
+
+    return {
+        "status": "success",
+        "booking_id": booking_id,
+        "channel_name": channel_name,
+        "duration_mins": duration,
+        "token_cost": token_cost,
+
+        # IMPORTANT:
+        "session_started_at": None,
+
+        "message": (
+            "📞 Call request sent successfully. "
+            "⏳ Timer will start only when "
+            "both User and Host join the call."
+        )
+    }
+
+
+# ============================================================
+# 📋 USER BOOKINGS
+# ============================================================
 
 @app.get("/api/user/bookings/{user_id}")
-def get_user_bookings(user_id: int):
-    try:
-        now = time.time()
-        user_raw_bookings = list(bookings_col.find({"user_id": int(user_id)}))
-        for b in user_raw_bookings:
-            start_time = b.get("time") or 0
-            if b.get("status") == "pending" and start_time > 0 and (now - start_time) > 600:
-                bookings_col.update_one({"_id": b["_id"]}, {"$set": {"status": "expired"}})
-                users_col.update_one({"user_id": int(b["user_id"])}, {"$inc": {"tokens": b["token_cost"]}})
-            elif b.get("status") == "approved":
-                duration_secs = b.get("duration_mins", 1) * 60
-                call_start = b.get("call_started_at", start_time)
-                if call_start == 0 or now > (call_start + duration_secs + 120):
-                    bookings_col.update_one({"_id": b["_id"]}, {"$set": {"status": "completed"}})
+def user_bookings(user_id: int):
 
-        user_bookings_cursor = bookings_col.find({"user_id": int(user_id)}, {"_id": 0}).sort("time", -1)
-        user_bookings = []
-        for b in user_bookings_cursor:
-            call_time_formatted = time.strftime('%Y-%m-%d %H:%M', time.localtime(b.get("time", time.time())))
-            h_val = str(b.get("host_id"))
-            clean_h = h_val.replace("h_", "").replace("host_", "")
-            host = hosts_col.find_one({
-                "$or": [
-                    {"id": h_val},
-                    {"_id": f"host_{clean_h}"},
-                    {"user_id": int(clean_h) if clean_h.isdigit() else 0}
-                ]
-            })
-            if host:
-                b["host_user_id"] = host.get("user_id") or (int(clean_h) if clean_h.isdigit() else 0)
-                b["host_img"] = host.get("img")
-            if not b.get("channel_name"):
-                b["channel_name"] = f"private_call_{clean_h}_{user_id}"
-            
-            b["call_started_at"] = b.get("call_started_at", b.get("time", time.time()))
-            b["formatted_time"] = call_time_formatted
-            user_bookings.append(b)
+    bookings = list(
+        bookings_col.find({
+            "user_id": int(user_id)
+        }).sort(
+            "created_at",
+            -1
+        )
+    )
 
-        return {"bookings": user_bookings}
-    except Exception as e:
-        print("Error in user bookings:", str(e))
-        return {"bookings": []}
-
-@app.post("/api/register-host")
-def register_host(data: HostRegisterModel):
-    host_data = data.dict()
-    host_data["status"] = "pending"
-    host_data["id"] = f"h_{data.user_id}"
-    host_data["_id"] = f"host_{data.user_id}"
-    host_data["user_id"] = int(data.user_id)
-    host_data["is_online"] = False
-    host_data["img"] = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop"
-    
-    hosts_col.update_one({"user_id": int(data.user_id)}, {"$set": host_data}, upsert=True)
-    
-    keyboard = {
-        "inline_keyboard": [
-            [
-                {"text": "✅ Approve Host", "callback_data": f"approve_host_{data.user_id}"},
-                {"text": "❌ Reject Host", "callback_data": f"reject_host_{data.user_id}"}
-            ]
-        ]
+    return {
+        "status": "success",
+        "bookings": serialize_many(
+            bookings
+        )
     }
-    send_telegram_message(GROUP_1_ID, f"📹 <b>New Host Application!</b>\nName: {data.name}\nAge: {data.age}\nRate: {data.rate} Tokens/min\nID: <code>{data.user_id}</code>", reply_markup=keyboard)
-    return {"status": "success", "message": "Host registered successfully! Waiting for admin approval."}
+
+
+# ============================================================
+# 📋 HOST BOOKINGS
+# ============================================================
+
+@app.get("/api/host/bookings/{host_id}")
+def host_bookings(host_id: str):
+
+    bookings = list(
+        bookings_col.find({
+            "host_id": str(host_id)
+        }).sort(
+            "created_at",
+            -1
+        )
+    )
+
+    return {
+        "status": "success",
+        "bookings": serialize_many(
+            bookings
+        )
+    }
+
+
+# ============================================================
+# ✅ ACCEPT BOOKING
+# ============================================================
+
+def approve_booking(
+    booking: dict
+):
+
+    if not booking:
+        return {
+            "status": "error",
+            "message": "Booking not found"
+        }
+
+    if booking.get("status") != "pending":
+
+        return {
+            "status": "error",
+            "message": (
+                "⚠️ This booking is already "
+                "processed."
+            )
+        }
+
+    accepted_at = now_ts()
+
+    # --------------------------------------------------------
+    # IMPORTANT:
+    # DO NOT START TIMER HERE.
+    # --------------------------------------------------------
+
+    result = bookings_col.update_one(
+        {
+            "_id": booking["_id"],
+            "status": "pending"
+        },
+        {
+            "$set": {
+                "status": "approved",
+                "session_status": "waiting",
+                "accepted_at": accepted_at,
+                "last_updated_at": accepted_at
+            }
+        }
+    )
+
+    if result.modified_count != 1:
+
+        return {
+            "status": "error",
+            "message": "Booking was already processed."
+        }
+
+    # --------------------------------------------------------
+    # Notify user
+    # --------------------------------------------------------
+
+    send_telegram_message(
+        int(booking["user_id"]),
+        (
+            "📞 <b>Your Call Request Was Accepted!</b>\n\n"
+            "👩 Host has accepted your call.\n"
+            "⏳ Your call timer will start only "
+            "when both participants join.\n\n"
+            "🎥 Please tap <b>Answer Call</b>."
+        )
+    )
+
+    return {
+        "status": "success",
+        "message": "✅ Booking approved",
+        "booking_id": booking["booking_id"]
+    }
+
+
+@app.post("/api/host/accept-booking")
+def accept_booking(
+    data: ActionBookingModel
+):
+
+    booking = get_booking(
+        data.booking_id
+    )
+
+    if not booking:
+
+        raise HTTPException(
+            status_code=404,
+            detail="Booking not found"
+        )
+
+    return approve_booking(
+        booking
+    )
+
+
+# ============================================================
+# ❌ REJECT BOOKING
+# ============================================================
+
+def reject_booking(
+    booking: dict
+):
+
+    if not booking:
+        return {
+            "status": "error",
+            "message": "Booking not found"
+        }
+
+    if booking.get("status") != "pending":
+
+        return {
+            "status": "error",
+            "message": "Booking already processed."
+        }
+
+    # --------------------------------------------------------
+    # Refund user's tokens
+    # --------------------------------------------------------
+
+    token_cost = safe_float(
+        booking.get("token_cost", 0)
+    )
+
+    bookings_col.update_one(
+        {
+            "_id": booking["_id"],
+            "status": "pending"
+        },
+        {
+            "$set": {
+                "status": "rejected",
+                "session_status": "ended",
+                "session_ended_at": now_ts(),
+                "last_updated_at": now_ts()
+            }
+        }
+    )
+
+    if token_cost > 0:
+
+        users_col.update_one(
+            {
+                "user_id": int(
+                    booking["user_id"]
+                )
+            },
+            {
+                "$inc": {
+                    "tokens": token_cost
+                }
+            }
+        )
+
+    send_telegram_message(
+        int(booking["user_id"]),
+        (
+            "❌ <b>Call Request Rejected</b>\n\n"
+            f"💰 <b>{token_cost}</b> tokens "
+            "have been refunded to your wallet."
+        )
+    )
+
+    return {
+        "status": "success",
+        "message": "❌ Booking rejected and tokens refunded."
+    }
+
+
+@app.post("/api/host/reject-booking")
+def reject_booking_api(
+    data: ActionBookingModel
+):
+
+    booking = get_booking(
+        data.booking_id
+    )
+
+    if not booking:
+
+        raise HTTPException(
+            status_code=404,
+            detail="Booking not found"
+        )
+
+    return reject_booking(
+        booking
+    )
+
+
+# ============================================================
+# 🎥 START CALL / JOIN SESSION
+# ============================================================
+
+class StartCallModel(BaseModel):
+
+    booking_id: str
+
+    user_id: int
+
+    role: str
+
+
+@app.post("/api/start-call")
+def start_call(
+    data: StartCallModel
+):
+
+    role = str(
+        data.role
+    ).lower().strip()
+
+    if role not in (
+        "user",
+        "host"
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid role"
+        )
+
+    booking = get_booking(
+        data.booking_id
+    )
+
+    if not booking:
+
+        raise HTTPException(
+            status_code=404,
+            detail="Booking not found"
+        )
+
+    # --------------------------------------------------------
+    # 🔐 PARTICIPANT VALIDATION
+    # --------------------------------------------------------
+
+    if role == "user":
+
+        if safe_int(
+            booking.get("user_id")
+        ) != int(data.user_id):
+
+            raise HTTPException(
+                status_code=403,
+                detail="User is not part of this booking."
+            )
+
+    if role == "host":
+
+        booking_host = str(
+            booking.get("host_id")
+        )
+
+        requested_host = str(
+            data.user_id
+        )
+
+        host_match = (
+            booking_host == requested_host
+            or clean_host_id(
+                booking_host
+            ) == requested_host
+        )
+
+        host_doc = get_host(
+            booking_host
+        )
+
+        if host_doc:
+
+            host_match = (
+                host_match
+                or safe_int(
+                    host_doc.get("user_id")
+                ) == int(data.user_id)
+            )
+
+        if not host_match:
+
+            raise HTTPException(
+                status_code=403,
+                detail="Host is not part of this booking."
+            )
+
+    # --------------------------------------------------------
+    # Only approved/active calls can start
+    # --------------------------------------------------------
+
+    if booking.get("status") not in (
+        "approved",
+        "active"
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Call is not approved yet."
+            )
+        )
+
+    current_time = now_ts()
+
+    # --------------------------------------------------------
+    # Record participant join
+    # --------------------------------------------------------
+
+    if role == "user":
+
+        bookings_col.update_one(
+            {
+                "_id": booking["_id"],
+                "user_joined_at": None
+            },
+            {
+                "$set": {
+                    "user_joined_at": current_time,
+                    "last_updated_at": current_time
+                }
+            }
+        )
+
+    elif role == "host":
+
+        bookings_col.update_one(
+            {
+                "_id": booking["_id"],
+                "host_joined_at": None
+            },
+            {
+                "$set": {
+                    "host_joined_at": current_time,
+                    "last_updated_at": current_time
+                }
+            }
+        )
+
+    # --------------------------------------------------------
+    # Reload booking
+    # --------------------------------------------------------
+
+    booking = bookings_col.find_one({
+        "_id": booking["_id"]
+    })
+
+    user_joined = booking.get(
+        "user_joined_at"
+    )
+
+    host_joined = booking.get(
+        "host_joined_at"
+    )
+
+    session_started = booking.get(
+        "session_started_at"
+    )
+
+    # --------------------------------------------------------
+    # 🚀 BOTH PARTICIPANTS JOINED
+    # --------------------------------------------------------
+
+    if (
+        user_joined is not None
+        and host_joined is not None
+        and session_started is None
+    ):
+
+        actual_start = now_ts()
+
+        # ----------------------------------------------------
+        # Atomic protection:
+        # Only ONE request can officially start timer.
+        # ----------------------------------------------------
+
+        result = bookings_col.update_one(
+            {
+                "_id": booking["_id"],
+
+                "session_status": "waiting",
+
+                "user_joined_at": {
+                    "$exists": True,
+                    "$ne": None
+                },
+
+                "host_joined_at": {
+                    "$exists": True,
+                    "$ne": None
+                },
+
+                "$or": [
+                    {
+                        "session_started_at": None
+                    },
+                    {
+                        "session_started_at": {
+                            "$exists": False
+                        }
+                    }
+                ]
+            },
+            {
+                "$set": {
+                    "session_started_at":
+                        actual_start,
+
+                    "call_started_at":
+                        actual_start,
+
+                    "session_status":
+                        "active",
+
+                    "status":
+                        "active",
+
+                    "last_updated_at":
+                        actual_start
+                }
+            }
+        )
+
+        # If another request started it,
+        # read the official value.
+        booking = bookings_col.find_one({
+            "_id": booking["_id"]
+        })
+
+        session_started = booking.get(
+            "session_started_at"
+        )
+
+    # --------------------------------------------------------
+    # Calculate server-authoritative timer
+    # --------------------------------------------------------
+
+    duration_secs = (
+        safe_int(
+            booking.get(
+                "duration_mins",
+                DEFAULT_DURATION_MINS
+            )
+        ) * 60
+    )
+
+    remaining_seconds = None
+    session_ends_at = None
+
+    if session_started:
+
+        session_ends_at = (
+            float(session_started)
+            + duration_secs
+        )
+
+        remaining_seconds = max(
+            0,
+            int(
+                session_ends_at
+                - now_ts()
+            )
+        )
+
+    return {
+        "status": "success",
+
+        "role": role,
+
+        "booking_id":
+            booking["booking_id"],
+
+        "user_joined_at":
+            booking.get(
+                "user_joined_at"
+            ),
+
+        "host_joined_at":
+            booking.get(
+                "host_joined_at"
+            ),
+
+        "session_started_at":
+            session_started,
+
+        "session_ends_at":
+            session_ends_at,
+
+        "duration_mins":
+            safe_int(
+                booking.get(
+                    "duration_mins",
+                    DEFAULT_DURATION_MINS
+                )
+            ),
+
+        "remaining_seconds":
+            remaining_seconds,
+
+        "session_status":
+            booking.get(
+                "session_status",
+                "waiting"
+            )
+    }
+
+
+# ============================================================
+# ⏱️ SESSION STATUS
+# ============================================================
+
+@app.get("/api/session/{booking_id}")
+def session_status(
+    booking_id: str
+):
+
+    booking = get_booking(
+        booking_id
+    )
+
+    if not booking:
+
+        raise HTTPException(
+            status_code=404,
+            detail="Booking not found"
+        )
+
+    duration_secs = (
+        safe_int(
+            booking.get(
+                "duration_mins",
+                DEFAULT_DURATION_MINS
+            )
+        ) * 60
+    )
+
+    session_started = booking.get(
+        "session_started_at"
+    )
+
+    remaining_seconds = None
+    session_ends_at = None
+
+    # --------------------------------------------------------
+    # Waiting for both participants
+    # --------------------------------------------------------
+
+    if not session_started:
+
+        return {
+            "status": "success",
+            "booking_id": booking_id,
+            "session_status":
+                booking.get(
+                    "session_status",
+                    "waiting"
+                ),
+            "session_started_at": None,
+            "session_ends_at": None,
+            "remaining_seconds": None,
+            "duration_mins":
+                safe_int(
+                    booking.get(
+                        "duration_mins",
+                        DEFAULT_DURATION_MINS
+                    )
+                ),
+            "user_joined":
+                booking.get(
+                    "user_joined_at"
+                ) is not None,
+            "host_joined":
+                booking.get(
+                    "host_joined_at"
+                ) is not None
+        }
+
+    session_ends_at = (
+        float(session_started)
+        + duration_secs
+    )
+
+    remaining_seconds = max(
+        0,
+        int(
+            session_ends_at
+            - now_ts()
+        )
+    )
+
+    # --------------------------------------------------------
+    # ⏰ Exact session expiration
+    # --------------------------------------------------------
+
+    if remaining_seconds <= 0:
+
+        ended_at = now_ts()
+
+        bookings_col.update_one(
+            {
+                "_id": booking["_id"],
+                "session_status": "active"
+            },
+            {
+                "$set": {
+                    "session_status": "ended",
+                    "status": "completed",
+                    "session_ended_at":
+                        ended_at,
+                    "last_updated_at":
+                        ended_at
+                }
+            }
+        )
+
+        booking = bookings_col.find_one({
+            "_id": booking["_id"]
+        })
+
+    return {
+        "status": "success",
+        "booking_id": booking_id,
+
+        "session_status":
+            booking.get(
+                "session_status"
+            ),
+
+        "session_started_at":
+            booking.get(
+                "session_started_at"
+            ),
+
+        "session_ends_at":
+            session_ends_at,
+
+        "remaining_seconds":
+            remaining_seconds,
+
+        "duration_mins":
+            safe_int(
+                booking.get(
+                    "duration_mins",
+                    DEFAULT_DURATION_MINS
+                )
+            )
+    }
+
+
+# ============================================================
+# 📞 COMPLETE BOOKING
+# ============================================================
+
+class CompleteBookingModel(BaseModel):
+    booking_id: str
+    user_id: Optional[int] = None
+    role: Optional[str] = None
+
+
+@app.post("/api/complete-booking")
+def complete_booking(
+    data: CompleteBookingModel
+):
+
+    booking = get_booking(
+        data.booking_id
+    )
+
+    if not booking:
+
+        raise HTTPException(
+            status_code=404,
+            detail="Booking not found"
+        )
+
+    # --------------------------------------------------------
+    # Participant verification
+    # --------------------------------------------------------
+
+    if data.user_id is not None:
+
+        role = (
+            data.role or ""
+        ).lower()
+
+        valid = False
+
+        if role == "user":
+
+            valid = (
+                safe_int(
+                    booking.get("user_id")
+                )
+                == int(data.user_id)
+            )
+
+        elif role == "host":
+
+            host = get_host(
+                booking.get("host_id")
+            )
+
+            valid = (
+                host is not None
+                and safe_int(
+                    host.get("user_id")
+                )
+                == int(data.user_id)
+            )
+
+        else:
+
+            valid = (
+                safe_int(
+                    booking.get("user_id")
+                )
+                == int(data.user_id)
+            )
+
+        if not valid:
+
+            raise HTTPException(
+                status_code=403,
+                detail="Not authorized."
+            )
+
+    ended_at = now_ts()
+
+    bookings_col.update_one(
+        {
+            "_id": booking["_id"],
+            "status": {
+                "$nin": [
+                    "completed",
+                    "rejected"
+                ]
+            }
+        },
+        {
+            "$set": {
+                "status": "completed",
+                "session_status": "ended",
+                "session_ended_at": ended_at,
+                "last_updated_at": ended_at
+            }
+        }
+    )
+
+    return {
+        "status": "success",
+        "message": "📞 Call ended successfully."
+    }
+
+
+# ============================================================
+# 🎟️ AGORA TOKEN
+# ============================================================
+
+class AgoraTokenModel(BaseModel):
+    channel_name: str
+    uid: int = 0
+    booking_id: Optional[str] = None
+    user_id: Optional[int] = None
+    role: Optional[str] = None
+
+
+@app.post("/api/agora/token")
+def generate_agora_token(
+    data: AgoraTokenModel
+):
+
+    if not AGORA_APP_ID:
+        raise HTTPException(
+            status_code=500,
+            detail="Agora App ID is not configured."
+        )
+
+    if not AGORA_APP_CERTIFICATE:
+        raise HTTPException(
+            status_code=500,
+            detail="Agora App Certificate is not configured."
+        )
+
+    # --------------------------------------------------------
+    # Private booking verification
+    # --------------------------------------------------------
+
+    if data.booking_id:
+
+        booking = get_booking(
+            data.booking_id
+        )
+
+        if not booking:
+
+            raise HTTPException(
+                status_code=404,
+                detail="Booking not found."
+            )
+
+        if data.user_id is not None:
+
+            role = (
+                data.role or ""
+            ).lower()
+
+            authorized = False
+
+            if role == "user":
+
+                authorized = (
+                    safe_int(
+                        booking.get("user_id")
+                    )
+                    == int(data.user_id)
+                )
+
+            elif role == "host":
+
+                host = get_host(
+                    booking.get("host_id")
+                )
+
+                authorized = (
+                    host is not None
+                    and safe_int(
+                        host.get("user_id")
+                    )
+                    == int(data.user_id)
+                )
+
+            if not authorized:
+
+                raise HTTPException(
+                    status_code=403,
+                    detail="Not authorized for this call."
+                )
+
+            # Channel verification
+            if (
+                booking.get("channel_name")
+                != data.channel_name
+            ):
+
+                raise HTTPException(
+                    status_code=403,
+                    detail="Invalid channel."
+                )
+
+    if RtcTokenBuilder is None:
+
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Agora token library is not installed."
+            )
+        )
+
+    # --------------------------------------------------------
+    # Agora token lifetime
+    # --------------------------------------------------------
+
+    expiration_time_in_seconds = 3600
+
+    privilege_expired_ts = int(
+        now_ts()
+        + expiration_time_in_seconds
+    )
+
+    token = RtcTokenBuilder.buildTokenWithUid(
+        AGORA_APP_ID,
+        AGORA_APP_CERTIFICATE,
+        data.channel_name,
+        int(data.uid),
+        1,
+        privilege_expired_ts
+    )
+
+    return {
+        "status": "success",
+        "token": token,
+        "app_id": AGORA_APP_ID,
+        "channel_name": data.channel_name,
+        "uid": int(data.uid),
+        "expires_at":
+            privilege_expired_ts
+    }
+
+
+# ============================================================
+# 💳 RECHARGE
+# ============================================================
+
+class RechargeModel(BaseModel):
+    user_id: int
+    amount: float = Field(
+        gt=0
+    )
+
 
 @app.post("/api/recharge")
-async def recharge(user_id: int = Form(...), amount_inr: int = Form(...), utr_number: str = Form(...), screenshot: UploadFile = File(...)):
-    tokens_expected = amount_inr if amount_inr < 500 else amount_inr + 50
-    recharge_id = str(int(time.time()))
-    recharges_col.insert_one({"recharge_id": recharge_id, "user_id": int(user_id), "amount_inr": amount_inr, "tokens_expected": tokens_expected, "utr_number": utr_number, "status": "pending"})
+def create_recharge(
+    data: RechargeModel
+):
 
-    keyboard = {"inline_keyboard": [[{"text": f"✅ Approve (+{tokens_expected})", "callback_data": f"approve_rc_{recharge_id}"}, {"text": "❌ Reject", "callback_data": f"reject_rc_{recharge_id}"}]]}
-    send_telegram_message(GROUP_1_ID, f"💳 <b>New Recharge Request!</b>\nUser ID: <code>{user_id}</code>\nAmount: ₹{amount_inr}\nUTR: <code>{utr_number}</code>", reply_markup=keyboard)
-    return {"status": "success", "message": "Recharge submitted! Waiting for admin approval."}
+    user = get_user(
+        data.user_id
+    )
+
+    if not user:
+
+        raise HTTPException(
+            status_code=404,
+            detail="User not found."
+        )
+
+    recharge_id = str(
+        uuid.uuid4()
+    )
+
+    recharge_doc = {
+
+        "recharge_id":
+            recharge_id,
+
+        "user_id":
+            int(data.user_id),
+
+        "amount":
+            float(data.amount),
+
+        "status":
+            "pending",
+
+        "created_at":
+            now_ts()
+    }
+
+    recharges_col.insert_one(
+        recharge_doc
+    )
+
+    return {
+        "status": "success",
+        "recharge_id":
+            recharge_id,
+        "message":
+            "💳 Recharge request created."
+    }
+
+
+# ============================================================
+# 📸 RECHARGE SCREENSHOT
+# ============================================================
+
+@app.post("/api/recharge/{recharge_id}/screenshot")
+async def upload_recharge_screenshot(
+    recharge_id: str,
+    file: UploadFile = File(...)
+):
+
+    recharge = recharges_col.find_one({
+        "recharge_id":
+            recharge_id
+    })
+
+    if not recharge:
+
+        raise HTTPException(
+            status_code=404,
+            detail="Recharge not found."
+        )
+
+    extension = os.path.splitext(
+        file.filename or ""
+    )[1].lower()
+
+    allowed_extensions = {
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".webp"
+    }
+
+    if extension not in allowed_extensions:
+
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid image format."
+        )
+
+    safe_filename = (
+        f"{uuid.uuid4()}"
+        f"{extension}"
+    )
+
+    file_path = os.path.join(
+        UPLOAD_DIR,
+        safe_filename
+    )
+
+    content = await file.read()
+
+    # Basic file size protection: 10 MB
+    if len(content) > 10 * 1024 * 1024:
+
+        raise HTTPException(
+            status_code=400,
+            detail="Image must be under 10 MB."
+        )
+
+    with open(
+        file_path,
+        "wb"
+    ) as f:
+
+        f.write(content)
+
+    relative_path = (
+        f"/uploads/{safe_filename}"
+    )
+
+    recharges_col.update_one(
+        {
+            "_id":
+                recharge["_id"]
+        },
+        {
+            "$set": {
+                "screenshot":
+                    relative_path,
+                "screenshot_uploaded_at":
+                    now_ts()
+            }
+        }
+    )
+
+    return {
+        "status": "success",
+        "screenshot":
+            relative_path,
+        "message":
+            "📸 Screenshot uploaded successfully."
+    }
+
+
+# ============================================================
+# 💰 ADMIN APPROVE RECHARGE
+# ============================================================
+
+class ApproveRechargeModel(BaseModel):
+    recharge_id: str
+
+
+@app.post("/api/admin/recharge/approve")
+def approve_recharge(
+    data: ApproveRechargeModel
+):
+
+    recharge = recharges_col.find_one({
+        "recharge_id":
+            data.recharge_id
+    })
+
+    if not recharge:
+
+        raise HTTPException(
+            status_code=404,
+            detail="Recharge not found."
+        )
+
+    if recharge.get("status") == "approved":
+
+        return {
+            "status": "success",
+            "message":
+                "Recharge already approved."
+        }
+
+    amount = safe_float(
+        recharge.get("amount", 0)
+    )
+
+    # --------------------------------------------------------
+    # Atomic status update prevents duplicate credit
+    # --------------------------------------------------------
+
+    result = recharges_col.update_one(
+        {
+            "_id":
+                recharge["_id"],
+            "status":
+                "pending"
+        },
+        {
+            "$set": {
+                "status":
+                    "approved",
+                "approved_at":
+                    now_ts()
+            }
+        }
+    )
+
+    if result.modified_count != 1:
+
+        return {
+            "status": "error",
+            "message":
+                "Recharge was already processed."
+        }
+
+    users_col.update_one(
+        {
+            "user_id":
+                int(recharge["user_id"])
+        },
+        {
+            "$inc": {
+                "tokens":
+                    amount
+            }
+        }
+    )
+
+    send_telegram_message(
+        int(recharge["user_id"]),
+        (
+            "🎉 <b>Recharge Successful!</b>\n\n"
+            f"💰 Added Tokens: <b>{amount}</b>\n"
+            "✅ Your wallet has been updated."
+        )
+    )
+
+    return {
+        "status": "success",
+        "message":
+            "💰 Recharge approved successfully."
+    }
+
+
+# ============================================================
+# 🎁 GIFTS
+# ============================================================
+
+class GiftModel(BaseModel):
+
+    user_id: int
+    host_id: str
+    gift_name: str
+    gift_value: float = Field(
+        gt=0
+    )
+
+
+@app.post("/api/gift/send")
+def send_gift(
+    data: GiftModel
+):
+
+    user = get_user(
+        data.user_id
+    )
+
+    if not user:
+
+        raise HTTPException(
+            status_code=404,
+            detail="User not found."
+        )
+
+    # --------------------------------------------------------
+    # Atomic wallet deduction
+    # --------------------------------------------------------
+
+    result = users_col.update_one(
+        {
+            "user_id":
+                data.user_id,
+            "tokens": {
+                "$gte":
+                    data.gift_value
+            }
+        },
+        {
+            "$inc": {
+                "tokens":
+                    -data.gift_value
+            }
+        }
+    )
+
+    if result.modified_count != 1:
+
+        raise HTTPException(
+            status_code=400,
+            detail="❌ Insufficient tokens."
+        )
+
+    gift_doc = {
+
+        "gift_id":
+            str(uuid.uuid4()),
+
+        "user_id":
+            data.user_id,
+
+        "host_id":
+            data.host_id,
+
+        "gift_name":
+            data.gift_name,
+
+        "gift_value":
+            data.gift_value,
+
+        "created_at":
+            now_ts()
+    }
+
+    chats_col.insert_one(
+        gift_doc
+    )
+
+    return {
+        "status": "success",
+        "message":
+            f"🎁 {data.gift_name} sent successfully!",
+        "gift":
+            serialize_doc(gift_doc)
+    }
+
+
+# ============================================================
+# 💬 CHAT
+# ============================================================
+
+class ChatMessageModel(BaseModel):
+
+    booking_id: str
+
+    sender_id: int
+
+    message: str
+
+
+@app.post("/api/chat/send")
+def send_chat(
+    data: ChatMessageModel
+):
+
+    booking = get_booking(
+        data.booking_id
+    )
+
+    if not booking:
+
+        raise HTTPException(
+            status_code=404,
+            detail="Booking not found."
+        )
+
+    message = (
+        data.message
+        .strip()
+    )
+
+    if not message:
+
+        raise HTTPException(
+            status_code=400,
+            detail="Message cannot be empty."
+        )
+
+    if len(message) > 2000:
+
+        raise HTTPException(
+            status_code=400,
+            detail="Message too long."
+        )
+
+    user_id = safe_int(
+        booking.get("user_id")
+    )
+
+    host = get_host(
+        booking.get("host_id")
+    )
+
+    host_user_id = (
+        safe_int(
+            host.get("user_id")
+        )
+        if host
+        else None
+    )
+
+    if data.sender_id not in (
+        user_id,
+        host_user_id
+    ):
+
+        raise HTTPException(
+            status_code=403,
+            detail="Not a participant."
+        )
+
+    chat_doc = {
+
+        "message_id":
+            str(uuid.uuid4()),
+
+        "booking_id":
+            data.booking_id,
+
+        "sender_id":
+            data.sender_id,
+
+        "message":
+            message,
+
+        "created_at":
+            now_ts()
+    }
+
+    chats_col.insert_one(
+        chat_doc
+    )
+
+    return {
+        "status":
+            "success",
+        "message":
+            serialize_doc(chat_doc)
+    }
+
+
+@app.get("/api/chat/{booking_id}")
+def get_chat(
+    booking_id: str
+):
+
+    messages = list(
+        chats_col.find({
+            "booking_id":
+                booking_id
+        }).sort(
+            "created_at",
+            1
+        )
+    )
+
+    return {
+        "status":
+            "success",
+        "messages":
+            serialize_many(
+                messages
+            )
+    }
+
+
+# ============================================================
+# 💸 WITHDRAWAL
+# ============================================================
+
+class WithdrawModel(BaseModel):
+
+    user_id: int
+
+    amount: float = Field(
+        gt=0
+    )
+
+    upi_id: str
+
 
 @app.post("/api/withdraw")
-def withdraw_earnings(data: WithdrawModel):
-    host = hosts_col.find_one({"user_id": int(data.user_id), "status": "approved"})
+def withdraw_earnings(
+    data: WithdrawModel
+):
+
+    user = get_user(
+        data.user_id
+    )
+
+    if not user:
+
+        raise HTTPException(
+            status_code=404,
+            detail="User not found."
+        )
+
+    current_tokens = safe_float(
+        user.get("tokens", 0)
+    )
+
+    if current_tokens < data.amount:
+
+        raise HTTPException(
+            status_code=400,
+            detail="❌ Insufficient wallet balance."
+        )
+
+    # --------------------------------------------------------
+    # Atomic deduction
+    # --------------------------------------------------------
+
+    result = users_col.update_one(
+        {
+            "user_id":
+                data.user_id,
+            "tokens": {
+                "$gte":
+                    data.amount
+            }
+        },
+        {
+            "$inc": {
+                "tokens":
+                    -data.amount
+            }
+        }
+    )
+
+    if result.modified_count != 1:
+
+        raise HTTPException(
+            status_code=400,
+            detail="Withdrawal could not be processed."
+        )
+
+    withdrawal_id = str(
+        uuid.uuid4()
+    )
+
+    withdrawal_doc = {
+
+        "withdrawal_id":
+            withdrawal_id,
+
+        "user_id":
+            data.user_id,
+
+        "amount":
+            data.amount,
+
+        "upi_id":
+            data.upi_id,
+
+        "status":
+            "pending",
+
+        "created_at":
+            now_ts()
+    }
+
+    withdrawals_col.insert_one(
+        withdrawal_doc
+    )
+
+    return {
+        "status":
+            "success",
+
+        "withdrawal_id":
+            withdrawal_id,
+
+        "message":
+            "💸 Withdrawal request submitted."
+    }
+
+
+# ============================================================
+# 💰 HOST EARNING CREDIT
+# ============================================================
+
+def credit_host_earning(
+    booking: dict
+):
+
+    if booking.get(
+        "earnings_credited",
+        False
+    ):
+
+        return False
+
+    host = get_host(
+        booking.get("host_id")
+    )
+
     if not host:
-        return {"status": "error", "message": "Withdrawal option is only available for approved hosts!"}
 
-    user = users_col.find_one({"user_id": int(data.user_id)})
-    net_earnings = int(user.get("earnings", 0) * 0.7)
-    if not user or net_earnings < data.tokens:
-        return {"status": "error", "message": "Insufficient net earnings balance (after 30% fee)!"}
+        return False
 
-    users_col.update_one({"user_id": int(data.user_id)}, {"$inc": {"earnings": -int(data.tokens / 0.7)}})
-    withdrawals_col.insert_one({"user_id": int(data.user_id), "upi_id": data.upi_id, "tokens": data.tokens, "status": "pending"})
-    send_telegram_message(GROUP_3_ID, f"💸 <b>New Withdrawal Request!</b>\nHost ID: <code>{data.user_id}</code>\nTokens: {data.tokens}\nUPI: <code>{data.upi_id}</code>")
-    return {"status": "success", "message": "Withdrawal request sent successfully!"}
+    host_user_id = host.get(
+        "user_id"
+    )
 
-@app.post("/api/update-profile-photo")
-async def update_profile_photo(user_id: int = Form(...), avatar: UploadFile = File(...)):
-    upload_dir = "static/uploads"
-    os.makedirs(upload_dir, exist_ok=True)
-    file_path = os.path.join(upload_dir, avatar.filename)
-    with open(file_path, "wb") as buffer:
-        buffer.write(await avatar.read())
-    
-    avatar_url = f"https://vynora-bot.onrender.com/static/uploads/{avatar.filename}"
-    users_col.update_one({"user_id": int(user_id)}, {"$set": {"avatar": avatar_url}}, upsert=True)
-    hosts_col.update_one({"user_id": int(user_id)}, {"$set": {"img": avatar_url}}, upsert=True)
-    return {"status": "success", "avatar_url": avatar_url}
+    if not host_user_id:
 
-@app.post("/api/send-gift")
-def send_gift(data: GiftModel):
-    user = users_col.find_one({"user_id": int(data.user_id)})
-    if not user or user.get("tokens", 0) < data.gift_cost:
-        return {"status": "error", "message": "Not enough tokens"}
+        return False
 
-    users_col.update_one({"user_id": int(data.user_id)}, {"$inc": {"tokens": -data.gift_cost}})
-    clean_h = str(data.host_id).replace("h_", "").replace("host_", "")
-    host = hosts_col.find_one({
-        "$or": [
-            {"id": data.host_id},
-            {"_id": f"host_{clean_h}"},
-            {"user_id": int(clean_h) if clean_h.isdigit() else 0}
-        ]
+    token_cost = safe_float(
+        booking.get(
+            "token_cost",
+            0
+        )
+    )
+
+    host_earning = calculate_host_earning(
+        token_cost
+    )
+
+    if host_earning <= 0:
+
+        return False
+
+    # --------------------------------------------------------
+    # Atomic earning protection
+    # --------------------------------------------------------
+
+    result = bookings_col.update_one(
+        {
+            "_id":
+                booking["_id"],
+
+            "earnings_credited":
+                False
+        },
+        {
+            "$set": {
+                "earnings_credited":
+                    True,
+
+                "host_earning":
+                    host_earning,
+
+                "platform_fee":
+                    round(
+                        token_cost
+                        - host_earning,
+                        2
+                    ),
+
+                "earning_credited_at":
+                    now_ts()
+            }
+        }
+    )
+
+    if result.modified_count != 1:
+
+        return False
+
+    users_col.update_one(
+        {
+            "user_id":
+                safe_int(
+                    host_user_id
+                )
+        },
+        {
+            "$inc": {
+                "tokens":
+                    host_earning
+            }
+        }
+    )
+
+    send_telegram_message(
+        int(host_user_id),
+        (
+            "💰 <b>Call Earning Added!</b>\n\n"
+            f"💵 Booking Value: <b>{token_cost}</b>\n"
+            f"🏦 Platform Fee: <b>"
+            f"{round(token_cost - host_earning, 2)}"
+            f"</b>\n"
+            f"👩‍💼 Your Earning: <b>"
+            f"{host_earning}"
+            f"</b>\n\n"
+            "✅ Amount added to your wallet."
+        )
+    )
+
+    return True
+
+
+# ============================================================
+# 🤖 TELEGRAM WEBHOOK
+# ============================================================
+
+@app.post("/telegram/webhook")
+async def telegram_webhook(
+    update: dict
+):
+
+    try:
+
+        # ----------------------------------------------------
+        # Callback Query
+        # ----------------------------------------------------
+
+        callback_query = update.get(
+            "callback_query"
+        )
+
+        if callback_query:
+
+            callback_id = callback_query.get(
+                "id"
+            )
+
+            answer_callback_query(
+                callback_id
+            )
+
+            callback_data = (
+                callback_query
+                .get("data", "")
+            )
+
+            from_user = (
+                callback_query
+                .get("from", {})
+            )
+
+            telegram_user_id = safe_int(
+                from_user.get("id")
+            )
+
+            # -----------------------------------------------
+            # ACCEPT
+            # -----------------------------------------------
+
+            if callback_data.startswith(
+                "accept_bk_"
+            ):
+
+                booking_id = (
+                    callback_data
+                    .replace(
+                        "accept_bk_",
+                        "",
+                        1
+                    )
+                )
+
+                booking = get_booking(
+                    booking_id
+                )
+
+                if not booking:
+
+                    send_telegram_message(
+                        telegram_user_id,
+                        "❌ Booking not found."
+                    )
+
+                    return {
+                        "ok": True
+                    }
+
+                host = get_host(
+                    booking.get("host_id")
+                )
+
+                # Verify Telegram user is this host
+                if not host or safe_int(
+                    host.get("user_id")
+                ) != telegram_user_id:
+
+                    send_telegram_message(
+                        telegram_user_id,
+                        "🔐 You are not authorized for this booking."
+                    )
+
+                    return {
+                        "ok": True
+                    }
+
+                result = approve_booking(
+                    booking
+                )
+
+                send_telegram_message(
+                    telegram_user_id,
+                    (
+                        "✅ <b>Call Accepted</b>\n\n"
+                        "📞 User has been notified.\n"
+                        "⏱️ Timer will start when "
+                        "both participants join."
+                    )
+                )
+
+                return {
+                    "ok": True,
+                    "result": result
+                }
+
+            # -----------------------------------------------
+            # REJECT
+            # -----------------------------------------------
+
+            if callback_data.startswith(
+                "reject_bk_"
+            ):
+
+                booking_id = (
+                    callback_data
+                    .replace(
+                        "reject_bk_",
+                        "",
+                        1
+                    )
+                )
+
+                booking = get_booking(
+                    booking_id
+                )
+
+                if not booking:
+
+                    send_telegram_message(
+                        telegram_user_id,
+                        "❌ Booking not found."
+                    )
+
+                    return {
+                        "ok": True
+                    }
+
+                host = get_host(
+                    booking.get("host_id")
+                )
+
+                if not host or safe_int(
+                    host.get("user_id")
+                ) != telegram_user_id:
+
+                    send_telegram_message(
+                        telegram_user_id,
+                        "🔐 You are not authorized."
+                    )
+
+                    return {
+                        "ok": True
+                    }
+
+                result = reject_booking(
+                    booking
+                )
+
+                send_telegram_message(
+                    telegram_user_id,
+                    "❌ Booking rejected successfully."
+                )
+
+                return {
+                    "ok": True,
+                    "result": result
+                }
+
+            return {
+                "ok": True
+            }
+
+        # ----------------------------------------------------
+        # Normal message
+        # ----------------------------------------------------
+
+        message = update.get(
+            "message"
+        )
+
+        if not message:
+
+            return {
+                "ok": True
+            }
+
+        chat = message.get(
+            "chat",
+            {}
+        )
+
+        chat_id = safe_int(
+            chat.get("id")
+        )
+
+        text = (
+            message.get(
+                "text",
+                ""
+            )
+            .strip()
+        )
+
+        if text == "/start":
+
+            send_telegram_message(
+                chat_id,
+                (
+                    "🚀 <b>Welcome to Vynora Live!</b>\n\n"
+                    "📞 Private 1v1 Calls\n"
+                    "💰 Host Earnings\n"
+                    "🎁 Gifts\n"
+                    "💬 Private Chat\n\n"
+                    "✨ Your Vynora Live system is ready!"
+                )
+            )
+
+        elif text == "/help":
+
+            send_telegram_message(
+                chat_id,
+                (
+                    "📚 <b>Vynora Live Help</b>\n\n"
+                    "📞 Accept calls from booking notifications.\n"
+                    "⏱️ Timer starts when both users join.\n"
+                    "💰 Earnings are automatically credited.\n"
+                    "💸 Withdrawal requests can be submitted from the app."
+                )
+            )
+
+        return {
+            "ok": True
+        }
+
+    except Exception as e:
+
+        logger.error(
+            "Webhook Error: %s",
+            e
+        )
+
+        logger.error(
+            traceback.format_exc()
+        )
+
+        return {
+            "ok": True,
+            "error": str(e)
+        }
+
+
+# ============================================================
+# 🧹 EXPIRED SESSION CLEANUP
+# ============================================================
+
+def cleanup_expired_sessions():
+    """
+    Can be called periodically.
+
+    This function checks active sessions and closes
+    sessions whose exact duration has finished.
+    """
+
+    current_time = now_ts()
+
+    active_bookings = bookings_col.find({
+        "session_status":
+            "active",
+        "session_started_at":
+            {
+                "$ne": None
+            }
     })
-    if host and "user_id" in host:
-        users_col.update_one({"user_id": int(host["user_id"])}, {"$inc": {"earnings": data.gift_cost}}, upsert=True)
 
-    chats_col.insert_one({"channel": data.channel, "sender": data.sender_name, "text": f"sent gift {data.gift_name} (🪙 {data.gift_cost})", "type": "gift", "time": time.time()})
-    return {"status": "success"}
+    for booking in active_bookings:
 
-@app.post("/api/send-chat")
-def send_chat(data: ChatModel):
-    chats_col.insert_one({"channel": data.channel, "sender": data.sender, "text": data.text, "type": data.type, "time": time.time()})
-    return {"status": "success"}
+        duration_secs = (
+            safe_int(
+                booking.get(
+                    "duration_mins",
+                    DEFAULT_DURATION_MINS
+                )
+            ) * 60
+        )
 
-@app.get("/api/get-chat/{channel}")
-def get_chat(channel: str):
-    messages = list(chats_col.find({"channel": channel}, {"_id": 0}).sort("time", 1).limit(50))
-    return {"messages": messages}
+        started_at = safe_float(
+            booking.get(
+                "session_started_at",
+                0
+            )
+        )
 
-@app.post("/telegram-webhook")
-async def telegram_webhook(req: Request):
-    body = await req.json()
-    if "message" in body:
-        msg = body["message"]
-        chat_id = msg["chat"]["id"]
-        user_id = msg["from"]["id"]
-        text = msg.get("text", "").strip()
+        if (
+            started_at > 0
+            and current_time
+            >= started_at
+            + duration_secs
+        ):
 
-        if text.startswith("/ban "):
-            try:
-                target_id = int(text.replace("/ban ", "").strip())
-                users_col.update_one({"user_id": target_id}, {"$set": {"is_banned": True}}, upsert=True)
-                send_telegram_message(chat_id, f"🚫 User <code>{target_id}</code> has been banned successfully.")
-            except Exception as e:
-                send_telegram_message(chat_id, "❌ Error. Format: /ban <user_id>")
-            return {"ok": True}
+            bookings_col.update_one(
+                {
+                    "_id":
+                        booking["_id"],
 
-        elif text.startswith("/unban "):
-            try:
-                target_id = int(text.replace("/unban ", "").strip())
-                users_col.update_one({"user_id": target_id}, {"$set": {"is_banned": False}}, upsert=True)
-                send_telegram_message(chat_id, f"✅ User <code>{target_id}</code> has been unbanned.")
-            except Exception as e:
-                send_telegram_message(chat_id, "❌ Error. Format: /unban <user_id>")
-            return {"ok": True}
+                    "session_status":
+                        "active"
+                },
+                {
+                    "$set": {
+                        "session_status":
+                            "ended",
 
-        elif text.startswith("/addtokens "):
-            try:
-                parts = text.replace("/addtokens ", "").strip().split()
-                target_id = int(parts[0])
-                amt = int(parts[1])
-                users_col.update_one({"user_id": target_id}, {"$inc": {"tokens": amt}}, upsert=True)
-                send_telegram_message(chat_id, f"🪙 Added {amt} tokens to User <code>{target_id}</code>.")
-                send_telegram_message(target_id, f"🎉 Admin added +{amt} Tokens to your wallet!")
-            except Exception as e:
-                send_telegram_message(chat_id, "❌ Error. Format: /addtokens <user_id> <amount>")
-            return {"ok": True}
+                        "status":
+                            "completed",
 
-        elif text.startswith("/cuttokens "):
-            try:
-                parts = text.replace("/cuttokens ", "").strip().split()
-                target_id = int(parts[0])
-                amt = int(parts[1])
-                users_col.update_one({"user_id": target_id}, {"$inc": {"tokens": -amt}}, upsert=True)
-                send_telegram_message(chat_id, f"✂️ Cut {amt} tokens from User <code>{target_id}</code>.")
-                send_telegram_message(target_id, f"⚠️ Admin deducted {amt} Tokens from your wallet.")
-            except Exception as e:
-                send_telegram_message(chat_id, "❌ Error. Format: /cuttokens <user_id> <amount>")
-            return {"ok": True}
+                        "session_ended_at":
+                            current_time,
 
-        elif text.startswith("/userinfo "):
-            try:
-                target_id = int(text.replace("/userinfo ", "").strip())
-                user = users_col.find_one({"user_id": target_id})
-                host = hosts_col.find_one({"user_id": target_id})
-                if user:
-                    msg = (
-                        f"👤 <b>User Data & Info:</b>\n\n"
-                        f"🆔 ID: <code>{target_id}</code>\n"
-                        f"🪙 Tokens: {user.get('tokens', 0)}\n"
-                        f"💰 Earnings: {user.get('earnings', 0)}\n"
-                        f"🚫 Banned: {user.get('is_banned', False)}\n"
-                        f"📹 Host Status: {host.get('status', 'None') if host else 'Not a Host'}"
-                    )
-                else:
-                    msg = f"❌ User ID <code>{target_id}</code> database mein nahi mila!"
-                send_telegram_message(chat_id, msg)
-            except Exception as e:
-                send_telegram_message(chat_id, "❌ Format: /userinfo <user_id>")
-            return {"ok": True}
+                        "last_updated_at":
+                            current_time
+                    }
+                }
+            )
 
-        elif text.startswith("/hostinfo "):
-            try:
-                target_id = int(text.replace("/hostinfo ", "").strip())
-                host = hosts_col.find_one({
-                    "$or": [
-                        {"user_id": target_id},
-                        {"id": str(target_id)},
-                        {"id": f"h_{target_id}"},
-                        {"_id": f"host_{target_id}"}
-                    ]
-                })
-                user = users_col.find_one({"user_id": target_id})
-                if host:
-                    raw_earnings = user.get("earnings", 0) if user else 0
-                    net_payout = int(raw_earnings * 0.7)
-                    msg = (
-                        f"📹 <b>Host Profile & Status Info:</b>\n\n"
-                        f"🆔 ID: <code>{target_id}</code>\n"
-                        f"👤 Name: {host.get('name', 'N/A')}\n"
-                        f"📌 Status: <b>{str(host.get('status', 'pending')).upper()}</b>\n"
-                        f"🟢 Live Online: {host.get('is_online', False)}\n"
-                        f"🪙 Call Rate: {host.get('rate', 50)} Tokens/min\n"
-                        f"💰 Total Earnings: {raw_earnings} Tokens\n"
-                        f"💸 Net Payout (70%): ₹{net_payout}"
-                    )
-                else:
-                    msg = f"❌ Host ID <code>{target_id}</code> approved ya registered nahi mila!"
-                send_telegram_message(chat_id, msg)
-            except Exception as e:
-                send_telegram_message(chat_id, "❌ Format: /hostinfo <user_id>")
-            return {"ok": True}
+            # Credit earning exactly once
+            credit_host_earning(
+                booking
+            )
 
-        if text.startswith("/start"):
-            user = users_col.find_one({"user_id": int(user_id)})
-            if user and user.get("is_banned", False):
-                send_telegram_message(chat_id, "🚫 Your account has been suspended by the admin.")
-                return {"ok": True}
 
-            if not user:
-                users_col.insert_one({"user_id": int(user_id), "tokens": 0, "earnings": 0, "avatar": "", "is_banned": False})
-                send_telegram_message(GROUP_2_ID, f"👤 <b>New User Started Bot!</b>\nID: <code>{user_id}</code>")
-            webapp_url = "https://vynora-bot.onrender.com/static/index.html"
-            keyboard = {"inline_keyboard": [[{"text": "🚀 Open Vynora Live App", "web_app": {"url": webapp_url}}]]}
-            send_telegram_message(chat_id, "✨ <b>Welcome to Vynora Live 1v1!</b>", reply_markup=keyboard)
+# ============================================================
+# 📊 ADMIN BOOKINGS
+# ============================================================
 
-    elif "callback_query" in body:
-        callback = body["callback_query"]
-        data_str = callback["data"]
-        message_id = callback["message"]["message_id"]
-        chat_id = callback["message"]["chat"]["id"]
+@app.get("/api/admin/bookings")
+def admin_bookings():
 
-        if data_str.startswith("approve_host_"):
-            host_user_id = int(data_str.replace("approve_host_", ""))
-            hosts_col.update_one({"user_id": host_user_id}, {"$set": {"status": "approved", "is_online": True}})
-            send_telegram_message(host_user_id, "🎉 <b>Congratulations!</b> Your host application has been approved by the admin.")
-            send_telegram_message(GROUP_3_ID, f"✅ <b>Host Approved!</b> Host ID: <code>{host_user_id}</code> is now active.")
-            requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": "✅ Host Approved Successfully"})
+    bookings = list(
+        bookings_col.find()
+        .sort(
+            "created_at",
+            -1
+        )
+        .limit(500)
+    )
 
-        elif data_str.startswith("reject_host_"):
-            host_user_id = int(data_str.replace("reject_host_", ""))
-            hosts_col.update_one({"user_id": host_user_id}, {"$set": {"status": "rejected"}})
-            send_telegram_message(host_user_id, "❌ Your host application was rejected by the admin.")
-            requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": "❌ Host Application Rejected"})
+    return {
+        "status":
+            "success",
 
-        elif data_str.startswith("approve_rc_"):
-            recharge_id = data_str.replace("approve_rc_", "")
-            rc = recharges_col.find_one({"recharge_id": recharge_id})
-            if rc and rc["status"] == "pending":
-                recharges_col.update_one({"recharge_id": recharge_id}, {"$set": {"status": "approved"}})
-                u_id = int(rc["user_id"])
-                tokens = rc["tokens_expected"]
-                users_col.update_one({"user_id": u_id}, {"$inc": {"tokens": tokens}}, upsert=True)
-                send_telegram_message(u_id, f"🎉 <b>Recharge Approved!</b> +{tokens} Tokens added.")
-                send_telegram_message(GROUP_3_ID, f"💳 <b>Recharge Approved & Verified!</b>\nUser ID: <code>{u_id}</code>\nAmount: ₹{rc.get('amount_inr')}\nTokens: +{tokens}\nUTR: <code>{rc.get('utr_number')}</code>")
-                requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": "✅ Recharge Approved Successfully"})
+        "bookings":
+            serialize_many(
+                bookings
+            )
+    }
 
-        elif data_str.startswith("reject_rc_"):
-            recharge_id = data_str.replace("reject_rc_", "")
-            recharges_col.update_one({"recharge_id": recharge_id}, {"$set": {"status": "rejected"}})
-            requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": "❌ Recharge Rejected"})
 
-        elif data_str.startswith("accept_bk_"):
-            booking_id = data_str.replace("accept_bk_", "")
-            booking = bookings_col.find_one({"booking_id": booking_id})
-            if booking and booking.get("status") == "pending":
-                bookings_col.update_one({"booking_id": booking_id}, {"$set": {"status": "approved"}})
-                h_val = str(booking["host_id"])
-                clean_h = h_val.replace("h_", "").replace("host_", "")
-                host = hosts_col.find_one({
-                    "$or": [
-                        {"id": h_val},
-                        {"_id": f"host_{clean_h}"},
-                        {"user_id": int(clean_h) if clean_h.isdigit() else 0}
-                    ]
-                })
-                if host and "user_id" in host:
-                    users_col.update_one({"user_id": int(host["user_id"])}, {"$inc": {"earnings": booking["token_cost"]}}, upsert=True)
-                
-                webapp_url = "https://vynora-bot.onrender.com/static/index.html"
-                user_keyboard = {"inline_keyboard": [[{"text": "📞 Answer Call", "web_app": {"url": webapp_url}}]]}
-                send_telegram_message(int(booking["user_id"]), "📞 <b>Incoming Video Call!</b> Host accepted your booking. Tap below to pick up.", reply_markup=user_keyboard)
-                requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": "✅ Booking Accepted & Call Ready"})
+# ============================================================
+# 📊 ADMIN RECHARGES
+# ============================================================
 
-        elif data_str.startswith("reject_bk_"):
-            booking_id = data_str.replace("reject_bk_", "")
-            booking = bookings_col.find_one({"booking_id": booking_id})
-            if booking:
-                bookings_col.update_one({"booking_id": booking_id}, {"$set": {"status": "rejected"}})
-                users_col.update_one({"user_id": int(booking["user_id"])}, {"$inc": {"tokens": booking["token_cost"]}})
-                send_telegram_message(int(booking["user_id"]), f"❌ Booking rejected. {booking['token_cost']} tokens refunded.")
-                requests.post(f"{TELEGRAM_API_URL}/editMessageText", json={"chat_id": chat_id, "message_id": message_id, "text": "❌ Booking Rejected"})
+@app.get("/api/admin/recharges")
+def admin_recharges():
 
-    return {"ok": True}
+    recharges = list(
+        recharges_col.find()
+        .sort(
+            "created_at",
+            -1
+        )
+        .limit(500)
+    )
+
+    return {
+        "status":
+            "success",
+
+        "recharges":
+            serialize_many(
+                recharges
+            )
+    }
+
+
+# ============================================================
+# 📊 ADMIN WITHDRAWALS
+# ============================================================
+
+@app.get("/api/admin/withdrawals")
+def admin_withdrawals():
+
+    withdrawals = list(
+        withdrawals_col.find()
+        .sort(
+            "created_at",
+            -1
+        )
+        .limit(500)
+    )
+
+    return {
+        "status":
+            "success",
+
+        "withdrawals":
+            serialize_many(
+                withdrawals
+            )
+    }
+
+
+# ============================================================
+# 📁 STATIC FILES
+# ============================================================
+
+if os.path.exists(
+    "static"
+):
+
+    app.mount(
+        "/static",
+        StaticFiles(
+            directory="static"
+        ),
+        name="static"
+    )
+
+if os.path.exists(
+    UPLOAD_DIR
+):
+
+    app.mount(
+        "/uploads",
+        StaticFiles(
+            directory=UPLOAD_DIR
+        ),
+        name="uploads"
+    )
+
+
+# ============================================================
+# ▶️ LOCAL RUN
+# ============================================================
+
+if __name__ == "__main__":
+
+    import uvicorn
+
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=PORT,
+        reload=False
+        )
