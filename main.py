@@ -73,6 +73,7 @@ withdrawals_col = db["withdrawals"]
 chats_col = db["chats"]
 gifts_col = db["gifts"]
 live_col = db["public_lives"]
+settings_col = db["settings"]
 
 try:
     users_col.create_index("user_id", unique=True)
@@ -81,6 +82,7 @@ try:
     bookings_col.create_index([("user_id", 1), ("status", 1)])
     bookings_col.create_index([("host_id", 1), ("status", 1)])
     live_col.create_index("host_user_id", unique=True)
+    settings_col.create_index("key", unique=True)
 except Exception:
     pass
 
@@ -209,6 +211,14 @@ class LiveJoinModel(BaseModel):
     host_user_id: int
 
 
+class AnnouncementModel(BaseModel):
+    title: str = "📢 Vynora Live Announcement"
+    message: str
+    button_text: str = "Open"
+    action: str = ""
+    active: bool = True
+
+
 # ------------------------- Helpers ----------------------------
 
 def now() -> float:
@@ -273,7 +283,7 @@ def save_base64_image(data: str, prefix: str) -> str:
 
 def public_host_exists(host_id: int) -> bool:
     h = host_doc(host_id)
-    return bool(h and (h.get("verified", True) or h.get("is_host", True)))
+    return bool(h and h.get("is_host", True) and h.get("verified", False) and not h.get("banned", False))
 
 
 def ensure_user(user_id: int, name: str = ""):
@@ -382,6 +392,8 @@ def admin_help_text():
         "/announceusers MESSAGE — users को message\n"
         "/announcehosts MESSAGE — hosts को message\n"
         "/offer MESSAGE — सभी registered users को offer message\n"
+        "/announcement MESSAGE — app banner set + broadcast\n"
+        "/clearannouncement — app banner हटाएँ\n"
         "/approverecharge RECHARGE_ID — recharge approve\n"
         "/rejectrecharge RECHARGE_ID — recharge reject\n"
         "/stats — users/hosts/banned counts\n"
@@ -559,12 +571,26 @@ def admin_command(chat_id: int, text: str):
             telegram_send(chat_id, f"❌ Recharge rejected: {rid}")
         return
 
-    if cmd in {"/announce", "/offer", "/announceusers", "/announcehosts"}:
+    if cmd == "/clearannouncement":
+        settings_col.update_one({"key": "announcement"}, {"$set": {"active": False, "updated_at": now(), "updated_by": int(chat_id)}}, upsert=True)
+        telegram_send(chat_id, "✅ App announcement banner cleared.")
+        return
+
+    if cmd in {"/announcement", "/announce", "/offer", "/announceusers", "/announcehosts"}:
         message = text.split(None, 1)[1].strip() if len(text.split(None, 1)) > 1 else ""
         if not message:
             telegram_send(chat_id, f"Usage: {cmd} MESSAGE")
             return
-        prefix = "🎁 SPECIAL OFFER\n\n" if cmd == "/offer" else "📢 ANNOUNCEMENT\n\n"
+
+        if cmd == "/announcement":
+            settings_col.update_one({"key": "announcement"}, {"$set": {
+                "active": True, "title": "📢 Vynora Live Announcement", "message": message,
+                "button_text": "Open", "action": "", "updated_at": now(), "updated_by": int(chat_id)
+            }}, upsert=True)
+            prefix = "📢 VYNORA LIVE\n\n"
+        else:
+            prefix = "🎁 SPECIAL OFFER\n\n" if cmd == "/offer" else "📢 ANNOUNCEMENT\n\n"
+
         query = {"telegram_chat_id": {"$exists": True}}
         if cmd == "/announcehosts":
             query["is_host"] = True
@@ -575,12 +601,6 @@ def admin_command(chat_id: int, text: str):
             cid = d.get("telegram_chat_id")
             if cid is not None:
                 recipients.add(int(cid))
-        # Also include Telegram chats stored on host records if they exist.
-        if cmd == "/announcehosts":
-            for d in hosts_col.find({"is_host": True, "telegram_chat_id": {"$exists": True}}, {"telegram_chat_id": 1}):
-                cid = d.get("telegram_chat_id")
-                if cid is not None:
-                    recipients.add(int(cid))
         sent = failed = 0
         for cid in recipients:
             result = telegram_send(cid, prefix + message)
@@ -697,6 +717,9 @@ def get_user(user_id: int):
         "verified": bool(u.get("verified", False)),
         "approved": bool(u.get("approved", False)),
         "banned": bool(u.get("banned", False)),
+        "role": "admin" if is_admin(user_id) else ("verified_host" if u.get("is_host") and u.get("verified") else ("host" if u.get("is_host") else "user")),
+        "is_admin": is_admin(user_id),
+        "admin_display_name": "VYNORA ADMIN" if is_admin(user_id) else "",
         "host_total_calls": host_calls,
         "host_total_tokens": host_tokens,
     }
@@ -718,7 +741,54 @@ def update_profile_photo(data: dict):
 
 @APP.get("/api/config")
 def public_config():
-    return {"upi_id": UPI_ID, "upi_name": UPI_NAME, "recharge_plans": [{"amount": a, "tokens": t} for a, t in RECHARGE_PLANS.items()]}
+    return {
+        "upi_id": UPI_ID,
+        "upi_name": UPI_NAME,
+        "support": "https://t.me/VynoraSupport",
+        "recharge_plans": [{"amount": a, "tokens": t} for a, t in RECHARGE_PLANS.items()],
+        "private_durations": [1, 2, 5, 10, 15, 20, 30],
+        "admin_badge": "👑 VYNORA ADMIN",
+        "host_badge": "✓ VERIFIED HOST",
+    }
+
+
+@APP.get("/api/announcement")
+def get_announcement():
+    doc = settings_col.find_one({"key": "announcement"}) or {}
+    return {
+        "active": bool(doc.get("active", False)),
+        "title": doc.get("title", "📢 Vynora Live Announcement"),
+        "message": doc.get("message", ""),
+        "button_text": doc.get("button_text", ""),
+        "action": doc.get("action", ""),
+        "updated_at": doc.get("updated_at"),
+    }
+
+
+@APP.post("/api/admin/announcement")
+def set_announcement(data: AnnouncementModel, request: Request):
+    # Admin authentication uses the authenticated Telegram user ID passed by the Mini App.
+    # For production, ADMIN_IDS must be configured in Render.
+    admin_id = request.headers.get("X-Telegram-User-Id") or request.query_params.get("admin_id")
+    if not admin_id or not is_admin(int(admin_id)):
+        raise HTTPException(403, "Admin only")
+    doc = {
+        "key": "announcement", "active": bool(data.active), "title": data.title[:80],
+        "message": data.message[:500], "button_text": data.button_text[:30],
+        "action": data.action[:300], "updated_at": now(), "updated_by": int(admin_id),
+    }
+    settings_col.update_one({"key": "announcement"}, {"$set": doc}, upsert=True)
+    return {"status": "success", **doc}
+
+
+@APP.get("/api/presence/{user_id}")
+def get_presence(user_id: int):
+    if is_admin(user_id):
+        return {"user_id": user_id, "role": "admin", "badge": "👑 VYNORA ADMIN", "display_name": "VYNORA ADMIN"}
+    h = host_doc(user_id)
+    if h and h.get("is_host") and h.get("verified"):
+        return {"user_id": user_id, "role": "verified_host", "badge": "✓ VERIFIED HOST", "display_name": h.get("name") or user_name(user_id)}
+    return {"user_id": user_id, "role": "user", "badge": "", "display_name": user_name(user_id)}
 
 
 @APP.get("/api/hosts")
@@ -1217,8 +1287,12 @@ def public_live_start(data: LiveStartModel):
     if int(data.host_user_id) < 0:
         raise HTTPException(403, "Demo host cannot start live")
     h = host_doc(data.host_user_id)
-    if not h or not h.get("verified", False):
-        raise HTTPException(404, "Host not registered")
+    if not h or not h.get("is_host"):
+        raise HTTPException(404, "Host account not found")
+    if not h.get("verified"):
+        raise HTTPException(403, "Only verified hosts can start Public Live")
+    if h.get("banned"):
+        raise HTTPException(403, "Host account is blocked")
     channel = f"host_live_{data.host_user_id}"
     doc = {
         "host_user_id": int(data.host_user_id),
