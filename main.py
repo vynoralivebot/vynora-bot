@@ -27,6 +27,8 @@ except Exception:
 # ============================================================
 
 APP = FastAPI(title="Vynora Live API", version="2.0")
+app = APP  # Render/uvicorn compatibility: main:app
+
 APP.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
