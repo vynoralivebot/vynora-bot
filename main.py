@@ -1363,11 +1363,4 @@ def schedule_booking(data: ScheduleBookingModel):
             "scheduled_end": scheduled_end,
             "schedule_confirmed": True,
             "scheduled_by_host_at": now(),
-            "start_notified": False,
-        }},
-
-
-
-
-
 
